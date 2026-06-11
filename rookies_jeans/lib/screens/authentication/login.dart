@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:rookies_jeans/screens/Dashboard/home_screen.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
 class Login extends StatefulWidget {
@@ -99,7 +100,11 @@ class _LoginState extends State<Login> {
       if (!mounted) return;
 
       if (!result.success) {
-        _showMessage(result.message ?? 'Login failed');
+        _showMessage(
+  result.customer != null
+      ? 'Welcome ${result.customer!.fullName}'
+      : 'Login successful',
+);
         if (kDebugMode) {
           debugPrint('UI LOGIN FAILED -> ${result.message}');
         }
@@ -110,11 +115,14 @@ class _LoginState extends State<Login> {
         debugPrint('UI LOGIN SUCCESS -> ${result.customer?.toJson()}');
       }
 
-      _showMessage(
-        result.customer != null
-            ? 'Welcome ${result.customer!.fullName}'
-            : 'Login successful',
-      );
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(
+    builder: (_) => const HomeScreen(),
+  ),
+);
     } catch (e) {
       if (!mounted) return;
       _showMessage('Something went wrong: $e');
@@ -169,11 +177,10 @@ class _LoginState extends State<Login> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 4),
-
                     Center(
                       child: Column(
-                        children: [
-                          const Text(
+                        children: const [
+                          Text(
                             "Welcome Back",
                             style: TextStyle(
                               fontSize: 30,
@@ -182,8 +189,8 @@ class _LoginState extends State<Login> {
                               letterSpacing: -0.5,
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          const Text(
+                          SizedBox(height: 8),
+                          Text(
                             "Sign in to continue to ROOKIES",
                             textAlign: TextAlign.center,
                             style: TextStyle(
@@ -195,9 +202,7 @@ class _LoginState extends State<Login> {
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 32),
-
                     const Text(
                       "Email",
                       style: TextStyle(
@@ -215,9 +220,7 @@ class _LoginState extends State<Login> {
                         icon: Icons.mail_outline_rounded,
                       ),
                     ),
-
                     const SizedBox(height: 18),
-
                     const Text(
                       "Password",
                       style: TextStyle(
@@ -248,9 +251,7 @@ class _LoginState extends State<Login> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 14),
-
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
@@ -268,9 +269,7 @@ class _LoginState extends State<Login> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 18),
-
                     SizedBox(
                       width: double.infinity,
                       height: 56,
@@ -304,9 +303,7 @@ class _LoginState extends State<Login> {
                               ),
                       ),
                     ),
-
                     const SizedBox(height: 22),
-
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -330,7 +327,6 @@ class _LoginState extends State<Login> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 6),
                   ],
                 ),

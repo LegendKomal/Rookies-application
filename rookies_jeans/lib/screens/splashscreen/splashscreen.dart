@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:rookies_jeans/screens/Dashboard/home_screen.dart';
 import 'package:rookies_jeans/screens/authentication/login.dart';
+import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -16,41 +18,47 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _scaleAnimation;
 
   @override
-  void initState() {
-    super.initState();
+void initState() {
+  super.initState();
 
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    );
+  _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 2),
+  );
 
-    _fadeAnimation = CurvedAnimation(
+  _fadeAnimation = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeIn,
+  );
+
+  _scaleAnimation = Tween<double>(
+    begin: 0.7,
+    end: 1.0,
+  ).animate(
+    CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeIn,
-    );
+      curve: Curves.easeOutBack,
+    ),
+  );
 
-    _scaleAnimation = Tween<double>(
-      begin: 0.7,
-      end: 1.0,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutBack,
-      ),
-    );
+  _controller.forward();
+  _checkLoginStatus();
+}
 
-    _controller.forward();
+Future<void> _checkLoginStatus() async {
+  await Future.delayed(const Duration(seconds: 3));
 
-    Timer(const Duration(seconds: 3), () {
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const Login(),
-        ),
-      );
-    });
-  }
+  final loggedIn = await ShopifyAuthService.instance.isLoggedIn();
+
+  if (!mounted) return;
+
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (_) => loggedIn ? const HomeScreen() : const Login(),
+    ),
+  );
+}
 
   @override
   void dispose() {

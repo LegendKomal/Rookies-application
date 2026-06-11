@@ -228,11 +228,26 @@ class ShopifyAuthService {
   }
 
   Future<bool> isLoggedIn() async {
-    final token = await _storage.read(key: _customerTokenKey);
-    final isLoggedIn = token != null && token.isNotEmpty;
-    _log('AUTH IS LOGGED IN -> $isLoggedIn');
-    return isLoggedIn;
+  final token = await _storage.read(key: _customerTokenKey);
+  final expiry = await _storage.read(key: _customerTokenExpiryKey);
+
+  if (token == null || token.isEmpty) {
+    _log('AUTH IS LOGGED IN -> false (no token)');
+    return false;
   }
+
+  if (expiry != null && expiry.isNotEmpty) {
+    final expiryDate = DateTime.tryParse(expiry);
+    if (expiryDate != null && DateTime.now().isAfter(expiryDate)) {
+      _log('AUTH IS LOGGED IN -> false (token expired)');
+      await logout();
+      return false;
+    }
+  }
+
+  _log('AUTH IS LOGGED IN -> true');
+  return true;
+}
 
   Future<void> logout() async {
     _log('AUTH LOGOUT START');
