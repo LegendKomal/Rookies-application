@@ -1,46 +1,44 @@
-class BannerModel {
-  final String desktopImageUrl;
-  final String mobileImageUrl;
-  final String heading;
-  final String subheading;
-  final String buttonText;
-  final String link;
+class HomeBanner {
+  final String id;
+  final String? imageUrl;
+  final String title;
+  final String subtitle;
+  final String? ctaLabel;
+  final String? ctaUrl;
 
-  const BannerModel({
-    required this.desktopImageUrl,
-    required this.mobileImageUrl,
-    required this.heading,
-    required this.subheading,
-    required this.buttonText,
-    required this.link,
+  const HomeBanner({
+    required this.id,
+    this.imageUrl,
+    required this.title,
+    required this.subtitle,
+    this.ctaLabel,
+    this.ctaUrl,
   });
 
-  factory BannerModel.fromJson(Map<String, dynamic> json) {
-    final fields = json['fields'] as List? ?? [];
+  factory HomeBanner.fromMetaobjectJson(Map<String, dynamic> json) {
+    final fields = (json['fields'] as List?) ?? [];
+    String title = '', subtitle = '', ctaLabel = '', ctaUrl = '';
+    String? imageUrl;
 
-    String valueOf(String key) {
-      final field = fields.cast<Map>().firstWhere(
-            (e) => e['key'] == key,
-            orElse: () => <String, dynamic>{},
-          );
-      return field['value'] as String? ?? '';
+    for (final f in fields) {
+      switch (f['key'] as String) {
+        case 'title':    title    = f['value'] as String? ?? ''; break;
+        case 'subtitle': subtitle = f['value'] as String? ?? ''; break;
+        case 'cta_label': ctaLabel = f['value'] as String? ?? ''; break;
+        case 'cta_url':  ctaUrl   = f['value'] as String? ?? ''; break;
+        case 'image':
+          imageUrl = f['reference']?['image']?['url'] as String?;
+          break;
+      }
     }
 
-    String imageOf(String key) {
-      final field = fields.cast<Map>().firstWhere(
-            (e) => e['key'] == key,
-            orElse: () => <String, dynamic>{},
-          );
-      return field['reference']?['image']?['url'] as String? ?? '';
-    }
-
-    return BannerModel(
-      desktopImageUrl: imageOf('image_desktop'),
-      mobileImageUrl: imageOf('image_mobile'),
-      heading: valueOf('heading'),
-      subheading: valueOf('subheading'),
-      buttonText: valueOf('button_text'),
-      link: valueOf('link'),
+    return HomeBanner(
+      id: json['id'] as String,
+      imageUrl: imageUrl,
+      title: title,
+      subtitle: subtitle,
+      ctaLabel: ctaLabel.isNotEmpty ? ctaLabel : null,
+      ctaUrl: ctaUrl.isNotEmpty ? ctaUrl : null,
     );
   }
 }

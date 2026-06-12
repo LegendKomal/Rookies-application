@@ -1,25 +1,28 @@
-class CollectionModel {
+class ShopifyCollection {
   final String id;
   final String title;
   final String handle;
-  final String description;
-  final String imageUrl;
+  final String? imageUrl;
+  final String label; // display label e.g. "CARGOS"
 
-  const CollectionModel({
+  const ShopifyCollection({
     required this.id,
     required this.title,
     required this.handle,
-    required this.description,
-    required this.imageUrl,
+    this.imageUrl,
+    required this.label,
   });
 
-  factory CollectionModel.fromJson(Map<String, dynamic> json) {
-    return CollectionModel(
-      id: json['id'] as String? ?? '',
-      title: json['title'] as String? ?? '',
-      handle: json['handle'] as String? ?? '',
-      description: json['description'] as String? ?? '',
-      imageUrl: json['image']?['url'] as String? ?? '',
+  factory ShopifyCollection.fromJson(
+    Map<String, dynamic> json, {
+    required String label,
+  }) {
+    return ShopifyCollection(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      handle: json['handle'] as String,
+      imageUrl: json['image']?['url'] as String?,
+      label: label,
     );
   }
 }
