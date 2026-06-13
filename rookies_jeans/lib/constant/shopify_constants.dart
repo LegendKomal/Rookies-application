@@ -23,7 +23,7 @@ class ShopifyConstants {
   static const String hotDealsHandle         = 'hot-deals';
   static const String summerEditHandle       = 'summer-edit';
   static const String trendingNowHandle      = 'trending-now';
-  static const String balloonCargosHandle    = 'balloonfit-cargo';
+  static const String balloonCargosHandle    = 'BALLOON FIT CARGO';
   static const String oversizedShirtsHandle  = 'oversized-shirts';
 
   static const List<Map<String, String>> exploreCategories = [
@@ -42,6 +42,7 @@ class ShopifyConstants {
     {'handle': shortsHandle,   'label': 'Shorts'},
     {'handle': jeansHandle,    'label': 'Jeans'},
     {'handle': shirtsHandle,   'label': 'Shirts'},
+    {'handle': balloonCargosHandle, 'label': 'Balloon Fit Pants'},
   ];
 
   static const List<Map<String, String>> ourCollectionTiles = [
