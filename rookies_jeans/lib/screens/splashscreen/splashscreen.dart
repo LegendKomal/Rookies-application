@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:rookies_jeans/screens/Dashboard/home_screen.dart';
-import 'package:rookies_jeans/screens/authentication/login.dart';
+import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -18,47 +17,42 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _scaleAnimation;
 
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 2),
-  );
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
 
-  _fadeAnimation = CurvedAnimation(
-    parent: _controller,
-    curve: Curves.easeIn,
-  );
-
-  _scaleAnimation = Tween<double>(
-    begin: 0.7,
-    end: 1.0,
-  ).animate(
-    CurvedAnimation(
+    _fadeAnimation = CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeOutBack,
-    ),
-  );
+      curve: Curves.easeIn,
+    );
 
-  _controller.forward();
-  _checkLoginStatus();
-}
+    _scaleAnimation = Tween<double>(
+      begin: 0.7,
+      end: 1.0,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOutBack,
+      ),
+    );
 
-Future<void> _checkLoginStatus() async {
-  await Future.delayed(const Duration(seconds: 3));
+    _controller.forward();
+    _checkLoginStatus();
+  }
 
-  final loggedIn = await ShopifyAuthService.instance.isLoggedIn();
+  Future<void> _checkLoginStatus() async {
+    await Future.delayed(const Duration(seconds: 3));
 
-  if (!mounted) return;
+    final loggedIn = await ShopifyAuthService.instance.isLoggedIn();
 
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (_) => loggedIn ? const HomeScreen() : const Login(),
-    ),
-  );
-}
+    if (!mounted) return;
+
+    context.go(loggedIn ? '/home' : '/login');
+  }
 
   @override
   void dispose() {

@@ -7,7 +7,7 @@ class ShopifyProduct {
   final String currencyCode;
   final List<String> imageUrls;
   final List<ProductVariant> variants;
-  final List<ProductOption> options;  // ← new
+  final List<ProductOption> options;
 
   const ShopifyProduct({
     required this.id,
@@ -18,7 +18,7 @@ class ShopifyProduct {
     required this.currencyCode,
     required this.imageUrls,
     required this.variants,
-    required this.options,            // ← new
+    required this.options,
   });
 
   bool get isOnSale => compareAtPrice != null && compareAtPrice! > price;
@@ -36,8 +36,6 @@ class ShopifyProduct {
 
   String? get primaryImageUrl => imageUrls.isNotEmpty ? imageUrls.first : null;
 
-  /// Returns unique color hex strings from the color option swatches
-  /// e.g. ["#4AADAA", "#6B4226", "#BFA882"]
   List<String> get colorHexCodes {
     for (final opt in options) {
       if (opt.name.toUpperCase() == 'COLOR' ||
@@ -89,7 +87,6 @@ class ShopifyProduct {
   }
 }
 
-// ── ProductVariant ────────────────────────────────────────────────────────────
 class ProductVariant {
   final String id;
   final String title;
@@ -123,7 +120,6 @@ class SelectedOption {
       );
 }
 
-// ── ProductOption ─────────────────────────────────────────────────────────────
 class ProductOption {
   final String name;
   final List<String> values;
@@ -148,12 +144,11 @@ class ProductOption {
 
 class OptionValue {
   final String name;
-  final String? swatchColor; // hex string like "#4AADAA" or null
+  final String? swatchColor;
 
   const OptionValue({required this.name, this.swatchColor});
 
   factory OptionValue.fromJson(Map<String, dynamic> json) {
-    // Shopify returns swatch.color as a CSS hex string e.g. "#4aadaa"
     final rawColor = json['swatch']?['color'] as String?;
     return OptionValue(
       name: json['name'] as String,

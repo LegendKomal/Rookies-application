@@ -1,15 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/banner_model.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
-import 'package:rookies_jeans/screens/Navigation/bottom_navigation.dart';
+import 'package:rookies_jeans/screens/cart/cart.dart';
+import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/screens/products/products.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/screens/authentication/login.dart';
+import 'package:video_player/video_player.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,17 +26,132 @@ class _HomeScreenState extends State<HomeScreen> {
   static const Color bgColor      = Color(ShopifyConstants.bgColorHex);
   static const Color cardColor    = Color(ShopifyConstants.cardColorHex);
   static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
-  static const Color borderColor  = Color(ShopifyConstants.borderColorHex);
+  static const Color borderColor  = Color.fromARGB(255, 80, 57, 57);
 
-  int _navIndex = 0;
+  final Set<String> _cartProductIds = {};
 
   bool _isLoading = true;
-  final List<String> _bannerAssets = [
-    'assets/banner1.jpg',
-    'assets/banner2.jpg',
-    'assets/banner3.png',
-    'assets/banner4.png',
-  ];
+
+  late VideoPlayerController _videoCtrl;
+  bool _videoReady = false;
+
+  final ScrollController _scrollCtrl = ScrollController();
+  final List<_SectionAnchor> _sectionAnchors = [];
+  bool _isSnapping = false;
+
+  void _registerAnchor(_SectionAnchor anchor) {
+    if (!_sectionAnchors.any((a) => a.key == anchor.key)) {
+      _sectionAnchors.add(anchor);
+    }
+  }
+
+  List<double> _collectSectionOffsets() {
+    final offsets = <double>[];
+    for (final anchor in _sectionAnchors) {
+      final ctx = anchor.key.currentContext;
+      if (ctx == null) continue;
+      final box = ctx.findRenderObject() as RenderBox?;
+      if (box == null || !box.attached) continue;
+      final scrollBox = _scrollableContext?.findRenderObject() as RenderBox?;
+      if (scrollBox == null) continue;
+      final position = box.localToGlobal(Offset.zero, ancestor: scrollBox);
+      offsets.add(_scrollCtrl.offset + position.dy);
+    }
+    offsets.sort();
+    return offsets;
+  }
+
+  BuildContext? _scrollableContext;
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollEndNotification && !_isSnapping) {
+      _snapToNearestSection();
+    }
+    return false;
+  }
+
+  Future<void> _snapToNearestSection() async {
+    final offsets = _collectSectionOffsets();
+    if (offsets.isEmpty) return;
+
+    final current = _scrollCtrl.offset;
+    final maxScroll = _scrollCtrl.position.maxScrollExtent;
+
+    double nearest = offsets.first;
+    double bestDelta = (offsets.first - current).abs();
+    for (final o in offsets) {
+      final delta = (o - current).abs();
+      if (delta < bestDelta) {
+        bestDelta = delta;
+        nearest = o;
+      }
+    }
+
+    final target = nearest.clamp(0.0, maxScroll);
+
+    if ((target - current).abs() < 1.0) return;
+
+    _isSnapping = true;
+    try {
+      await _scrollCtrl.animateTo(
+        target,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+    } finally {
+      _isSnapping = false;
+    }
+  }
+
+  void _openProductDetail(ShopifyProduct product) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductDetailPage(
+          handle: product.handle,
+          title: product.title,
+          heroImageUrl: product.primaryImageUrl,
+        ),
+      ),
+    );
+  }
+
+  void _goToCart() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CartScreen(),
+      ),
+    );
+  }
+
+  Future<void> _addToCart(ShopifyProduct product) async {
+    try {
+      if (!mounted) return;
+      setState(() {
+        _cartProductIds.add(product.id);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${product.title} added to cart'),
+          duration: const Duration(seconds: 2),
+          action: SnackBarAction(
+            label: 'GO TO CART',
+            onPressed: _goToCart,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to add product to cart'),
+        ),
+      );
+    }
+  }
+
   List<ShopifyCollection> _latestDrop    = [];
   List<ShopifyCollection> _categories    = [];
   List<ShopifyCollection> _ourCollection = [];
@@ -50,62 +168,54 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _bannerCtrl = PageController();
+    _videoCtrl = VideoPlayerController.asset('assets/rookies_video.mp4')
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() => _videoReady = true);
+        _videoCtrl.setLooping(true);
+        _videoCtrl.setVolume(0);
+        _videoCtrl.play();
+      });
     _fetchAll();
   }
 
   @override
   void dispose() {
-    _bannerCtrl.dispose();
-    _bannerTimer?.cancel();
+    _videoCtrl.dispose();
     _searchCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchAll() async {
+  Future<void> _fetchAll({bool forceRefresh = false}) async {
     if (mounted) setState(() => _isLoading = true);
+
+    if (forceRefresh) {
+      ShopifyStorefrontService.instance.clearCache();
+    }
 
     final results = await Future.wait([
       ShopifyStorefrontService.instance.getLatestDropCollections(),
-      ShopifyStorefrontService.instance.getLatestDropCollections(),
       ShopifyStorefrontService.instance.getOurCollectionTiles(),
-      ShopifyStorefrontService.instance
-          .getOversizedShirts(first: ShopifyConstants.oversizedShirtsCount),
-      ShopifyStorefrontService.instance
-          .getHotDeals(first: ShopifyConstants.hotDealsCount),
+      ShopifyStorefrontService.instance.getOversizedShirts(
+          first: ShopifyConstants.oversizedShirtsCount),
+      ShopifyStorefrontService.instance.getHotDeals(
+          first: ShopifyConstants.hotDealsCount),
+      ShopifyStorefrontService.instance.getBalloonBanner(),
     ]);
-
-    final balloon =
-        await ShopifyStorefrontService.instance.getBalloonBanner();
 
     if (!mounted) return;
     setState(() {
       _latestDrop      = results[0] as List<ShopifyCollection>;
-      _categories      = results[1] as List<ShopifyCollection>;
-      _ourCollection   = results[2] as List<ShopifyCollection>;
-      _oversizedShirts = results[3] as List<ShopifyProduct>;
-      _hotDeals        = results[4] as List<ShopifyProduct>;
-      _balloonBanner   = balloon;
+      _categories      = results[0] as List<ShopifyCollection>;
+      _ourCollection   = results[1] as List<ShopifyCollection>;
+      _oversizedShirts = results[2] as List<ShopifyProduct>;
+      _hotDeals        = results[3] as List<ShopifyProduct>;
+      _balloonBanner   = results[4] as BalloonBannerData?;
       _isLoading       = false;
     });
-    _startAutoPlay();
   }
 
-  void _startAutoPlay() {
-    _bannerTimer?.cancel();
-    if (_bannerAssets.length <= 1) return;
-    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!mounted) return;
-      final next = (_currentBanner + 1) % _bannerAssets.length;
-      _bannerCtrl.animateToPage(
-        next,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
-    });
-  }
-
-  /// Navigate to [ProductsPage] for the given [collection].
   void _openCollection(ShopifyCollection collection) {
     Navigator.push(
       context,
@@ -118,160 +228,199 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _logout() async {
     await ShopifyAuthService.instance.logout();
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const Login()),
-    );
+    context.go('/home');
   }
-
-  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    _sectionAnchors.clear();
+
     return Scaffold(
       backgroundColor: bgColor,
-      bottomNavigationBar: RookiesBottomNavBar(
-        currentIndex: _navIndex,
-        onTap: (i) => setState(() => _navIndex = i),
-      ),
       body: SafeArea(
-        child: Column(
-          children: [
-            _topBar(),
-            Expanded(
-              child: _isLoading
-                  ? _shimmer()
-                  : RefreshIndicator(
+        child: _isLoading
+            ? _shimmer()
+            : Builder(
+                builder: (scrollableContext) {
+                  _scrollableContext = scrollableContext;
+                  return NotificationListener<ScrollNotification>(
+                    onNotification: _handleScrollNotification,
+                    child: RefreshIndicator(
                       color: primary,
                       onRefresh: _fetchAll,
                       child: CustomScrollView(
+                        controller: _scrollCtrl,
+                        physics: const ClampingScrollPhysics(),
                         slivers: [
-                          _sliverSearch(),
-                          _sliverBanner(),
-                          _sliverHead('THE LATEST DROP'),
-                          _sliverLatestDrop(),
-                          _sliverHead('EXPLORE CATEGORIES'),
-                          _sliverCategoriesGrid(),
-                          _sliverBalloonBanner(),
-                          _sliverHead('OUR COLLECTION'),
-                          _sliverOurCollection(),
-                          _sliverHead('OVERSIZED SHIRTS'),
-                          _sliverOversizedShirts(),
-                          if (_hotDeals.isNotEmpty) ...[
-                            _sliverHead('HOT DEALS'),
-                            _sliverHotDeals(),
-                          ],
-                          const SliverToBoxAdapter(
-                              child: SizedBox(height: 40)),
+                          _snapSection(
+                            id: 'banner',
+                            child: _sliverBannerWithOverlayBar(),
+                          ),
+                          _snapSection(
+                            id: 'bestseller_sales',
+                            child: _sliverBestsellerSalesBlocks(),
+                          ),
+                          _snapSection(
+                            id: 'categories',
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _sliverHeadAsBox('EXPLORE CATEGORIES'),
+                                _categoriesGridAsBox(),
+                              ],
+                            ),
+                          ),
+                          _snapSection(
+                            id: 'balloon_banner',
+                            child: _balloonBannerAsBox(),
+                          ),
+                          _snapSection(
+                            id: 'oversized_shirts',
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _sliverHeadAsBox('OVERSIZED SHIRTS'),
+                                _oversizedShirtsAsBox(),
+                              ],
+                            ),
+                          ),
+                          _snapSection(
+                            id: 'shop_by_fit',
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _sliverHeadAsBox('SHOP BY FIT'),
+                                _shopByFitAsBox(),
+                              ],
+                            ),
+                          ),
+                          const SliverToBoxAdapter(child: SizedBox(height: 40)),
                         ],
                       ),
                     ),
-            ),
-          ],
-        ),
+                  );
+                },
+              ),
       ),
     );
   }
 
-  // ── Top bar ───────────────────────────────────────────────────────────────
+  Widget _snapSection({required String id, required Widget child}) {
+    final key = GlobalKey(debugLabel: id);
+    _registerAnchor(_SectionAnchor(id: id, key: key));
+    return SliverToBoxAdapter(
+      child: KeyedSubtree(
+        key: key,
+        child: child,
+      ),
+    );
+  }
 
-  Widget _topBar() => Container(
-        color: cardColor,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Row(
+  double _fullScreenBannerHeight(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    return mq.size.height - mq.padding.top - mq.padding.bottom;
+  }
+
+  Widget _sliverBannerWithOverlayBar() => SizedBox(
+        height: _fullScreenBannerHeight(context),
+        width: double.infinity,
+        child: Stack(
           children: [
-            Image.asset('assets/logo.png',
-                height: 15, fit: BoxFit.contain),
-            const Spacer(),
-            IconButton(
-              icon: const Icon(Icons.favorite_border_rounded),
-              color: primary,
-              onPressed: () {},
+            _videoBannerItem(),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 80,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.40),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
             ),
-            IconButton(
-              icon: const Icon(Icons.shopping_bag_outlined),
-              color: primary,
-              onPressed: () {},
-            ),
-            IconButton(
-              icon: const Icon(Icons.person_outline_rounded),
-              color: primary,
-              tooltip: 'Logout',
-              onPressed: _logout,
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: SizedBox(
+                  height: 56,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: IconButton(
+                            icon: const Icon(Icons.search, size: 22),
+                            color: Colors.white,
+                            onPressed: () {},
+                          ),
+                        ),
+                      ),
+                      Image.asset(
+                        'assets/logo2.png',
+                        height: 14,
+                        fit: BoxFit.contain,
+                        color: Colors.white,
+                        colorBlendMode: BlendMode.srcIn,
+                      ),
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.favorite_border_rounded, size: 22),
+                                color: Colors.white,
+                                onPressed: () {},
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.person_outline_rounded, size: 22),
+                                color: Colors.white,
+                                tooltip: 'Logout',
+                                onPressed: _logout,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
       );
 
-  // ── Search ────────────────────────────────────────────────────────────────
-
-  Widget _sliverSearch() => SliverToBoxAdapter(
-        child: Container(
-          color: cardColor,
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: Container(
-            height: 42,
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: borderColor),
-            ),
-            child: TextField(
-              controller: _searchCtrl,
-              decoration: const InputDecoration(
-                hintText: 'Search',
-                hintStyle:
-                    TextStyle(color: Color(0xFF9A9A9A), fontSize: 14),
-                prefixIcon: Icon(Icons.search,
-                    color: Color(0xFF9A9A9A), size: 20),
-                border: InputBorder.none,
-                contentPadding:
-                    EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-              ),
-            ),
-          ),
-        ),
-      );
-
-  // ── Banner ────────────────────────────────────────────────────────────────
-
-  Widget _sliverBanner() => SliverToBoxAdapter(
-        child: SizedBox(
-          height: 560,
-          child: Stack(
-            children: [
-              PageView.builder(
-                controller: _bannerCtrl,
-                itemCount: _bannerAssets.length,
-                onPageChanged: (i) =>
-                    setState(() => _currentBanner = i),
-                itemBuilder: (_, i) =>
-                    _bannerItem(_bannerAssets[i]),
-              ),
-              Positioned(
-                bottom: 10,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: _dotIndicator(
-                      _bannerAssets.length, _currentBanner),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-
-  Widget _bannerItem(String imagePath) => Stack(
+  Widget _videoBannerItem() => Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            imagePath,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) =>
-                Container(color: const Color(0xFF6B7A5E)),
-          ),
+          if (_videoReady)
+            ClipRect(
+              child: SizedBox.expand(
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                  child: SizedBox(
+                    width: _videoCtrl.value.size.width,
+                    height: _videoCtrl.value.size.height,
+                    child: VideoPlayer(_videoCtrl),
+                  ),
+                ),
+              ),
+            )
+          else
+            Container(color: const Color(0xFF6B7A5E)),
           Positioned.fill(
             child: IgnorePointer(
               child: DecoratedBox(
@@ -321,19 +470,17 @@ class _HomeScreenState extends State<HomeScreen> {
             width: i == current ? 15 : 8,
             height: 4,
             decoration: BoxDecoration(
-              color:
-                  i == current ? primary : const Color(0xFFCCCCCC),
+              color: i == current ? primary : const Color(0xFFCCCCCC),
               borderRadius: BorderRadius.circular(4),
             ),
           ),
         ),
       );
 
-  // ── Section header ────────────────────────────────────────────────────────
-
-  Widget _sliverHead(String title) => SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 22, 16, 10),
+  Widget _sliverHeadAsBox(String title) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 22, 16, 10),
+        child: Align(
+          alignment: Alignment.centerLeft,
           child: Text(
             title,
             style: const TextStyle(
@@ -346,64 +493,76 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
 
-  // ── Latest Drop ───────────────────────────────────────────────────────────
+  Widget _sliverBestsellerSalesBlocks() {
+    final Size screenSize = MediaQuery.of(context).size;
+    final double screenWidth = screenSize.width;
+    final double blockHeight =
+        (screenSize.height * 0.40).clamp(220.0, 420.0);
 
-  Widget _sliverLatestDrop() => SliverToBoxAdapter(
-        child: _latestDrop.isEmpty
-            ? _empty()
-            : SizedBox(
-                height: 220,
-                child: ListView.separated(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _latestDrop.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(width: 12),
-                  itemBuilder: (_, i) =>
-                      _latestDropTile(_latestDrop[i]),
+    return Column(
+      children: [
+        _fullWidthImageBlock(
+          assetPath: 'assets/bestseller.jpg',
+          label: 'Bestseller',
+          width: screenWidth,
+          height: blockHeight,
+          onTap: () {},
+        ),
+        _fullWidthImageBlock(
+          assetPath: 'assets/sales.jpg',
+          label: 'Sales',
+          width: screenWidth,
+          height: blockHeight,
+          onTap: () {},
+        ),
+      ],
+    );
+  }
+
+  Widget _fullWidthImageBlock({
+    required String assetPath,
+    required String label,
+    required double width,
+    required double height,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              assetPath,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) =>
+                  Container(color: const Color(0xFF555555)),
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.10),
+                    Colors.black.withOpacity(0.45),
+                  ],
                 ),
               ),
-      );
-
-  Widget _latestDropTile(ShopifyCollection collection) {
-    const double tileWidth   = 160.0;
-    const double imageHeight = 180.0;
-
-    return GestureDetector(
-      onTap: () => _openCollection(collection), // ← wired
-      child: SizedBox(
-        width: tileWidth,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                width: tileWidth,
-                height: imageHeight,
-                child: collection.imageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: collection.imageUrl!,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) =>
-                            Container(color: const Color(0xFFE0E0E0)),
-                        errorWidget: (_, __, ___) =>
-                            _collectionPlaceholder(collection.label),
-                      )
-                    : _collectionPlaceholder(collection.label),
-              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              collection.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: primary,
+            Positioned(
+              left: 18,
+              bottom: 18,
+              child: Text(
+                label.toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.6,
+                ),
               ),
             ),
           ],
@@ -412,47 +571,26 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _collectionPlaceholder(String label) => Container(
-        color: const Color(0xFFDDDDDD),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Color(0xFF888888),
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
+  Widget _categoriesGridAsBox() => _categories.isEmpty
+      ? _empty()
+      : Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            shrinkWrap: true,
+            itemCount: _categories.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.95,
+            ),
+            itemBuilder: (_, i) => _categoryTile(_categories[i]),
           ),
-        ),
-      );
-
-  // ── Categories grid ───────────────────────────────────────────────────────
-
-  Widget _sliverCategoriesGrid() => SliverToBoxAdapter(
-        child: _categories.isEmpty
-            ? _empty()
-            : Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16),
-                child: GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
-                  shrinkWrap: true,
-                  itemCount: _categories.length,
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    childAspectRatio: 0.95,
-                  ),
-                  itemBuilder: (_, i) =>
-                      _categoryTile(_categories[i]),
-                ),
-              ),
-      );
+        );
 
   Widget _categoryTile(ShopifyCollection cat) => GestureDetector(
-        onTap: () => _openCollection(cat), // ← wired
+        onTap: () => _openCollection(cat),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Stack(
@@ -487,7 +625,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   cat.label,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.2,
                   ),
@@ -498,146 +636,144 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
 
-  // ── Balloon banner ────────────────────────────────────────────────────────
+  static const List<String> _fitAssets = [
+    'assets/jeans1.jpeg',
+    'assets/jeans2.jpeg',
+    'assets/jeans3.jpeg',
+    'assets/jeans4.jpeg',
+    'assets/jeans5.jpeg',
+  ];
 
-  Widget _sliverBalloonBanner() {
-    final banner = _balloonBanner;
-    return SliverToBoxAdapter(
-      child: GestureDetector(
-        onTap: () {
-          // Optional: navigate to a specific collection for the balloon banner
-        },
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-          height: 100,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
+  static const List<String> _fitLabels = [
+    'Slim Fit',
+    'Regular Fit',
+    'Baggy Fit',
+    'Straight Fit',
+    'Oversized Fit',
+  ];
+
+  Widget _shopByFitAsBox() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          children: [
+            GridView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              shrinkWrap: true,
+              itemCount: 4,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 0.90,
+              ),
+              itemBuilder: (_, i) => _fitTile(_fitAssets[i], _fitLabels[i]),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 170,
+              child: _fitTile(_fitAssets[4], _fitLabels[4]),
+            ),
+          ],
+        ),
+      );
+
+  Widget _fitTile(String assetPath, String label) => GestureDetector(
+        onTap: () {},
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                assetPath,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    Container(color: const Color(0xFF555555)),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.62),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 8,
+                bottom: 8,
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ),
+            ],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: banner?.imageUrl != null
-                ? CachedNetworkImage(
-                    imageUrl: banner!.imageUrl!,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) =>
-                        Container(color: const Color(0xFFD0D4C8)),
-                    errorWidget: (_, __, ___) => Image.asset(
-                      'assets/last-chance-banner.png',
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                : Image.asset(
+        ),
+      );
+
+  Widget _balloonBannerAsBox() {
+    final banner = _balloonBanner;
+    return GestureDetector(
+      onTap: () {},
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+        height: 150,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: banner?.imageUrl != null
+              ? CachedNetworkImage(
+                  imageUrl: banner!.imageUrl!,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) =>
+                      Container(color: const Color(0xFFD0D4C8)),
+                  errorWidget: (_, __, ___) => Image.asset(
                     'assets/last-chance-banner.png',
                     fit: BoxFit.cover,
                   ),
-          ),
+                )
+              : Image.asset(
+                  'assets/last-chance-banner.png',
+                  fit: BoxFit.cover,
+                ),
         ),
       ),
     );
   }
 
-  // ── Our Collection ────────────────────────────────────────────────────────
-
-  Widget _sliverOurCollection() => SliverToBoxAdapter(
-        child: SizedBox(
-          height: 110,
-          child: _ourCollection.isEmpty
-              ? _empty()
-              : ListView.separated(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _ourCollection.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(width: 10),
-                  itemBuilder: (_, i) {
-                    final col = _ourCollection[i];
-                    return GestureDetector(
-                      onTap: () => _openCollection(col), // ← wired
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: SizedBox(
-                          width: 120,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              col.imageUrl != null
-                                  ? CachedNetworkImage(
-                                      imageUrl: col.imageUrl!,
-                                      fit: BoxFit.cover,
-                                      placeholder: (_, __) =>
-                                          Container(
-                                              color: const Color(
-                                                  0xFF555555)),
-                                      errorWidget: (_, __, ___) =>
-                                          Container(
-                                              color: const Color(
-                                                  0xFF555555)),
-                                    )
-                                  : Container(
-                                      color: const Color(0xFF555555)),
-                              Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Colors.transparent,
-                                      Colors.black.withOpacity(0.65),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                left: 8,
-                                bottom: 10,
-                                child: Text(
-                                  col.label,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.8,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-        ),
-      );
-
-  // ── Oversized Shirts ──────────────────────────────────────────────────────
-
-  Widget _sliverOversizedShirts() => SliverToBoxAdapter(
-        child: _oversizedShirts.isEmpty
-            ? _empty()
-            : SizedBox(
-                height: 330,
-                child: ListView.separated(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _oversizedShirts.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(width: 12),
-                  itemBuilder: (_, i) =>
-                      _productTile(_oversizedShirts[i]),
-                ),
-              ),
-      );
+  Widget _oversizedShirtsAsBox() => _oversizedShirts.isEmpty
+      ? _empty()
+      : SizedBox(
+          height: 330,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: _oversizedShirts.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, i) => _productTile(_oversizedShirts[i]),
+          ),
+        );
 
   Widget _productTile(ShopifyProduct product) {
-    const double tileWidth   = 160.0;
+    const double tileWidth = 160.0;
     const double imageHeight = 185.0;
     final colorHexes = product.colorHexCodes;
+    final bool isAddedToCart = _cartProductIds.contains(product.id);
 
     return GestureDetector(
-      onTap: () {},
+      onTap: () => _openProductDetail(product),
       child: SizedBox(
         width: tileWidth,
         child: Column(
@@ -680,7 +816,13 @@ class _HomeScreenState extends State<HomeScreen> {
               width: tileWidth,
               height: 30,
               child: OutlinedButton(
-                onPressed: () {},
+                onPressed: () async {
+                  if (isAddedToCart) {
+                    _goToCart();
+                  } else {
+                    await _addToCart(product);
+                  }
+                },
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: primary, width: 1.2),
                   shape: RoundedRectangleBorder(
@@ -689,9 +831,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: EdgeInsets.zero,
                   foregroundColor: primary,
                 ),
-                child: const Text(
-                  'SHOP NOW',
-                  style: TextStyle(
+                child: Text(
+                  isAddedToCart ? 'GO TO CART' : 'SHOP NOW',
+                  style: const TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.2,
@@ -802,8 +944,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Hot Deals ─────────────────────────────────────────────────────────────
-
   Widget _sliverHotDeals() {
     const buckets = [
       _Bucket('STYLES UNDER ₹999',  Color(0xFF111111)),
@@ -820,8 +960,7 @@ class _HomeScreenState extends State<HomeScreen> {
           itemCount: buckets.length,
           separatorBuilder: (_, __) => const SizedBox(width: 12),
           itemBuilder: (_, i) {
-            final product =
-                i < _hotDeals.length ? _hotDeals[i] : null;
+            final product = i < _hotDeals.length ? _hotDeals[i] : null;
             return GestureDetector(
               onTap: () {},
               child: ClipRRect(
@@ -871,8 +1010,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Shimmer / empty ───────────────────────────────────────────────────────
-
   Widget _shimmer() => ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -896,14 +1033,12 @@ class _HomeScreenState extends State<HomeScreen> {
             physics: const NeverScrollableScrollPhysics(),
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
-            children:
-                List.generate(6, (_) => _sh(double.infinity)),
+            children: List.generate(6, (_) => _sh(double.infinity)),
           ),
         ],
       );
 
-  Widget _sh(double height, {double? width, double radius = 8}) =>
-      Container(
+  Widget _sh(double height, {double? width, double radius = 8}) => Container(
         height: height,
         width: width,
         decoration: BoxDecoration(
@@ -913,8 +1048,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
   Widget _empty() => const Padding(
-        padding:
-            EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         child: Center(
           child: Text(
             'Nothing here yet.',
@@ -922,6 +1056,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       );
+}
+
+class _SectionAnchor {
+  final String id;
+  final GlobalKey key;
+  const _SectionAnchor({required this.id, required this.key});
 }
 
 class _Bucket {

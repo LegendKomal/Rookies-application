@@ -14,12 +14,12 @@ class ShopifyConstants {
       };
 
   static const String latestDropHandle       = 'new-arrivals';
-  static const String cargosHandle           = 'cargos';
-  static const String jeansHandle            = 'jeans';
-  static const String shirtsHandle           = 'shirts';
+  static const String cargosHandle           = 'CARGOS';
+  static const String jeansHandle            = 'JEANS';
+  static const String shirtsHandle           = 'SHIRTS';
   static const String tshirtsHandle          = 'TSHIRTS';
-  static const String linensHandle           = 'linens';
-  static const String shortsHandle           = 'shorts';
+  static const String linensHandle           = 'LINENS';
+  static const String shortsHandle           = 'SHORTS';
   static const String hotDealsHandle         = 'hot-deals';
   static const String summerEditHandle       = 'summer-edit';
   static const String trendingNowHandle      = 'trending-now';

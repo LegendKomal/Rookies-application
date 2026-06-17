@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/screens/Dashboard/home_screen.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
@@ -100,16 +101,26 @@ class _LoginState extends State<Login> {
       if (!mounted) return;
 
       if (!result.success) {
-        _showMessage(
-  result.customer != null
-      ? 'Welcome ${result.customer!.fullName}'
-      : 'Login successful',
-);
+        _showMessage(result.message ?? 'Login failed');
         if (kDebugMode) {
           debugPrint('UI LOGIN FAILED -> ${result.message}');
         }
         return;
       }
+
+      // success path
+_showMessage(
+  result.customer != null
+      ? 'Welcome ${result.customer!.fullName}'
+      : 'Login successful',
+);
+
+if (kDebugMode) {
+  debugPrint('UI LOGIN SUCCESS -> ${result.customer?.toJson()}');
+}
+
+ScaffoldMessenger.of(context).hideCurrentSnackBar();
+context.go('/home'); // see Bug 1 fix
 
       if (kDebugMode) {
         debugPrint('UI LOGIN SUCCESS -> ${result.customer?.toJson()}');
@@ -117,12 +128,7 @@ class _LoginState extends State<Login> {
 
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-      Navigator.pushReplacement(
-  context,
-  MaterialPageRoute(
-    builder: (_) => const HomeScreen(),
-  ),
-);
+     context.go('/home');
     } catch (e) {
       if (!mounted) return;
       _showMessage('Something went wrong: $e');

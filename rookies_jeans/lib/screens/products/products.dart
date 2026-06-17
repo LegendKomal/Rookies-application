@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
+import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 
 class ProductsPage extends StatefulWidget {
@@ -15,41 +16,152 @@ class ProductsPage extends StatefulWidget {
 }
 
 class _ProductsPageState extends State<ProductsPage> {
-  static const Color primary     = Color(ShopifyConstants.primaryColorHex);
-  static const Color bgColor     = Color(ShopifyConstants.bgColorHex);
-  static const Color cardColor   = Color(ShopifyConstants.cardColorHex);
+  static const Color primary = Color(ShopifyConstants.primaryColorHex);
+  static const Color bgColor = Color(ShopifyConstants.bgColorHex);
+  static const Color cardColor = Color(ShopifyConstants.cardColorHex);
   static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
   static const Color borderColor = Color(ShopifyConstants.borderColorHex);
 
+  final ScrollController _scrollController = ScrollController();
+
   List<ShopifyProduct> _products = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasNextPage = true;
+  bool _isAddingToCart = false;
+  String? _endCursor;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _fetchProducts();
+    _fetchInitialProducts();
+
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 300 &&
+          !_isLoading &&
+          !_isLoadingMore &&
+          _hasNextPage) {
+        _loadMoreProducts();
+      }
+    });
   }
 
-  Future<void> _fetchProducts() async {
-    if (mounted) setState(() { _isLoading = true; _error = null; });
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchInitialProducts() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+        _products = [];
+        _endCursor = null;
+        _hasNextPage = true;
+      });
+    }
 
     try {
-      final products = await ShopifyStorefrontService.instance
-    .getProductsByCollection(widget.collection.handle, first: 24);
+      final response = await ShopifyStorefrontService.instance
+          .getProductsByCollectionPaginated(
+        widget.collection.handle,
+        first: 24,
+      );
+
       if (!mounted) return;
+
       setState(() {
-        _products = products;
+        _products = response.products;
+        _hasNextPage = response.hasNextPage;
+        _endCursor = response.endCursor;
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
+
       setState(() {
         _error = 'Failed to load products. Pull down to retry.';
         _isLoading = false;
       });
     }
   }
+
+  Future<void> _loadMoreProducts() async {
+    if (_isLoadingMore || !_hasNextPage) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final response = await ShopifyStorefrontService.instance
+          .getProductsByCollectionPaginated(
+        widget.collection.handle,
+        first: 24,
+        after: _endCursor,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _products.addAll(response.products);
+        _hasNextPage = response.hasNextPage;
+        _endCursor = response.endCursor;
+        _isLoadingMore = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingMore = false;
+      });
+    }
+  }
+
+  Future<void> _refreshProducts() async {
+    ShopifyStorefrontService.instance.clearCache();
+    await _fetchInitialProducts();
+  }
+
+  Future<void> _handleAddToCart(ShopifyProduct product) async {
+  if (_isAddingToCart) return;
+
+  setState(() {
+    _isAddingToCart = true;
+  });
+
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.hideCurrentSnackBar();
+
+  bool success = false;
+  try {
+    success = await ShopifyStorefrontService.instance.addProductToCart(product);
+  } catch (_) {
+    success = false;
+  }
+
+  if (!mounted) return;
+
+  setState(() {
+    _isAddingToCart = false;
+  });
+
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(
+        success
+            ? '${product.title} added to cart'
+            : 'Failed to add item to cart',
+      ),
+      duration: const Duration(seconds: 2),
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +176,7 @@ class _ProductsPageState extends State<ProductsPage> {
                   ? _shimmerGrid()
                   : RefreshIndicator(
                       color: primary,
-                      onRefresh: _fetchProducts,
+                      onRefresh: _refreshProducts,
                       child: _error != null
                           ? _errorState()
                           : _products.isEmpty
@@ -77,8 +189,6 @@ class _ProductsPageState extends State<ProductsPage> {
       ),
     );
   }
-
-  // ── Top bar ───────────────────────────────────────────────────────────────
 
   Widget _topBar(BuildContext context) => Container(
         color: cardColor,
@@ -118,18 +228,27 @@ class _ProductsPageState extends State<ProductsPage> {
         ),
       );
 
-  // ── Product grid ──────────────────────────────────────────────────────────
-
   Widget _productGrid() => GridView.builder(
+        controller: _scrollController,
         padding: const EdgeInsets.all(12),
-        itemCount: _products.length,
+        itemCount: _products.length + (_isLoadingMore ? 1 : 0),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
           mainAxisSpacing: 14,
           crossAxisSpacing: 12,
           childAspectRatio: 0.52,
         ),
-        itemBuilder: (_, i) => _productCard(_products[i]),
+        itemBuilder: (_, i) {
+          if (i >= _products.length) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          return _productCard(_products[i]);
+        },
       );
 
   Widget _productCard(ShopifyProduct product) {
@@ -137,7 +256,16 @@ class _ProductsPageState extends State<ProductsPage> {
 
     return GestureDetector(
       onTap: () {
-        // TODO: navigate to product detail page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductDetailPage(
+              handle: product.handle,
+              title: product.title,
+              heroImageUrl: product.primaryImageUrl,
+            ),
+          ),
+        );
       },
       child: Container(
         decoration: BoxDecoration(
@@ -148,7 +276,6 @@ class _ProductsPageState extends State<ProductsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Product image ──
             Expanded(
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(
@@ -163,19 +290,18 @@ class _ProductsPageState extends State<ProductsPage> {
                             fit: BoxFit.cover,
                             placeholder: (_, __) =>
                                 Container(color: const Color(0xFFEEEEEE)),
-                            errorWidget: (_, __, ___) =>
-                                _imagePlaceholder(),
+                            errorWidget: (_, __, ___) => _imagePlaceholder(),
                           )
                         : _imagePlaceholder(),
-
-                    // Sale badge
                     if (product.isOnSale)
                       Positioned(
                         top: 8,
                         left: 8,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 3),
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFD32F2F),
                             borderRadius: BorderRadius.circular(4),
@@ -195,8 +321,6 @@ class _ProductsPageState extends State<ProductsPage> {
                 ),
               ),
             ),
-
-            // ── Product info ──
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
               child: Column(
@@ -204,8 +328,9 @@ class _ProductsPageState extends State<ProductsPage> {
                 children: [
                   Text(
                     product.title,
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    softWrap: false,
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -224,7 +349,9 @@ class _ProductsPageState extends State<ProductsPage> {
                     width: double.infinity,
                     height: 30,
                     child: OutlinedButton(
-                      onPressed: () {},
+                      onPressed: _isAddingToCart
+                          ? null
+                          : () => _handleAddToCart(product),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: primary, width: 1.2),
                         shape: RoundedRectangleBorder(
@@ -233,15 +360,21 @@ class _ProductsPageState extends State<ProductsPage> {
                         padding: EdgeInsets.zero,
                         foregroundColor: primary,
                       ),
-                      child: const Text(
-                        'SHOP NOW',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                          color: primary,
-                        ),
-                      ),
+                      child: _isAddingToCart
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'SHOP NOW',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
+                                color: primary,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -253,13 +386,14 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
   Widget _imagePlaceholder() => Container(
         color: const Color(0xFFEEEEEE),
         alignment: Alignment.center,
-        child: const Icon(Icons.image_not_supported_outlined,
-            color: Color(0xFFBBBBBB), size: 32),
+        child: const Icon(
+          Icons.image_not_supported_outlined,
+          color: Color(0xFFBBBBBB),
+          size: 32,
+        ),
       );
 
   Widget _priceBlock(ShopifyProduct product) {
@@ -283,15 +417,9 @@ class _ProductsPageState extends State<ProductsPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
           children: [
-            const Text(
-              'MRP ',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF9A9A9A),
-              ),
-            ),
             Text(
               product.formattedCompareAtPrice,
               style: const TextStyle(
@@ -301,11 +429,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 decorationColor: Color(0xFF9A9A9A),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 2),
-        Row(
-          children: [
+            const SizedBox(width: 6),
             Text(
               product.formattedPrice,
               style: const TextStyle(
@@ -314,7 +438,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 color: primary,
               ),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 6),
             Text(
               'Save $savedStr',
               style: const TextStyle(
@@ -363,8 +487,6 @@ class _ProductsPageState extends State<ProductsPage> {
     return '$pct% OFF';
   }
 
-  // ── States ────────────────────────────────────────────────────────────────
-
   Widget _emptyState() => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -401,12 +523,11 @@ class _ProductsPageState extends State<ProductsPage> {
               Text(
                 _error ?? 'Something went wrong.',
                 textAlign: TextAlign.center,
-                style:
-                    const TextStyle(fontSize: 13, color: secondaryTxt),
+                style: const TextStyle(fontSize: 13, color: secondaryTxt),
               ),
               const SizedBox(height: 20),
               OutlinedButton.icon(
-                onPressed: _fetchProducts,
+                onPressed: _fetchInitialProducts,
                 icon: const Icon(Icons.refresh_rounded, size: 16),
                 label: const Text('RETRY'),
                 style: OutlinedButton.styleFrom(
