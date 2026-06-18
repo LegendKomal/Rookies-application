@@ -1,3 +1,59 @@
+/// A single filter facet returned by Shopify's Storefront API
+/// (e.g. "Size", "Color", "Availability", "Price").
+class ShopifyFilter {
+  final String id;
+  final String label;
+  final String type; // LIST, PRICE_RANGE, BOOLEAN
+  final List<ShopifyFilterValue> values;
+
+  const ShopifyFilter({
+    required this.id,
+    required this.label,
+    required this.type,
+    required this.values,
+  });
+
+  factory ShopifyFilter.fromJson(Map<String, dynamic> json) {
+    final valuesList = (json['values'] as List?) ?? [];
+    return ShopifyFilter(
+      id: json['id'] as String? ?? '',
+      label: json['label'] as String? ?? '',
+      type: json['type'] as String? ?? 'LIST',
+      values: valuesList
+          .map((v) => ShopifyFilterValue.fromJson(v as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+/// A single selectable value within a [ShopifyFilter], e.g. "Blue" under
+/// the "Color" filter, or "$0 - $50" under "Price".
+///
+/// [input] is the raw JSON string Shopify expects you to pass back,
+/// unmodified, inside the `filters` argument of the products query.
+class ShopifyFilterValue {
+  final String id;
+  final String label;
+  final int count;
+  final String input;
+
+  const ShopifyFilterValue({
+    required this.id,
+    required this.label,
+    required this.count,
+    required this.input,
+  });
+
+  factory ShopifyFilterValue.fromJson(Map<String, dynamic> json) {
+    return ShopifyFilterValue(
+      id: json['id'] as String? ?? '',
+      label: json['label'] as String? ?? '',
+      count: json['count'] as int? ?? 0,
+      input: json['input'] as String? ?? '{}',
+    );
+  }
+}
+
 class ShopifyProduct {
   final String id;
   final String title;

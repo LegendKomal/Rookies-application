@@ -11,12 +11,32 @@ class PaginatedProductsResponse {
   final List<ShopifyProduct> products;
   final bool hasNextPage;
   final String? endCursor;
+  final List<ShopifyFilter> filters;
 
   const PaginatedProductsResponse({
     required this.products,
     required this.hasNextPage,
     required this.endCursor,
+    this.filters = const [],
   });
+}
+
+/// Sort options exposed to the UI. [shopifyKey] maps 1:1 to Shopify's
+/// `ProductCollectionSortKeys` enum used in the Storefront API.
+enum ProductSortOption {
+  featured('Featured', 'COLLECTION_DEFAULT', false),
+  priceLowToHigh('Price: Low to High', 'PRICE', false),
+  priceHighToLow('Price: High to Low', 'PRICE', true),
+  newest('Newest', 'CREATED', true),
+  bestSelling('Best Selling', 'BEST_SELLING', false),
+  titleAZ('Alphabetically: A-Z', 'TITLE', false),
+  titleZA('Alphabetically: Z-A', 'TITLE', true);
+
+  final String label;
+  final String shopifyKey;
+  final bool reverse;
+
+  const ProductSortOption(this.label, this.shopifyKey, this.reverse);
 }
 
 class ShopifyStorefrontService {
@@ -85,29 +105,74 @@ class ShopifyStorefrontService {
     return response.products;
   }
 
+  /// Fetches a page of products for [handle], with optional sort and
+  /// filtering.
+  ///
+  /// [sortKey] / [reverse] map directly to Shopify's
+  /// `ProductCollectionSortKeys` enum (e.g. 'PRICE', 'BEST_SELLING',
+  /// 'CREATED', 'TITLE', 'COLLECTION_DEFAULT').
+  ///
+  /// [filters] is a list of raw filter `input` JSON strings as returned by
+  /// Shopify in [ShopifyFilterValue.input] — pass them back unmodified,
+  /// this method takes care of wrapping them for the query.
   Future<PaginatedProductsResponse> getProductsByCollectionPaginated(
     String handle, {
     int first = 24,
     String? after,
-  }) =>
-      _cachedFetch(
-        'collection:$handle:$first:${after ?? ''}',
-        () => _fetchProductsByCollectionPaginated(
-          handle,
-          first: first,
-          after: after,
-        ),
-      );
+    String sortKey = 'COLLECTION_DEFAULT',
+    bool reverse = false,
+    List<String> filters = const [],
+  }) {
+    final filterKey = filters.join('|');
+    return _cachedFetch(
+      'collection:$handle:$first:${after ?? ''}:$sortKey:$reverse:$filterKey',
+      () => _fetchProductsByCollectionPaginated(
+        handle,
+        first: first,
+        after: after,
+        sortKey: sortKey,
+        reverse: reverse,
+        filters: filters,
+      ),
+    );
+  }
 
   Future<PaginatedProductsResponse> _fetchProductsByCollectionPaginated(
     String handle, {
     int first = 24,
     String? after,
+    String sortKey = 'COLLECTION_DEFAULT',
+    bool reverse = false,
+    List<String> filters = const [],
   }) async {
     const String query = r'''
-    query getCollectionProducts($handle: String!, $first: Int!, $after: String) {
+    query getCollectionProducts(
+      $handle: String!
+      $first: Int!
+      $after: String
+      $sortKey: ProductCollectionSortKeys
+      $reverse: Boolean
+      $filters: [ProductFilter!]
+    ) {
       collectionByHandle(handle: $handle) {
-        products(first: $first, after: $after) {
+        products(
+          first: $first
+          after: $after
+          sortKey: $sortKey
+          reverse: $reverse
+          filters: $filters
+        ) {
+          filters {
+            id
+            label
+            type
+            values {
+              id
+              label
+              count
+              input
+            }
+          }
           edges {
             cursor
             node {
@@ -144,6 +209,20 @@ class ShopifyStorefrontService {
     ''';
 
     try {
+      // Each entry in `filters` is a raw JSON object string, e.g.
+      // '{"price":{"min":0,"max":50}}' or '{"available":true}'. Decode them
+      // back into maps so they slot correctly into the GraphQL variables.
+      final decodedFilters = filters
+          .map((f) {
+            try {
+              return jsonDecode(f) as Map<String, dynamic>;
+            } catch (_) {
+              return null;
+            }
+          })
+          .whereType<Map<String, dynamic>>()
+          .toList();
+
       final response = await http.post(
         Uri.parse(ShopifyConstants.storefrontEndpoint),
         headers: ShopifyConstants.headers,
@@ -153,11 +232,16 @@ class ShopifyStorefrontService {
             'handle': handle,
             'first': first,
             'after': after,
+            'sortKey': sortKey,
+            'reverse': reverse,
+            'filters': decodedFilters,
           },
         }),
       );
 
-      _log('getProductsByCollectionPaginated [$handle, after=$after] → ${response.statusCode}');
+      _log(
+        'getProductsByCollectionPaginated [$handle, after=$after, sort=$sortKey, reverse=$reverse, filters=$filters] → ${response.statusCode}',
+      );
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (decoded['errors'] != null) {
@@ -181,15 +265,21 @@ class ShopifyStorefrontService {
       final productsMap = collection['products'] as Map<String, dynamic>?;
       final edges = (productsMap?['edges'] as List?) ?? [];
       final pageInfo = productsMap?['pageInfo'] as Map<String, dynamic>?;
+      final filtersList = (productsMap?['filters'] as List?) ?? [];
 
       final products = edges
           .map((e) => ShopifyProduct.fromJson(e['node'] as Map<String, dynamic>))
+          .toList();
+
+      final parsedFilters = filtersList
+          .map((f) => ShopifyFilter.fromJson(f as Map<String, dynamic>))
           .toList();
 
       return PaginatedProductsResponse(
         products: products,
         hasNextPage: pageInfo?['hasNextPage'] as bool? ?? false,
         endCursor: pageInfo?['endCursor'] as String?,
+        filters: parsedFilters,
       );
     } catch (e) {
       _log('EXCEPTION in _fetchProductsByCollectionPaginated: $e');

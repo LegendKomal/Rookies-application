@@ -109,7 +109,7 @@ class _LoginState extends State<Login> {
       }
 
       // success path
-_showMessage(
+_showMessage(   
   result.customer != null
       ? 'Welcome ${result.customer!.fullName}'
       : 'Login successful',
