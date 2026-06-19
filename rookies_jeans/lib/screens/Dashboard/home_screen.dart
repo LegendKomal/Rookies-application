@@ -11,6 +11,7 @@ import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/screens/products/products.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
+import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/screens/authentication/login.dart';
 import 'package:video_player/video_player.dart';
 
@@ -28,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
   static const Color borderColor  = Color.fromARGB(255, 80, 57, 57);
 
-  final Set<String> _cartProductIds = {};
+  final Set<String> _addingToCartProductIds = {};
 
   bool _isLoading = true;
 
@@ -126,30 +127,37 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _addToCart(ShopifyProduct product) async {
-    try {
-      if (!mounted) return;
-      setState(() {
-        _cartProductIds.add(product.id);
-      });
+    if (_addingToCartProductIds.contains(product.id)) return;
+    if (product.variants.isEmpty) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${product.title} added to cart'),
-          duration: const Duration(seconds: 2),
-          action: SnackBarAction(
-            label: 'GO TO CART',
-            onPressed: _goToCart,
-          ),
+    setState(() => _addingToCartProductIds.add(product.id));
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+
+    final success = await CartService.instance.addLine(
+      variantId: product.variants.first.id,
+    );
+
+    if (!mounted) return;
+    setState(() => _addingToCartProductIds.remove(product.id));
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? '${product.title} added to cart'
+              : 'Failed to add product to cart',
         ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to add product to cart'),
-        ),
-      );
-    }
+        duration: const Duration(seconds: 2),
+        // action: success
+        //     ? SnackBarAction(
+        //         label: 'GO TO CART',
+        //         onPressed: _goToCart,
+        //       )
+        //     : null,
+      ),
+    );
   }
 
   List<ShopifyCollection> _latestDrop    = [];
@@ -177,6 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _videoCtrl.play();
       });
     _fetchAll();
+    CartService.instance.initialize();
   }
 
   @override
@@ -383,6 +392,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: Colors.white,
                                 onPressed: () {},
                               ),
+                              // _cartIconWithBadge(),
                               IconButton(
                                 icon: const Icon(Icons.person_outline_rounded, size: 22),
                                 color: Colors.white,
@@ -400,6 +410,45 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+      );
+
+  Widget _cartIconWithBadge() => AnimatedBuilder(
+        animation: CartService.instance,
+        builder: (context, _) {
+          final count = CartService.instance.totalQuantity;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.shopping_bag_outlined, size: 22),
+                color: Colors.white,
+                onPressed: _goToCart,
+              ),
+              if (count > 0)
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD32F2F),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    constraints: const BoxConstraints(minWidth: 16),
+                    child: Text(
+                      '$count',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       );
 
   Widget _videoBannerItem() => Stack(
@@ -770,7 +819,8 @@ class _HomeScreenState extends State<HomeScreen> {
     const double tileWidth = 160.0;
     const double imageHeight = 185.0;
     final colorHexes = product.colorHexCodes;
-    final bool isAddedToCart = _cartProductIds.contains(product.id);
+    final isAdding = _addingToCartProductIds.contains(product.id);
+    final variantId = product.variants.isNotEmpty ? product.variants.first.id : null;
 
     return GestureDetector(
       onTap: () => _openProductDetail(product),
@@ -812,35 +862,51 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 6),
             if (colorHexes.isNotEmpty) _colorSwatches(colorHexes),
             const SizedBox(height: 8),
-            SizedBox(
-              width: tileWidth,
-              height: 30,
-              child: OutlinedButton(
-                onPressed: () async {
-                  if (isAddedToCart) {
-                    _goToCart();
-                  } else {
-                    await _addToCart(product);
-                  }
-                },
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: primary, width: 1.2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(5),
+            AnimatedBuilder(
+              animation: CartService.instance,
+              builder: (context, _) {
+                final isAddedToCart =
+                    variantId != null && CartService.instance.isInCart(variantId);
+
+                return SizedBox(
+                  width: tileWidth,
+                  height: 30,
+                  child: OutlinedButton(
+                    onPressed: isAdding
+                        ? null
+                        : () async {
+                            if (isAddedToCart) {
+                              _goToCart();
+                            } else {
+                              await _addToCart(product);
+                            }
+                          },
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: primary, width: 1.2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      padding: EdgeInsets.zero,
+                      foregroundColor: primary,
+                    ),
+                    child: isAdding
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            isAddedToCart ? 'GO TO CART' : 'SHOP NOW',
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                              color: primary,
+                            ),
+                          ),
                   ),
-                  padding: EdgeInsets.zero,
-                  foregroundColor: primary,
-                ),
-                child: Text(
-                  isAddedToCart ? 'GO TO CART' : 'SHOP NOW',
-                  style: const TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                    color: primary,
-                  ),
-                ),
-              ),
+                );
+              },
             ),
           ],
         ),

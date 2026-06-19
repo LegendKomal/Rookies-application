@@ -3,7 +3,6 @@ import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/screens/products/products.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
-// ^ adjust this import path to wherever ShopifyStorefrontService actually lives
 
 class ExploreCategoriesPage extends StatefulWidget {
   const ExploreCategoriesPage({super.key});

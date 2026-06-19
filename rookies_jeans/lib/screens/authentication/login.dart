@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/screens/Dashboard/home_screen.dart';
+import 'package:rookies_jeans/screens/authentication/forgot_password.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
 class Login extends StatefulWidget {
@@ -109,26 +110,18 @@ class _LoginState extends State<Login> {
       }
 
       // success path
-_showMessage(   
-  result.customer != null
-      ? 'Welcome ${result.customer!.fullName}'
-      : 'Login successful',
-);
-
-if (kDebugMode) {
-  debugPrint('UI LOGIN SUCCESS -> ${result.customer?.toJson()}');
-}
-
-ScaffoldMessenger.of(context).hideCurrentSnackBar();
-context.go('/home'); // see Bug 1 fix
+      _showMessage(
+        result.customer != null
+            ? 'Welcome ${result.customer!.fullName}'
+            : 'Login successful',
+      );
 
       if (kDebugMode) {
         debugPrint('UI LOGIN SUCCESS -> ${result.customer?.toJson()}');
       }
 
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
-     context.go('/home');
+      context.go('/home');
     } catch (e) {
       if (!mounted) return;
       _showMessage('Something went wrong: $e');
@@ -152,6 +145,15 @@ context.go('/home'); // see Bug 1 fix
           style: const TextStyle(color: Colors.white),
         ),
       ),
+    );
+  }
+
+  void _handleForgotPassword() {
+    if (kDebugMode) {
+      debugPrint('UI FORGOT PASSWORD TAP');
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ForgotPassword()),
     );
   }
 
@@ -261,7 +263,7 @@ context.go('/home'); // see Bug 1 fix
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {},
+                        onPressed: _handleForgotPassword,
                         style: TextButton.styleFrom(
                           foregroundColor: primary,
                           padding: EdgeInsets.zero,

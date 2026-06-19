@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/services/cart_service.dart';
 
 class RookiesBottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -15,6 +16,10 @@ class RookiesBottomNavBar extends StatelessWidget {
   static const Color _inactive    = Color(0xFFAAAAAA);
   static const Color _bg          = Color(ShopifyConstants.cardColorHex);
   static const Color _border      = Color(ShopifyConstants.borderColorHex);
+  static const Color _badgeBg     = Color(0xFFD32F2F);
+
+  // Index of the cart tab within _items / the nav row.
+  static const int _cartIndex = 3;
 
   // static const List<_NavItem> _items = [
   //   _NavItem(label: 'Home',      icon: Icons.home_outlined,           activeIcon: Icons.home_rounded),
@@ -61,14 +66,13 @@ class RookiesBottomNavBar extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 200),
-                        child: Icon(
-                          active ? item.activeIcon : item.icon,
-                          key: ValueKey(active),
-                          size: 22,
-                          color: active ? _primary : _inactive,
-                        ),
+                      _NavIcon(
+                        icon: active ? item.activeIcon : item.icon,
+                        active: active,
+                        showCartBadge: i == _cartIndex,
+                        activeColor: _primary,
+                        inactiveColor: _inactive,
+                        badgeColor: _badgeBg,
                       ),
                       const SizedBox(height: 3),
                       // AnimatedDefaultTextStyle(
@@ -86,6 +90,98 @@ class RookiesBottomNavBar extends StatelessWidget {
                 ),
               );
             }),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A single nav icon. When [showCartBadge] is true, this listens to
+/// [CartService] directly and overlays a small count badge that updates
+/// live whenever items are added to, removed from, or have their quantity
+/// changed in the cart — independent of which tab is currently selected.
+class _NavIcon extends StatelessWidget {
+  const _NavIcon({
+    required this.icon,
+    required this.active,
+    required this.showCartBadge,
+    required this.activeColor,
+    required this.inactiveColor,
+    required this.badgeColor,
+  });
+
+  final IconData icon;
+  final bool active;
+  final bool showCartBadge;
+  final Color activeColor;
+  final Color inactiveColor;
+  final Color badgeColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconWidget = AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      child: Icon(
+        icon,
+        key: ValueKey(active),
+        size: 22,
+        color: active ? activeColor : inactiveColor,
+      ),
+    );
+
+    if (!showCartBadge) return iconWidget;
+
+    return AnimatedBuilder(
+      animation: CartService.instance,
+      builder: (context, _) {
+        final count = CartService.instance.cart.totalQuantity;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            iconWidget,
+            if (count > 0)
+              Positioned(
+                right: -8,
+                top: -4,
+                child: _CountBadge(count: count, color: badgeColor),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count, required this.color});
+
+  final int count;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = count > 99 ? '99+' : '$count';
+    return AnimatedScale(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutBack,
+      scale: 1,
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white, width: 1.2),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+            height: 1.2,
           ),
         ),
       ),

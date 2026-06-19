@@ -5,6 +5,8 @@ import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
+import 'package:rookies_jeans/services/cart_service.dart';
+import 'package:rookies_jeans/screens/cart/cart.dart';
 
 class ProductsPage extends StatefulWidget {
   final ShopifyCollection collection;
@@ -29,7 +31,7 @@ class _ProductsPageState extends State<ProductsPage> {
   bool _isLoading = true;
   bool _isLoadingMore = false;
   bool _hasNextPage = true;
-  bool _isAddingToCart = false;
+  final Set<String> _addingToCartProductIds = {};
   String? _endCursor;
   String? _error;
 
@@ -185,29 +187,29 @@ class _ProductsPageState extends State<ProductsPage> {
     _fetchInitialProducts();
   }
 
-  Future<void> _handleAddToCart(ShopifyProduct product) async {
-    if (_isAddingToCart) return;
+  void _goToCart() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CartScreen()),
+    );
+  }
 
-    setState(() {
-      _isAddingToCart = true;
-    });
+  Future<void> _handleAddToCart(ShopifyProduct product) async {
+    if (_addingToCartProductIds.contains(product.id)) return;
+    if (product.variants.isEmpty) return;
+
+    setState(() => _addingToCartProductIds.add(product.id));
 
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
 
-    bool success = false;
-    try {
-      success =
-          await ShopifyStorefrontService.instance.addProductToCart(product);
-    } catch (_) {
-      success = false;
-    }
+    final success = await CartService.instance.addLine(
+      variantId: product.variants.first.id,
+    );
 
     if (!mounted) return;
 
-    setState(() {
-      _isAddingToCart = false;
-    });
+    setState(() => _addingToCartProductIds.remove(product.id));
 
     messenger.showSnackBar(
       SnackBar(
@@ -218,6 +220,9 @@ class _ProductsPageState extends State<ProductsPage> {
         ),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
+        // action: success
+        //     ? SnackBarAction(label: 'GO TO CART', onPressed: _goToCart)
+        //     : null,
       ),
     );
   }
@@ -1017,44 +1022,60 @@ class _ProductsPageState extends State<ProductsPage> {
                     _colorSwatches(colorHexes),
                   ],
                   const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 30,
-                    child: OutlinedButton(
-                      onPressed: _isAddingToCart
-                          ? null
-                          : () => _handleAddToCart(product),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: primary, width: 1.2),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        padding: EdgeInsets.zero,
-                        foregroundColor: primary,
-                      ),
-                      child: _isAddingToCart
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text(
-                              'SHOP NOW',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.2,
-                                color: primary,
-                              ),
-                            ),
-                    ),
-                  ),
+                  _cartButtonForProduct(product),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _cartButtonForProduct(ShopifyProduct product) {
+    final isAdding = _addingToCartProductIds.contains(product.id);
+    final variantId = product.variants.isNotEmpty ? product.variants.first.id : null;
+
+    return AnimatedBuilder(
+      animation: CartService.instance,
+      builder: (context, _) {
+        final inCart = variantId != null && CartService.instance.isInCart(variantId);
+
+        return SizedBox(
+          width: double.infinity,
+          height: 30,
+          child: OutlinedButton(
+            onPressed: isAdding
+                ? null
+                : inCart
+                    ? _goToCart
+                    : () => _handleAddToCart(product),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: primary, width: 1.2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(5),
+              ),
+              padding: EdgeInsets.zero,
+              foregroundColor: primary,
+            ),
+            child: isAdding
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(
+                    inCart ? 'GO TO CART' : 'SHOP NOW',
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                      color: primary,
+                    ),
+                  ),
+          ),
+        );
+      },
     );
   }
 
@@ -1273,4 +1294,4 @@ enum ProductSortOption {
   final String label;
   final String shopifyKey;
   final bool reverse;
-} 
+}

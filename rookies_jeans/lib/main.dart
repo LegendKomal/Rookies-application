@@ -4,10 +4,18 @@ import 'package:rookies_jeans/screens/Navigation/bottom_navigation.dart';
 import 'package:rookies_jeans/screens/Dashboard/home_screen.dart';
 import 'package:rookies_jeans/screens/authentication/login.dart';
 import 'package:rookies_jeans/screens/collections/collections.dart';
+import 'package:rookies_jeans/screens/products/Wishlist.dart';
+import 'package:rookies_jeans/screens/cart/cart.dart';
 import 'package:rookies_jeans/screens/splashscreen/splashscreen.dart';
+import 'package:rookies_jeans/services/cart_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Restore the persisted Shopify cart id (if any) and fetch the latest
+  // cart contents from Shopify before the UI needs it. CartScreen and the
+  // various "Add to Cart" buttons listen to CartService directly, so this
+  // just makes sure cart state/badges are correct from the first frame.
+  CartService.instance.initialize();
   runApp(const MyApp());
 }
 
@@ -48,20 +56,18 @@ final GoRouter _appRouter = GoRouter(
           ],
         ),
         StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/wishlist',
-              builder: (context, state) =>
-                  const Scaffold(body: Center(child: Text('Wishlist'))),
-            ),
-          ],
-        ),
+  routes: [
+    GoRoute(
+      path: '/wishlist',
+      builder: (context, state) => const WishlistPage(),
+    ),
+  ],
+),
         StatefulShellBranch(
           routes: [
             GoRoute(
               path: '/cart',
-              builder: (context, state) =>
-                  const Scaffold(body: Center(child: Text('Cart'))),
+              builder: (context, state) => const CartScreen(),
             ),
           ],
         ),
