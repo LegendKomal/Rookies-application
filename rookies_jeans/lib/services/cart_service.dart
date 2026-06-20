@@ -328,8 +328,43 @@ class CartService extends ChangeNotifier {
     }
   }
 
-  /// Clears the local reference to this cart (does not delete it on
-  /// Shopify's side — Shopify carts simply expire on their own).
+ Future<bool> linkCheckoutToCustomer({required String customerAccessToken}) async {
+    if (_cartId == null) return false;
+
+    const mutation = r'''
+      mutation cartBuyerIdentityUpdate($cartId: ID!, $buyerIdentity: CartBuyerIdentityInput!) {
+        cartBuyerIdentityUpdate(cartId: $cartId, buyerIdentity: $buyerIdentity) {
+          cart { id }
+          userErrors { field message }
+        }
+      }
+    ''';
+
+    try {
+      final decoded = await _post(mutation, {
+        'cartId': _cartId,
+        'buyerIdentity': {
+          'customerAccessToken': customerAccessToken,
+        },
+      });
+
+      _log('cartBuyerIdentityUpdate → ${decoded['errors'] ?? 'ok'}');
+      final data = decoded['data']?['cartBuyerIdentityUpdate'];
+      final userErrors = (data?['userErrors'] as List?) ?? [];
+      if (decoded['errors'] != null || userErrors.isNotEmpty) {
+        _log('cartBuyerIdentityUpdate userErrors: $userErrors');
+        return false;
+      }
+
+      // Refresh so cart.checkoutUrl reflects the now-linked checkout.
+      await refresh();
+      return true;
+    } catch (e) {
+      _log('linkCheckoutToCustomer EXCEPTION: $e');
+      return false;
+    }
+  }
+  
   Future<void> reset() async {
     await _clearPersistedCartId();
     _cart = ShopifyCart.empty;

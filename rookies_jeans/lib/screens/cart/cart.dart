@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/cart_model.dart';
+import 'package:rookies_jeans/screens/cart/checkout.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
+import 'package:rookies_jeans/services/shopify_auth_service.dart';
+import 'package:rookies_jeans/screens/authentication/login.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -21,6 +24,7 @@ class _CartScreenState extends State<CartScreen> {
   static const Color borderColor = Color(ShopifyConstants.borderColorHex);
 
   final Set<String> _pendingLineIds = {};
+  bool _isCheckingOut = false;
 
  @override
 void initState() {
@@ -66,14 +70,72 @@ void initState() {
     }
   }
 
+  /// Gate point: makes sure the user is logged in (prompting login if not),
+  /// links the Shopify cart to that customer so the resulting order is
+  /// associated with their account, then opens Shopify's hosted checkout.
+  /// Razorpay appears as a payment option on that checkout page because
+  /// it's configured as a payment provider in Shopify Admin — no payment
+  /// handling happens in this app.
   Future<void> _checkout() async {
-    final url = CartService.instance.cart.checkoutUrl;
-    if (url == null) return;
-    final uri = Uri.parse(url);
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!mounted) return;
-    if (!launched) {
-      _showToast('Could not open checkout.', isError: true);
+    if (_isCheckingOut) return;
+    setState(() => _isCheckingOut = true);
+
+    try {
+      final isLoggedIn = await ShopifyAuthService.instance.isLoggedIn();
+
+      if (!isLoggedIn) {
+        final loggedInNow = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => const Login(isCheckoutFlow: true),
+          ),
+        );
+        if (!mounted) return;
+        if (loggedInNow != true) {
+          // User backed out of login without signing in — stop here.
+          return;
+        }
+      }
+
+      final token = await ShopifyAuthService.instance.getSavedCustomerToken();
+      if (token != null && token.isNotEmpty) {
+        final linked = await CartService.instance.linkCheckoutToCustomer(
+          customerAccessToken: token,
+        );
+        if (!mounted) return;
+        if (!linked) {
+          _showToast(
+            'Could not link your account to checkout.',
+            isError: true,
+          );
+          // Not fatal — fall through so they can still check out as guest
+          // rather than being blocked from purchasing entirely.
+        }
+      }
+
+      final url = CartService.instance.cart.checkoutUrl;
+      if (url == null) {
+        if (!mounted) return;
+        _showToast('Checkout is not available right now.', isError: true);
+        return;
+      }
+
+      final result = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => CheckoutWebView(checkoutUrl: url),
+          fullscreenDialog: true,
+        ),
+      );
+      if (!mounted) return;
+
+      if (result == true) {
+        // Order was placed (WebView detected the thank_you page). The cart
+        // is now empty on Shopify's side — refresh local state to match.
+        await CartService.instance.refresh();
+        if (!mounted) return;
+        _showToast('Order placed successfully!');
+      }
+    } finally {
+      if (mounted) setState(() => _isCheckingOut = false);
     }
   }
 
@@ -134,7 +196,13 @@ void initState() {
             IconButton(
               icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
               color: primary,
-              onPressed: () => Navigator.maybePop(context),
+              onPressed: () {
+  if (context.canPop()) {
+    context.pop();
+  } else {
+    context.go('/home');
+  }
+},
             ),
             Expanded(
               child: Text(
@@ -185,29 +253,29 @@ void initState() {
                     'Items you add will show up here.',
                     style: TextStyle(fontSize: 12, color: secondaryTxt),
                   ),
-                  const SizedBox(height: 20),
-                  OutlinedButton(
-                    onPressed: () => Navigator.maybePop(context),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: primary,
-                      side: const BorderSide(color: primary),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 22,
-                        vertical: 12,
-                      ),
-                    ),
-                    child: const Text(
-                      'CONTINUE SHOPPING',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ),
+                  // const SizedBox(height: 20),
+                  // OutlinedButton(
+                  //   onPressed: () => Navigator.maybePop(context),
+                  //   style: OutlinedButton.styleFrom(
+                  //     foregroundColor: primary,
+                  //     side: const BorderSide(color: primary),
+                  //     shape: RoundedRectangleBorder(
+                  //       borderRadius: BorderRadius.circular(6),
+                  //     ),
+                  //     padding: const EdgeInsets.symmetric(
+                  //       horizontal: 22,
+                  //       vertical: 12,
+                  //     ),
+                  //   ),
+                  //   child: const Text(
+                  //     'CONTINUE SHOPPING',
+                  //     style: TextStyle(
+                  //       fontSize: 11,
+                  //       fontWeight: FontWeight.w800,
+                  //       letterSpacing: 1.2,
+                  //     ),
+                  //   ),
+                  // ),
                 ],
               ),
             ),
@@ -425,7 +493,9 @@ void initState() {
               ),
               const SizedBox(width: 12),
               ElevatedButton(
-                onPressed: cart.checkoutUrl == null ? null : _checkout,
+                onPressed: (cart.checkoutUrl == null || _isCheckingOut)
+                    ? null
+                    : _checkout,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primary,
                   shape: RoundedRectangleBorder(
@@ -437,15 +507,24 @@ void initState() {
                     vertical: 16,
                   ),
                 ),
-                child: const Text(
-                  'CHECKOUT',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: 1.5,
-                  ),
-                ),
+                child: _isCheckingOut
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'CHECKOUT',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
               ),
             ],
           ),

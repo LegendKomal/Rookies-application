@@ -390,7 +390,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               IconButton(
                                 icon: const Icon(Icons.favorite_border_rounded, size: 22),
                                 color: Colors.white,
-                                onPressed: () {},
+                                 onPressed: () => context.go('/wishlist'),
                               ),
                               // _cartIconWithBadge(),
                               IconButton(

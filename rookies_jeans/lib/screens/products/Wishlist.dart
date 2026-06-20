@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
@@ -40,7 +41,13 @@ class _WishlistPageState extends State<WishlistPage> {
           size: 18,
           color: primary,
         ),
-        onPressed: () => Navigator.pop(context),
+        onPressed: () {
+  if (context.canPop()) {
+    context.pop();
+  } else {
+    context.go('/home');
+  }
+},
       ),
       const Text(
         'MY WISHLIST',

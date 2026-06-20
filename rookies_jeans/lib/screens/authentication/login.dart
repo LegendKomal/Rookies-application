@@ -6,8 +6,9 @@ import 'package:rookies_jeans/screens/authentication/forgot_password.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
 class Login extends StatefulWidget {
-  const Login({super.key});
+  const Login({super.key, this.isCheckoutFlow = false});
 
+final bool isCheckoutFlow;
   @override
   State<Login> createState() => _LoginState();
 }
@@ -121,7 +122,12 @@ class _LoginState extends State<Login> {
       }
 
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      context.go('/home');
+
+      if (widget.isCheckoutFlow) {
+        Navigator.of(context).pop(true);
+      } else {
+        context.go('/home');
+      }
     } catch (e) {
       if (!mounted) return;
       _showMessage('Something went wrong: $e');
