@@ -9,10 +9,10 @@ import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/cart/cart.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/screens/products/products.dart';
+import 'package:rookies_jeans/screens/search/search.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
-import 'package:rookies_jeans/screens/authentication/login.dart';
 import 'package:video_player/video_player.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -23,14 +23,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const Color primary      = Color(ShopifyConstants.primaryColorHex);
-  static const Color bgColor      = Color(ShopifyConstants.bgColorHex);
-  static const Color cardColor    = Color(ShopifyConstants.cardColorHex);
+  static const Color primary = Color(ShopifyConstants.primaryColorHex);
+  static const Color bgColor = Color(ShopifyConstants.bgColorHex);
+  static const Color cardColor = Color(ShopifyConstants.cardColorHex);
   static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
-  static const Color borderColor  = Color.fromARGB(255, 80, 57, 57);
+  static const Color borderColor = Color.fromARGB(255, 80, 57, 57);
 
   final Set<String> _addingToCartProductIds = {};
-
   bool _isLoading = true;
 
   late VideoPlayerController _videoCtrl;
@@ -39,6 +38,117 @@ class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollCtrl = ScrollController();
   final List<_SectionAnchor> _sectionAnchors = [];
   bool _isSnapping = false;
+  BuildContext? _scrollableContext;
+
+  List<ShopifyCollection> _latestDrop = [];
+  List<ShopifyCollection> _categories = [];
+  List<ShopifyCollection> _ourCollection = [];
+  List<ShopifyProduct> _oversizedShirts = [];
+  List<ShopifyProduct> _hotDeals = [];
+  BalloonBannerData? _balloonBanner;
+
+  late final PageController _bannerCtrl;
+  int _currentBanner = 0;
+  Timer? _bannerTimer;
+
+  final TextEditingController _searchCtrl = TextEditingController();
+
+  final List<_PromoCollectionTile> _latestDropTiles = const [
+    _PromoCollectionTile(
+      title: 'NEW ARRIVALS',
+      subtitle: 'Fresh picks just landed',
+      handle: 'all',
+      imageAsset: 'assets/new_arrivals.jpg',
+      buttonText: 'SHOP NOW',
+    ),
+    _PromoCollectionTile(
+      title: 'SUMMER EDIT',
+      subtitle: 'Lightweight staples for summer',
+      handle: 'summer-edit',
+      imageAsset: 'assets/summer_edit.jpg',
+      buttonText: 'SHOP NOW',
+    ),
+    _PromoCollectionTile(
+      title: 'HOT DEALS',
+      subtitle: 'Best prices before they are gone',
+      handle: 'hot-deals',
+      imageAsset: 'assets/hot_deals.jpg',
+      buttonText: 'SHOP NOW',
+    ),
+    _PromoCollectionTile(
+      title: 'TRENDING NOW',
+      subtitle: 'Most wanted styles right now',
+      handle: 'trending-now',
+      imageAsset: 'assets/trending_now.jpg',
+      buttonText: 'SHOP NOW',
+    ),
+  ];
+
+  final List<_PromoCollectionTile> _ourCollectionPromoTiles = const [
+    _PromoCollectionTile(
+      title: 'OVERSIZED TEES',
+      subtitle: 'Relaxed drape. Everyday attitude',
+      handle: 'ss26-tshirts-oversize-fit-half-sleeve',
+      imageAsset: 'assets/oversized_tees.jpg',
+    ),
+    _PromoCollectionTile(
+      title: 'BALLOON FIT PANTS',
+      subtitle: 'Ease in every step',
+      handle: 'baloon-fit-pants',
+      imageAsset: 'assets/balloon_fit_pants.jpg',
+    ),
+    _PromoCollectionTile(
+      title: 'OVERSIZED SHIRTS',
+      subtitle: 'Relaxed cuts. Effortless layering',
+      handle: 'oversized-shirts',
+      imageAsset: 'assets/oversized_shirts.jpg',
+    ),
+    _PromoCollectionTile(
+      title: 'LINENS',
+      subtitle: 'Airy fabric. Summer essential',
+      handle: 'ss26-linens',
+      imageAsset: 'assets/linens.jpg',
+    ),
+    _PromoCollectionTile(
+      title: 'LOOSE FIT JEANS',
+      subtitle: 'Denim that breathes',
+      handle: 'ss26-loose-fit-jeans',
+      imageAsset: 'assets/loose_fit_jeans.jpg',
+    ),
+    _PromoCollectionTile(
+      title: 'BOOTCUT FIT JEANS',
+      subtitle: 'Classic shape. Effortless attitude',
+      handle: 'ss26-bootcutjeans',
+      imageAsset: 'assets/bootcut_fit_jeans.jpg',
+    ),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _bannerCtrl = PageController(viewportFraction: 1);
+    _videoCtrl = VideoPlayerController.asset('assets/rookies_video.mp4')
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() => _videoReady = true);
+        _videoCtrl.setLooping(true);
+        _videoCtrl.setVolume(0);
+        _videoCtrl.play();
+      });
+
+    _fetchAll();
+    CartService.instance.initialize();
+  }
+
+  @override
+  void dispose() {
+    _bannerTimer?.cancel();
+    _bannerCtrl.dispose();
+    _videoCtrl.dispose();
+    _searchCtrl.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
 
   void _registerAnchor(_SectionAnchor anchor) {
     if (!_sectionAnchors.any((a) => a.key == anchor.key)) {
@@ -62,8 +172,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return offsets;
   }
 
-  BuildContext? _scrollableContext;
-
   bool _handleScrollNotification(ScrollNotification notification) {
     if (notification is ScrollEndNotification && !_isSnapping) {
       _snapToNearestSection();
@@ -80,6 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     double nearest = offsets.first;
     double bestDelta = (offsets.first - current).abs();
+
     for (final o in offsets) {
       final delta = (o - current).abs();
       if (delta < bestDelta) {
@@ -89,7 +198,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final target = nearest.clamp(0.0, maxScroll);
-
     if ((target - current).abs() < 1.0) return;
 
     _isSnapping = true;
@@ -104,6 +212,38 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _fetchAll({bool forceRefresh = false}) async {
+    if (mounted) setState(() => _isLoading = true);
+
+    if (forceRefresh) {
+      ShopifyStorefrontService.instance.clearCache();
+    }
+
+    final results = await Future.wait([
+      ShopifyStorefrontService.instance.getLatestDropCollections(),
+      ShopifyStorefrontService.instance.getOurCollectionTiles(),
+      ShopifyStorefrontService.instance.getOversizedShirts(
+        first: ShopifyConstants.oversizedShirtsCount,
+      ),
+      ShopifyStorefrontService.instance.getHotDeals(
+        first: ShopifyConstants.hotDealsCount,
+      ),
+      ShopifyStorefrontService.instance.getBalloonBanner(),
+    ]);
+
+    if (!mounted) return;
+
+    setState(() {
+      _latestDrop = results[0] as List<ShopifyCollection>;
+      _categories = results[0] as List<ShopifyCollection>;
+      _ourCollection = results[1] as List<ShopifyCollection>;
+      _oversizedShirts = results[2] as List<ShopifyProduct>;
+      _hotDeals = results[3] as List<ShopifyProduct>;
+      _balloonBanner = results[4] as BalloonBannerData?;
+      _isLoading = false;
+    });
+  }
+
   void _openProductDetail(ShopifyProduct product) {
     Navigator.push(
       context,
@@ -113,6 +253,47 @@ class _HomeScreenState extends State<HomeScreen> {
           title: product.title,
           heroImageUrl: product.primaryImageUrl,
         ),
+      ),
+    );
+  }
+
+  void _openCollection(ShopifyCollection collection) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductsPage(collection: collection),
+      ),
+    );
+  }
+
+  void _openCollectionByHandle(String handle, {String? title, String? label}) {
+    final collection = ShopifyCollection(
+      id: handle,
+      title: title ?? label ?? handle,
+      handle: handle,
+      label: label ?? (title ?? handle).toUpperCase(),
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductsPage(collection: collection),
+      ),
+    );
+  }
+
+  Future<void> _openAssortedCollection() async {
+    const assortedCollection = ShopifyCollection(
+      id: 'assorted',
+      title: 'Assorted',
+      handle: 'assorted',
+      label: 'ASSORTED',
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductsPage(collection: assortedCollection),
       ),
     );
   }
@@ -150,86 +331,6 @@ class _HomeScreenState extends State<HomeScreen> {
               : 'Failed to add product to cart',
         ),
         duration: const Duration(seconds: 2),
-        // action: success
-        //     ? SnackBarAction(
-        //         label: 'GO TO CART',
-        //         onPressed: _goToCart,
-        //       )
-        //     : null,
-      ),
-    );
-  }
-
-  List<ShopifyCollection> _latestDrop    = [];
-  List<ShopifyCollection> _categories    = [];
-  List<ShopifyCollection> _ourCollection = [];
-  List<ShopifyProduct>    _oversizedShirts = [];
-  List<ShopifyProduct>    _hotDeals        = [];
-  BalloonBannerData?      _balloonBanner;
-
-  late final PageController _bannerCtrl;
-  int    _currentBanner = 0;
-  Timer? _bannerTimer;
-
-  final TextEditingController _searchCtrl = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _videoCtrl = VideoPlayerController.asset('assets/rookies_video.mp4')
-      ..initialize().then((_) {
-        if (!mounted) return;
-        setState(() => _videoReady = true);
-        _videoCtrl.setLooping(true);
-        _videoCtrl.setVolume(0);
-        _videoCtrl.play();
-      });
-    _fetchAll();
-    CartService.instance.initialize();
-  }
-
-  @override
-  void dispose() {
-    _videoCtrl.dispose();
-    _searchCtrl.dispose();
-    _scrollCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _fetchAll({bool forceRefresh = false}) async {
-    if (mounted) setState(() => _isLoading = true);
-
-    if (forceRefresh) {
-      ShopifyStorefrontService.instance.clearCache();
-    }
-
-    final results = await Future.wait([
-      ShopifyStorefrontService.instance.getLatestDropCollections(),
-      ShopifyStorefrontService.instance.getOurCollectionTiles(),
-      ShopifyStorefrontService.instance.getOversizedShirts(
-          first: ShopifyConstants.oversizedShirtsCount),
-      ShopifyStorefrontService.instance.getHotDeals(
-          first: ShopifyConstants.hotDealsCount),
-      ShopifyStorefrontService.instance.getBalloonBanner(),
-    ]);
-
-    if (!mounted) return;
-    setState(() {
-      _latestDrop      = results[0] as List<ShopifyCollection>;
-      _categories      = results[0] as List<ShopifyCollection>;
-      _ourCollection   = results[1] as List<ShopifyCollection>;
-      _oversizedShirts = results[2] as List<ShopifyProduct>;
-      _hotDeals        = results[3] as List<ShopifyProduct>;
-      _balloonBanner   = results[4] as BalloonBannerData?;
-      _isLoading       = false;
-    });
-  }
-
-  void _openCollection(ShopifyCollection collection) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProductsPage(collection: collection),
       ),
     );
   }
@@ -280,6 +381,16 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           _snapSection(
+                            id: 'latest_drops',
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _sliverCenteredHeadAsBox('LATEST DROPS'),
+                                _latestDropsAsBox(),
+                              ],
+                            ),
+                          ),
+                          _snapSection(
                             id: 'balloon_banner',
                             child: _balloonBannerAsBox(),
                           ),
@@ -294,16 +405,18 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           _snapSection(
-                            id: 'shop_by_fit',
+                            id: 'our_collections',
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                _sliverHeadAsBox('SHOP BY FIT'),
-                                _shopByFitAsBox(),
+                                _sliverCenteredHeadAsBox('OUR COLLECTIONS'),
+                                _ourCollectionsAsBox(),
                               ],
                             ),
                           ),
-                          const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                          const SliverToBoxAdapter(
+                            child: SizedBox(height: 40),
+                          ),
                         ],
                       ),
                     ),
@@ -359,7 +472,8 @@ class _HomeScreenState extends State<HomeScreen> {
               left: 0,
               right: 0,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 child: SizedBox(
                   height: 56,
                   child: Row(
@@ -368,10 +482,27 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: IconButton(
-                            icon: const Icon(Icons.search, size: 22),
-                            color: Colors.white,
-                            onPressed: () {},
-                          ),
+  icon: const Icon(Icons.search, size: 22),
+  color: Colors.white,
+  onPressed: () {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, animation, __) => const SearchPage(),
+        transitionsBuilder: (_, animation, __, child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOut,
+            ),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 200),
+      ),
+    );
+  },
+),
                         ),
                       ),
                       Image.asset(
@@ -388,13 +519,18 @@ class _HomeScreenState extends State<HomeScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.favorite_border_rounded, size: 22),
+                                icon: const Icon(
+                                  Icons.favorite_border_rounded,
+                                  size: 22,
+                                ),
                                 color: Colors.white,
-                                 onPressed: () => context.go('/wishlist'),
+                                onPressed: () => context.go('/wishlist'),
                               ),
-                              // _cartIconWithBadge(),
                               IconButton(
-                                icon: const Icon(Icons.person_outline_rounded, size: 22),
+                                icon: const Icon(
+                                  Icons.person_outline_rounded,
+                                  size: 22,
+                                ),
                                 color: Colors.white,
                                 tooltip: 'Logout',
                                 onPressed: _logout,
@@ -410,45 +546,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-      );
-
-  Widget _cartIconWithBadge() => AnimatedBuilder(
-        animation: CartService.instance,
-        builder: (context, _) {
-          final count = CartService.instance.totalQuantity;
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.shopping_bag_outlined, size: 22),
-                color: Colors.white,
-                onPressed: _goToCart,
-              ),
-              if (count > 0)
-                Positioned(
-                  right: 4,
-                  top: 4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD32F2F),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    constraints: const BoxConstraints(minWidth: 16),
-                    child: Text(
-                      '$count',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
       );
 
   Widget _videoBannerItem() => Stack(
@@ -509,23 +606,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       );
 
-  Widget _dotIndicator(int count, int current) => Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(
-          count,
-          (i) => AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            width: i == current ? 15 : 8,
-            height: 4,
-            decoration: BoxDecoration(
-              color: i == current ? primary : const Color(0xFFCCCCCC),
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-        ),
-      );
-
   Widget _sliverHeadAsBox(String title) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 22, 16, 10),
         child: Align(
@@ -537,6 +617,21 @@ class _HomeScreenState extends State<HomeScreen> {
               fontWeight: FontWeight.w800,
               color: primary,
               letterSpacing: 1.8,
+            ),
+          ),
+        ),
+      );
+
+  Widget _sliverCenteredHeadAsBox(String title) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 26, 16, 16),
+        child: Center(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w400,
+              color: primary,
+              letterSpacing: 1.2,
             ),
           ),
         ),
@@ -685,95 +780,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
 
-  static const List<String> _fitAssets = [
-    'assets/jeans1.jpeg',
-    'assets/jeans2.jpeg',
-    'assets/jeans3.jpeg',
-    'assets/jeans4.jpeg',
-    'assets/jeans5.jpeg',
-  ];
-
-  static const List<String> _fitLabels = [
-    'Slim Fit',
-    'Regular Fit',
-    'Baggy Fit',
-    'Straight Fit',
-    'Oversized Fit',
-  ];
-
-  Widget _shopByFitAsBox() => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          children: [
-            GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              shrinkWrap: true,
-              itemCount: 4,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 0.90,
-              ),
-              itemBuilder: (_, i) => _fitTile(_fitAssets[i], _fitLabels[i]),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              height: 170,
-              child: _fitTile(_fitAssets[4], _fitLabels[4]),
-            ),
-          ],
-        ),
-      );
-
-  Widget _fitTile(String assetPath, String label) => GestureDetector(
-        onTap: () {},
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.asset(
-                assetPath,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    Container(color: const Color(0xFF555555)),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.62),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 8,
-                bottom: 8,
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-
   Widget _balloonBannerAsBox() {
     final banner = _balloonBanner;
     return GestureDetector(
-      onTap: () {},
+      onTap: _openAssortedCollection,
       child: Container(
         margin: const EdgeInsets.fromLTRB(16, 20, 16, 4),
         height: 150,
@@ -815,12 +825,202 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
 
+  Widget _latestDropsAsBox() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          itemCount: _latestDropTiles.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.68,
+          ),
+          itemBuilder: (_, i) => _latestDropCard(_latestDropTiles[i]),
+        ),
+      );
+
+  Widget _ourCollectionsAsBox() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          itemCount: _ourCollectionPromoTiles.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 0,
+            mainAxisSpacing: 0,
+            childAspectRatio: 0.68,
+          ),
+          itemBuilder: (_, i) =>
+              _ourCollectionCard(_ourCollectionPromoTiles[i], i),
+        ),
+      );
+
+  Widget _latestDropCard(_PromoCollectionTile tile) => GestureDetector(
+        onTap: () => _openCollectionByHandle(
+          tile.handle,
+          title: tile.title,
+          label: tile.title,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                tile.imageAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    Container(color: const Color(0xFF555555)),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.10),
+                      Colors.black.withOpacity(0.42),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 18,
+                child: Column(
+                  children: [
+                    Text(
+                      tile.title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 42,
+                      child: OutlinedButton(
+                        onPressed: () => _openCollectionByHandle(
+                          tile.handle,
+                          title: tile.title,
+                          label: tile.title,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(
+                            color: Colors.white,
+                            width: 1,
+                          ),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        child: Text(
+                          '${tile.buttonText}  →',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _ourCollectionCard(_PromoCollectionTile tile, int index) =>
+      GestureDetector(
+        onTap: () => _openCollectionByHandle(
+          tile.handle,
+          title: tile.title,
+          label: tile.title,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: borderColor,
+                width: index < 2 ? 1 : 0.8,
+              ),
+              left: BorderSide(
+                color: borderColor,
+                width: index.isEven ? 1 : 0.4,
+              ),
+              right: const BorderSide(
+                color: borderColor,
+                width: 0.8,
+              ),
+              bottom: const BorderSide(
+                color: borderColor,
+                width: 0.8,
+              ),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                color: const Color(0xFFF5F5F5),
+                padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+                child: Column(
+                  children: [
+                    Text(
+                      tile.title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: primary,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      tile.subtitle,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 9,
+                        color: secondaryTxt,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Image.asset(
+                  tile.imageAsset,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Container(color: const Color(0xFFE0E0E0)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
   Widget _productTile(ShopifyProduct product) {
     const double tileWidth = 160.0;
     const double imageHeight = 185.0;
     final colorHexes = product.colorHexCodes;
     final isAdding = _addingToCartProductIds.contains(product.id);
-    final variantId = product.variants.isNotEmpty ? product.variants.first.id : null;
+    final variantId =
+        product.variants.isNotEmpty ? product.variants.first.id : null;
 
     return GestureDetector(
       onTap: () => _openProductDetail(product),
@@ -1010,72 +1210,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _sliverHotDeals() {
-    const buckets = [
-      _Bucket('STYLES UNDER ₹999',  Color(0xFF111111)),
-      _Bucket('STYLES UNDER ₹1499', Color(0xFF8B4513)),
-      _Bucket('STYLES UNDER ₹1999', Color(0xFFFF3B3B)),
-      _Bucket('STYLES UNDER ₹2999', Color(0xFF111111)),
-    ];
-    return SliverToBoxAdapter(
-      child: SizedBox(
-        height: 175,
-        child: ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          scrollDirection: Axis.horizontal,
-          itemCount: buckets.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (_, i) {
-            final product = i < _hotDeals.length ? _hotDeals[i] : null;
-            return GestureDetector(
-              onTap: () {},
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: 130,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      product?.primaryImageUrl != null
-                          ? CachedNetworkImage(
-                              imageUrl: product!.primaryImageUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) => Container(
-                                  color: const Color(0xFFE8E8E8)),
-                              errorWidget: (_, __, ___) => Container(
-                                  color: const Color(0xFFE8E8E8)),
-                            )
-                          : Container(color: const Color(0xFFE8E8E8)),
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 7),
-                          color: buckets[i].labelColor,
-                          child: Text(
-                            buckets[i].label,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
   Widget _shimmer() => ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -1132,6 +1266,22 @@ class _SectionAnchor {
 
 class _Bucket {
   final String label;
-  final Color  labelColor;
+  final Color labelColor;
   const _Bucket(this.label, this.labelColor);
+}
+
+class _PromoCollectionTile {
+  final String title;
+  final String subtitle;
+  final String handle;
+  final String imageAsset;
+  final String buttonText;
+
+  const _PromoCollectionTile({
+    required this.title,
+    required this.subtitle,
+    required this.handle,
+    required this.imageAsset,
+    this.buttonText = 'SHOP NOW',
+  });
 }

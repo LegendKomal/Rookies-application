@@ -6,16 +6,20 @@ import 'package:rookies_jeans/screens/authentication/login.dart';
 import 'package:rookies_jeans/screens/collections/collections.dart';
 import 'package:rookies_jeans/screens/products/Wishlist.dart';
 import 'package:rookies_jeans/screens/cart/cart.dart';
+import 'package:rookies_jeans/screens/profile/profile.dart';
 import 'package:rookies_jeans/screens/splashscreen/splashscreen.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Restore the persisted Shopify cart id (if any) and fetch the latest
-  // cart contents from Shopify before the UI needs it. CartScreen and the
-  // various "Add to Cart" buttons listen to CartService directly, so this
-  // just makes sure cart state/badges are correct from the first frame.
+
+  // Restore cart state from Shopify
   CartService.instance.initialize();
+
+  // ── Restore auth session so the profile tab shows the correct state
+  //    immediately on app launch (even after a hot restart / cold start).
+  await AuthService.instance.initialize();
+
   runApp(const MyApp());
 }
 
@@ -34,52 +38,90 @@ final GoRouter _appRouter = GoRouter(
       path: '/login',
       builder: (context, state) => const Login(),
     ),
+
+    // ── Profile sub-page placeholders ─────────────────────────────────────
+    GoRoute(
+      path: '/register',
+      builder: (context, state) =>
+          const Scaffold(body: Center(child: Text('Create Account'))),
+    ),
+    GoRoute(
+      path: '/orders',
+      builder: (context, state) =>
+          const Scaffold(body: Center(child: Text('Order History'))),
+    ),
+    GoRoute(
+      path: '/addresses',
+      builder: (context, state) =>
+          const Scaffold(body: Center(child: Text('Address Book'))),
+    ),
+    GoRoute(
+      path: '/change-password',
+      builder: (context, state) =>
+          const Scaffold(body: Center(child: Text('Change Password'))),
+    ),
+    GoRoute(
+      path: '/data-privacy',
+      builder: (context, state) =>
+          const Scaffold(body: Center(child: Text('Data & Privacy'))),
+    ),
+    GoRoute(
+      path: '/refund-policy',
+      builder: (context, state) =>
+          const Scaffold(body: Center(child: Text('Return & Refund Policy'))),
+    ),
+    GoRoute(
+      path: '/shipping-policy',
+      builder: (context, state) =>
+          const Scaffold(body: Center(child: Text('Shipping Policy'))),
+    ),
+    GoRoute(
+      path: '/store-locator',
+      builder: (context, state) =>
+          const Scaffold(body: Center(child: Text('Store Locator'))),
+    ),
+    GoRoute(
+      path: '/track-order',
+      builder: (context, state) =>
+          const Scaffold(body: Center(child: Text('Track Your Order'))),
+    ),
+
+    // ── Main shell with bottom nav ────────────────────────────────────────
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return ScaffoldWithNavBar(navigationShell: navigationShell);
       },
       branches: [
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/home',
-              builder: (context, state) => const HomeScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/category',
-              builder: (context, state) => const ExploreCategoriesPage(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-  routes: [
-    GoRoute(
-      path: '/wishlist',
-      builder: (context, state) => const WishlistPage(),
-    ),
-  ],
-),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/cart',
-              builder: (context, state) => const CartScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/profile',
-              builder: (context, state) =>
-                  const Scaffold(body: Center(child: Text('Profile'))),
-            ),
-          ],
-        ),
+        StatefulShellBranch(routes: [
+          GoRoute(
+            path: '/home',
+            builder: (context, state) => const HomeScreen(),
+          ),
+        ]),
+        StatefulShellBranch(routes: [
+          GoRoute(
+            path: '/category',
+            builder: (context, state) => const ExploreCategoriesPage(),
+          ),
+        ]),
+        StatefulShellBranch(routes: [
+          GoRoute(
+            path: '/wishlist',
+            builder: (context, state) => const WishlistPage(),
+          ),
+        ]),
+        StatefulShellBranch(routes: [
+          GoRoute(
+            path: '/cart',
+            builder: (context, state) => const CartScreen(),
+          ),
+        ]),
+        StatefulShellBranch(routes: [
+          GoRoute(
+            path: '/profile',
+            builder: (context, state) => const ProfileScreen(),
+          ),
+        ]),
       ],
     ),
   ],
@@ -87,7 +129,6 @@ final GoRouter _appRouter = GoRouter(
 
 class ScaffoldWithNavBar extends StatelessWidget {
   const ScaffoldWithNavBar({super.key, required this.navigationShell});
-
   final StatefulNavigationShell navigationShell;
 
   @override
@@ -110,8 +151,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const background = Color(0xfff5f5f3);
-    const primary = Color(0xff111111);
+    const background = Color(0xFFF5F5F3);
+    const primary    = Color(0xFF111111);
 
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
@@ -131,12 +172,11 @@ class MyApp extends StatelessWidget {
           surfaceTintColor: Colors.transparent,
           centerTitle: true,
         ),
-        progressIndicatorTheme: const ProgressIndicatorThemeData(
-          color: primary,
-        ),
+        progressIndicatorTheme:
+            const ProgressIndicatorThemeData(color: primary),
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
-        dividerColor: const Color(0xffe7e7e7),
+        dividerColor: const Color(0xFFE7E7E7),
       ),
       routerConfig: _appRouter,
     );

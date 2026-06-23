@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/screens/products/products.dart';
+import 'package:rookies_jeans/screens/search/search.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 
 class ExploreCategoriesPage extends StatefulWidget {
@@ -47,23 +48,38 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
             icon: const Icon(Icons.search),
             color: const Color(ShopifyConstants.primaryColorHex),
             onPressed: () {
-              // TODO: hook up to your search page/route
+              Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, animation, __) => const SearchPage(),
+        transitionsBuilder: (_, animation, __, child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOut,
+            ),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 200),
+      ),
+    );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.favorite_border),
-            color: const Color(ShopifyConstants.primaryColorHex),
-            onPressed: () {
-              // TODO: hook up to your wishlist page/route
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.shopping_bag_outlined),
-            color: const Color(ShopifyConstants.primaryColorHex),
-            onPressed: () {
-              // TODO: hook up to your cart page/route
-            },
-          ),
+          // IconButton(
+          //   icon: const Icon(Icons.favorite_border),
+          //   color: const Color(ShopifyConstants.primaryColorHex),
+          //   onPressed: () {
+          //     // TODO: hook up to your wishlist page/route
+          //   },
+          // ),
+          // IconButton(
+          //   icon: const Icon(Icons.shopping_bag_outlined),
+          //   color: const Color(ShopifyConstants.primaryColorHex),
+          //   onPressed: () {
+          //     // TODO: hook up to your cart page/route
+          //   },
+          // ),
         ],
       ),
       body: SafeArea(

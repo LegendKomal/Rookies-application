@@ -648,6 +648,142 @@ query getProduct($handle: String!) {
     }
   }
 
+  Future<List<ShopifyCollection>> fetchCollectionsByHandles(
+    List<Map<String, String>> items) async {
+  final buffer = StringBuffer('query fetchCollections {\n');
+  for (int i = 0; i < items.length; i++) {
+    buffer.write('  c$i: collectionByHandle(handle: "${items[i]['handle']}") {\n');
+    buffer.write('    id title handle\n');
+    buffer.write('    image { url altText }\n');
+    // Fallback: grab first product image if collection has no image
+    buffer.write('    products(first: 1) {\n');
+    buffer.write('      edges { node { images(first: 1) { edges { node { url } } } } }\n');
+    buffer.write('    }\n');
+    buffer.write('  }\n');
+  }
+  buffer.write('}');
+
+  try {
+    final response = await http.post(
+      Uri.parse(ShopifyConstants.storefrontEndpoint),
+      headers: ShopifyConstants.headers,
+      body: jsonEncode({'query': buffer.toString()}),
+    );
+    _log('fetchCollectionsByHandles → ${response.statusCode}');
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    if (decoded['errors'] != null || decoded['data'] == null) return [];
+    final data = decoded['data'] as Map<String, dynamic>;
+    final List<ShopifyCollection> result = [];
+    for (int i = 0; i < items.length; i++) {
+      final c = data['c$i'];
+      if (c == null) continue;
+
+      // Use collection image, fall back to first product image
+      String? imageUrl = c['image']?['url'] as String?;
+      if (imageUrl == null) {
+        final edges = c['products']?['edges'] as List?;
+        if (edges != null && edges.isNotEmpty) {
+          final imgEdges = edges[0]['node']['images']['edges'] as List?;
+          if (imgEdges != null && imgEdges.isNotEmpty) {
+            imageUrl = imgEdges[0]['node']['url'] as String?;
+          }
+        }
+      }
+
+      result.add(ShopifyCollection(
+        id: c['id'] as String,
+        title: c['title'] as String,
+        handle: c['handle'] as String,
+        imageUrl: imageUrl,
+        label: items[i]['label']!,
+      ));
+    }
+    return result;
+  } catch (e) {
+    _log('fetchCollectionsByHandles EXCEPTION: $e');
+    return [];
+  }
+}
+
+Future<List<ShopifyProduct>> searchProducts(
+    String query, {
+    int first = 20,
+  }) =>
+      _cachedFetch(
+        'search:${query.toLowerCase()}:$first',
+        () => _fetchSearchProducts(query, first: first),
+      );
+ 
+  Future<List<ShopifyProduct>> _fetchSearchProducts(
+    String query, {
+    int first = 20,
+  }) async {
+    const String gqlQuery = r'''
+    query searchProducts($query: String!, $first: Int!) {
+      products(query: $query, first: $first) {
+        edges {
+          node {
+            id
+            title
+            handle
+            priceRange { minVariantPrice { amount currencyCode } }
+            compareAtPriceRange { minVariantPrice { amount currencyCode } }
+            images(first: 2) { edges { node { url altText } } }
+            options {
+              name
+              values
+              optionValues { name swatch { color } }
+            }
+            variants(first: 10) {
+              edges {
+                node {
+                  id
+                  title
+                  availableForSale
+                  selectedOptions { name value }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    ''';
+ 
+    try {
+      final response = await http.post(
+        Uri.parse(ShopifyConstants.storefrontEndpoint),
+        headers: ShopifyConstants.headers,
+        body: jsonEncode({
+          'query': gqlQuery,
+          'variables': {
+            'query': query,
+            'first': first,
+          },
+        }),
+      );
+ 
+      _log('searchProducts [$query] → ${response.statusCode}');
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+ 
+      if (decoded['errors'] != null || decoded['data'] == null) {
+        _log('searchProducts errors: ${decoded['errors']}');
+        return [];
+      }
+ 
+      final edges =
+          (decoded['data']?['products']?['edges'] as List?) ?? [];
+ 
+      return edges
+          .map((e) =>
+              ShopifyProduct.fromJson(e['node'] as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      _log('searchProducts EXCEPTION: $e');
+      return [];
+    }
+  }
+  
   Future<List<ShopifyCollection>> getExploreCategories() =>
       _cachedFetch('exploreCategories', _fetchExploreCategories);
 

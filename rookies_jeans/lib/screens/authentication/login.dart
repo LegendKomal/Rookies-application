@@ -1,31 +1,32 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:rookies_jeans/screens/Dashboard/home_screen.dart';
 import 'package:rookies_jeans/screens/authentication/forgot_password.dart';
+import 'package:rookies_jeans/screens/profile/profile.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key, this.isCheckoutFlow = false});
 
-final bool isCheckoutFlow;
+  final bool isCheckoutFlow;
+
   @override
   State<Login> createState() => _LoginState();
 }
 
 class _LoginState extends State<Login> {
-  final TextEditingController emailController = TextEditingController();
+  final TextEditingController emailController    = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
   bool isPasswordHidden = true;
-  bool isLoading = false;
+  bool isLoading        = false;
 
-  static const Color bgColor = Color(0xfff5f5f3);
-  static const Color cardColor = Colors.white;
-  static const Color primary = Color(0xff111111);
+  static const Color bgColor      = Color(0xfff5f5f3);
+  static const Color cardColor    = Colors.white;
+  static const Color primary      = Color(0xff111111);
   static const Color secondaryText = Color(0xff6b6b6b);
-  static const Color borderColor = Color(0xffdddddd);
-  static const Color fieldFill = Color(0xfffafafa);
+  static const Color borderColor  = Color(0xffdddddd);
+  static const Color fieldFill    = Color(0xfffafafa);
 
   @override
   void dispose() {
@@ -46,15 +47,12 @@ class _LoginState extends State<Login> {
         fontSize: 14.5,
         fontWeight: FontWeight.w400,
       ),
-      prefixIcon: Icon(
-        icon,
-        color: const Color(0xff444444),
-        size: 20,
-      ),
+      prefixIcon: Icon(icon, color: const Color(0xff444444), size: 20),
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: fieldFill,
-      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+      contentPadding:
+          const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: borderColor),
@@ -77,18 +75,13 @@ class _LoginState extends State<Login> {
   Future<void> _handleLogin() async {
     FocusScope.of(context).unfocus();
 
-    final email = emailController.text.trim();
+    final email    = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    if (kDebugMode) {
-      debugPrint('UI LOGIN CLICK -> email: $email');
-    }
+    if (kDebugMode) debugPrint('UI LOGIN CLICK -> email: $email');
 
     if (email.isEmpty || password.isEmpty) {
       _showMessage('Please enter email and password.');
-      if (kDebugMode) {
-        debugPrint('UI LOGIN VALIDATION FAILED -> empty email/password');
-      }
       return;
     }
 
@@ -104,22 +97,28 @@ class _LoginState extends State<Login> {
 
       if (!result.success) {
         _showMessage(result.message ?? 'Login failed');
-        if (kDebugMode) {
-          debugPrint('UI LOGIN FAILED -> ${result.message}');
-        }
+        if (kDebugMode) debugPrint('UI LOGIN FAILED -> ${result.message}');
         return;
       }
 
-      // success path
+      // ── BRIDGE: tell AuthService the user is now logged in ──────────────
+      // This is the critical step that was missing before.
+      if (result.customer != null) {
+        AuthService.instance.signIn(
+          firstName: result.customer!.firstName ?? '',
+          lastName:  result.customer!.lastName  ?? '',
+          email:     result.customer!.email     ?? '',
+        );
+      }
+      // ────────────────────────────────────────────────────────────────────
+
       _showMessage(
         result.customer != null
             ? 'Welcome ${result.customer!.fullName}'
             : 'Login successful',
       );
 
-      if (kDebugMode) {
-        debugPrint('UI LOGIN SUCCESS -> ${result.customer?.toJson()}');
-      }
+      if (kDebugMode) debugPrint('UI LOGIN SUCCESS -> ${result.customer?.toJson()}');
 
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
@@ -131,13 +130,9 @@ class _LoginState extends State<Login> {
     } catch (e) {
       if (!mounted) return;
       _showMessage('Something went wrong: $e');
-      if (kDebugMode) {
-        debugPrint('UI LOGIN EXCEPTION -> $e');
-      }
+      if (kDebugMode) debugPrint('UI LOGIN EXCEPTION -> $e');
     } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -146,18 +141,13 @@ class _LoginState extends State<Login> {
       SnackBar(
         backgroundColor: primary,
         behavior: SnackBarBehavior.floating,
-        content: Text(
-          message,
-          style: const TextStyle(color: Colors.white),
-        ),
+        content: Text(message, style: const TextStyle(color: Colors.white)),
       ),
     );
   }
 
   void _handleForgotPassword() {
-    if (kDebugMode) {
-      debugPrint('UI FORGOT PASSWORD TAP');
-    }
+    if (kDebugMode) debugPrint('UI FORGOT PASSWORD TAP');
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const ForgotPassword()),
     );
@@ -217,14 +207,11 @@ class _LoginState extends State<Login> {
                       ),
                     ),
                     const SizedBox(height: 32),
-                    const Text(
-                      "Email",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: primary,
-                      ),
-                    ),
+                    const Text("Email",
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: primary)),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: emailController,
@@ -235,14 +222,11 @@ class _LoginState extends State<Login> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    const Text(
-                      "Password",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: primary,
-                      ),
-                    ),
+                    const Text("Password",
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: primary)),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: passwordController,
@@ -251,11 +235,8 @@ class _LoginState extends State<Login> {
                         hintText: "Enter your password",
                         icon: Icons.lock_outline_rounded,
                         suffixIcon: IconButton(
-                          onPressed: () {
-                            setState(() {
-                              isPasswordHidden = !isPasswordHidden;
-                            });
-                          },
+                          onPressed: () => setState(
+                              () => isPasswordHidden = !isPasswordHidden),
                           icon: Icon(
                             isPasswordHidden
                                 ? Icons.visibility_off_outlined
@@ -274,13 +255,9 @@ class _LoginState extends State<Login> {
                           foregroundColor: primary,
                           padding: EdgeInsets.zero,
                         ),
-                        child: const Text(
-                          "Forgot Password?",
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: const Text("Forgot Password?",
+                            style: TextStyle(
+                                fontSize: 13.5, fontWeight: FontWeight.w600)),
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -295,49 +272,36 @@ class _LoginState extends State<Login> {
                           disabledBackgroundColor: const Color(0xff2d2d2d),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+                              borderRadius: BorderRadius.circular(14)),
                         ),
                         child: isLoading
                             ? const SizedBox(
                                 width: 22,
                                 height: 22,
                                 child: CircularProgressIndicator(
-                                  strokeWidth: 2.2,
-                                  color: Colors.white,
-                                ),
+                                    strokeWidth: 2.2, color: Colors.white),
                               )
-                            : const Text(
-                                "Sign In",
+                            : const Text("Sign In",
                                 style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.2)),
                       ),
                     ),
                     const SizedBox(height: 22),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
-                          "New to ROOKIES? ",
-                          style: TextStyle(
-                            color: secondaryText,
-                            fontSize: 14,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {},
-                          child: const Text(
-                            "Create Account",
+                        const Text("New to ROOKIES? ",
                             style: TextStyle(
-                              color: primary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
+                                color: secondaryText, fontSize: 14)),
+                        GestureDetector(
+                          onTap: () => context.push('/register'),
+                          child: const Text("Create Account",
+                              style: TextStyle(
+                                  color: primary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700)),
                         ),
                       ],
                     ),
