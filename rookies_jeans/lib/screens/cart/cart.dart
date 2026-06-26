@@ -17,22 +17,26 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  static const Color primary = Color(ShopifyConstants.primaryColorHex);
-  static const Color bgColor = Color(ShopifyConstants.bgColorHex);
-  static const Color cardColor = Color(ShopifyConstants.cardColorHex);
+  static const Color primary      = Color(ShopifyConstants.primaryColorHex);
+  static const Color bgColor      = Color(ShopifyConstants.bgColorHex);
+  static const Color cardColor    = Color(ShopifyConstants.cardColorHex);
   static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
-  static const Color borderColor = Color(ShopifyConstants.borderColorHex);
+  static const Color borderColor  = Color(ShopifyConstants.borderColorHex);
+
+  static const String _fHead = ShopifyConstants.fontHeading;
+  static const String _fBody = ShopifyConstants.fontBody;
+  static const String _fBold = ShopifyConstants.fontBodyBold;
 
   final Set<String> _pendingLineIds = {};
   bool _isCheckingOut = false;
 
- @override
-void initState() {
-  super.initState();
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    CartService.instance.refresh();
-  });
-}
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      CartService.instance.refresh();
+    });
+  }
 
   void _showToast(String message, {bool isError = false}) {
     Fluttertoast.showToast(
@@ -70,12 +74,6 @@ void initState() {
     }
   }
 
-  /// Gate point: makes sure the user is logged in (prompting login if not),
-  /// links the Shopify cart to that customer so the resulting order is
-  /// associated with their account, then opens Shopify's hosted checkout.
-  /// Razorpay appears as a payment option on that checkout page because
-  /// it's configured as a payment provider in Shopify Admin — no payment
-  /// handling happens in this app.
   Future<void> _checkout() async {
     if (_isCheckingOut) return;
     setState(() => _isCheckingOut = true);
@@ -90,10 +88,7 @@ void initState() {
           ),
         );
         if (!mounted) return;
-        if (loggedInNow != true) {
-          // User backed out of login without signing in — stop here.
-          return;
-        }
+        if (loggedInNow != true) return;
       }
 
       final token = await ShopifyAuthService.instance.getSavedCustomerToken();
@@ -107,8 +102,6 @@ void initState() {
             'Could not link your account to checkout.',
             isError: true,
           );
-          // Not fatal — fall through so they can still check out as guest
-          // rather than being blocked from purchasing entirely.
         }
       }
 
@@ -128,8 +121,6 @@ void initState() {
       if (!mounted) return;
 
       if (result == true) {
-        // Order was placed (WebView detected the thank_you page). The cart
-        // is now empty on Shopify's side — refresh local state to match.
         await CartService.instance.refresh();
         if (!mounted) return;
         _showToast('Order placed successfully!');
@@ -162,7 +153,7 @@ void initState() {
         child: AnimatedBuilder(
           animation: CartService.instance,
           builder: (context, _) {
-            final cart = CartService.instance.cart;
+            final cart      = CartService.instance.cart;
             final isLoading = CartService.instance.isLoading;
 
             return Column(
@@ -197,21 +188,24 @@ void initState() {
               icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
               color: primary,
               onPressed: () {
-  if (context.canPop()) {
-    context.pop();
-  } else {
-    context.go('/home');
-  }
-},
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/home');
+                }
+              },
             ),
             Expanded(
               child: Text(
-                cart.totalQuantity > 0 ? 'MY CART (${cart.totalQuantity})' : 'MY CART',
+                cart.totalQuantity > 0
+                    ? 'MY CART (${cart.totalQuantity})'
+                    : 'MY CART',
                 style: const TextStyle(
+                  fontFamily: _fBold,
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                   color: primary,
-                  letterSpacing: 1.8,
+                  // letterSpacing: 1.8,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -243,39 +237,21 @@ void initState() {
                   const Text(
                     'Your cart is empty',
                     style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                      fontFamily: _fHead,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w500,
                       color: primary,
                     ),
                   ),
                   const SizedBox(height: 6),
                   const Text(
                     'Items you add will show up here.',
-                    style: TextStyle(fontSize: 12, color: secondaryTxt),
+                    style: TextStyle(
+                      fontFamily: _fBody,
+                      fontSize: 12,
+                      color: secondaryTxt,
+                    ),
                   ),
-                  // const SizedBox(height: 20),
-                  // OutlinedButton(
-                  //   onPressed: () => Navigator.maybePop(context),
-                  //   style: OutlinedButton.styleFrom(
-                  //     foregroundColor: primary,
-                  //     side: const BorderSide(color: primary),
-                  //     shape: RoundedRectangleBorder(
-                  //       borderRadius: BorderRadius.circular(6),
-                  //     ),
-                  //     padding: const EdgeInsets.symmetric(
-                  //       horizontal: 22,
-                  //       vertical: 12,
-                  //     ),
-                  //   ),
-                  //   child: const Text(
-                  //     'CONTINUE SHOPPING',
-                  //     style: TextStyle(
-                  //       fontSize: 11,
-                  //       fontWeight: FontWeight.w800,
-                  //       letterSpacing: 1.2,
-                  //     ),
-                  //   ),
-                  // ),
                 ],
               ),
             ),
@@ -293,7 +269,7 @@ void initState() {
 
   Widget _cartLineCard(ShopifyCartLine line) {
     final isPending = _pendingLineIds.contains(line.lineId);
-    final heroTag = 'cart_image_${line.lineId}';
+    final heroTag   = 'cart_image_${line.lineId}';
 
     return Container(
       decoration: BoxDecoration(
@@ -347,6 +323,7 @@ void initState() {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
+                    fontFamily: _fBold,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: primary,
@@ -358,13 +335,18 @@ void initState() {
                   const SizedBox(height: 3),
                   Text(
                     line.variantTitle!,
-                    style: const TextStyle(fontSize: 11, color: secondaryTxt),
+                    style: const TextStyle(
+                      fontFamily: _fBody,
+                      fontSize: 11,
+                      color: secondaryTxt,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 6),
                 Text(
                   line.formattedPrice,
                   style: const TextStyle(
+                    fontFamily: _fBold,
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
                     color: primary,
@@ -375,6 +357,7 @@ void initState() {
                   const Text(
                     'Out of stock',
                     style: TextStyle(
+                      fontFamily: _fBold,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFFD32F2F),
@@ -430,6 +413,7 @@ void initState() {
                 '${line.quantity}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
+                  fontFamily: _fBold,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: primary,
@@ -473,16 +457,18 @@ void initState() {
                     const Text(
                       'SUBTOTAL',
                       style: TextStyle(
+                        fontFamily: _fBold,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: secondaryTxt,
-                        letterSpacing: 1.0,
+                        // letterSpacing: 1.0,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       cart.formattedSubtotal,
                       style: const TextStyle(
+                        fontFamily: _fBold,
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
                         color: primary,
@@ -519,10 +505,11 @@ void initState() {
                     : const Text(
                         'CHECKOUT',
                         style: TextStyle(
+                          fontFamily: _fBold,
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
-                          letterSpacing: 1.5,
+                          // letterSpacing: 1.5,
                         ),
                       ),
               ),
@@ -532,9 +519,6 @@ void initState() {
       );
 }
 
-/// Fullscreen pinch-to-zoom / pan image viewer.
-/// Tap to open (via Hero), pinch + drag to zoom/pan, swipe down or tap the
-/// backdrop to dismiss.
 class _ImageZoomViewer extends StatefulWidget {
   const _ImageZoomViewer({required this.imageUrl, required this.heroTag});
 
@@ -549,9 +533,9 @@ class _ImageZoomViewerState extends State<_ImageZoomViewer> {
   final TransformationController _transformController =
       TransformationController();
 
-  double _dragOffset = 0;
+  double _dragOffset      = 0;
   double _backdropOpacity = 1;
-  bool _isZoomed = false;
+  bool   _isZoomed        = false;
 
   static const double _dismissThreshold = 120;
 
@@ -567,9 +551,9 @@ class _ImageZoomViewerState extends State<_ImageZoomViewer> {
   }
 
   void _onVerticalDragUpdate(DragUpdateDetails details) {
-    if (_isZoomed) return; // let InteractiveViewer handle panning when zoomed
+    if (_isZoomed) return;
     setState(() {
-      _dragOffset += details.delta.dy;
+      _dragOffset     += details.delta.dy;
       _backdropOpacity = (1 - (_dragOffset.abs() / 350)).clamp(0.0, 1.0);
     });
   }
@@ -581,7 +565,7 @@ class _ImageZoomViewerState extends State<_ImageZoomViewer> {
       Navigator.of(context).pop();
     } else {
       setState(() {
-        _dragOffset = 0;
+        _dragOffset      = 0;
         _backdropOpacity = 1;
       });
     }
@@ -645,7 +629,11 @@ class _ImageZoomViewerState extends State<_ImageZoomViewer> {
             right: 8,
             child: SafeArea(
               child: IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ),

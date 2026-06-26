@@ -3,11 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
-// ---------------------------------------------------------------------------
-// AuthService — single source of truth for UI auth state.
-// It bridges ShopifyAuthService (which owns the token) so every widget
-// that listens to AuthService.instance automatically reacts to login/logout.
-// ---------------------------------------------------------------------------
 class AuthService extends ChangeNotifier {
   static final AuthService instance = AuthService._();
   AuthService._();
@@ -22,30 +17,26 @@ class AuthService extends ChangeNotifier {
   String get lastName   => _lastName;
   String get email      => _email;
 
-  /// Two-letter initials for the avatar bubble (e.g. "JO").
   String get initials {
     final f = _firstName.isNotEmpty ? _firstName[0].toUpperCase() : '';
     final l = _lastName.isNotEmpty  ? _lastName[0].toUpperCase()  : '';
     return '$f$l';
   }
 
-  /// Call once at app start (e.g. in main() or SplashScreen) to restore
-  /// a persisted Shopify session so the profile tab is correct immediately.
   Future<void> initialize() async {
     final loggedIn = await ShopifyAuthService.instance.isLoggedIn();
     if (!loggedIn) return;
 
     final customer = await ShopifyAuthService.instance.getCurrentCustomer();
     if (customer != null) {
-      _firstName = customer.firstName ?? '';
-      _lastName  = customer.lastName  ?? '';
-      _email     = customer.email     ?? '';
+      _firstName  = customer.firstName ?? '';
+      _lastName   = customer.lastName  ?? '';
+      _email      = customer.email     ?? '';
       _isLoggedIn = true;
       notifyListeners();
     }
   }
 
-  /// Call this right after ShopifyAuthService.login() succeeds.
   void signIn({
     required String firstName,
     required String lastName,
@@ -58,7 +49,6 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Clears both local state AND the Shopify secure-storage token.
   Future<void> signOut() async {
     await ShopifyAuthService.instance.logout();
     _firstName  = '';
@@ -69,9 +59,6 @@ class AuthService extends ChangeNotifier {
   }
 }
 
-// ---------------------------------------------------------------------------
-// ProfileScreen — switches between logged-out / logged-in views automatically.
-// ---------------------------------------------------------------------------
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -88,15 +75,15 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Logged-Out state
-// ---------------------------------------------------------------------------
 class _LoggedOutProfile extends StatelessWidget {
   const _LoggedOutProfile();
 
   static const _primary = Color(ShopifyConstants.primaryColorHex);
-  static const _accent  = Color(0xFF4285F4);
   static const _bg      = Color(0xFFF5F5F3);
+
+  static const String _fHead = ShopifyConstants.fontHeading;
+  static const String _fBody = ShopifyConstants.fontBody;
+  static const String _fBold = ShopifyConstants.fontBodyBold;
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +98,6 @@ class _LoggedOutProfile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Full-bleed hero image — exactly half the screen height
                 SizedBox(
                   width: double.infinity,
                   height: halfH,
@@ -127,21 +113,21 @@ class _LoggedOutProfile extends StatelessWidget {
                   ),
                 ),
 
-                // WELCOME! + Sign In + Create Account
                 Container(
                   color: Colors.white,
                   padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text(
+                      Text(
                         'WELCOME!',
                         textAlign: TextAlign.center,
                         style: TextStyle(
+                          fontFamily: _fHead,
                           color: _primary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.5,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w500,
+                          // letterSpacing: 1.5,
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -158,10 +144,13 @@ class _LoggedOutProfile extends StatelessWidget {
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Sign In',
                             style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w600),
+                              fontFamily: _fBold,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
@@ -170,16 +159,20 @@ class _LoggedOutProfile extends StatelessWidget {
                       Center(
                         child: RichText(
                           text: TextSpan(
-                            style: const TextStyle(
-                                fontSize: 13, color: Color(0xFF666666)),
+                            style: TextStyle(
+                              fontFamily: _fBody,
+                              fontSize: 13,
+                              color: const Color(0xFF666666),
+                            ),
                             children: [
                               const TextSpan(text: "Don't have an account? "),
                               WidgetSpan(
                                 child: GestureDetector(
                                   onTap: () => context.push('/register'),
-                                  child: const Text(
+                                  child: Text(
                                     'Create Account',
                                     style: TextStyle(
+                                      fontFamily: _fBold,
                                       fontSize: 13,
                                       color: _primary,
                                       decoration: TextDecoration.underline,
@@ -197,7 +190,7 @@ class _LoggedOutProfile extends StatelessWidget {
                 ),
 
                 const SizedBox(height: 12),
-                _MoreSection(showSignOut: false),
+                const _MoreSection(showSignOut: false),
               ],
             ),
           );
@@ -207,14 +200,15 @@ class _LoggedOutProfile extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Logged-In state
-// ---------------------------------------------------------------------------
 class _LoggedInProfile extends StatelessWidget {
   const _LoggedInProfile();
 
   static const _primary = Color(ShopifyConstants.primaryColorHex);
   static const _bg      = Color(0xFFF5F5F3);
+
+  static const String _fHead = ShopifyConstants.fontHeading;
+  static const String _fBody = ShopifyConstants.fontBody;
+  static const String _fBold = ShopifyConstants.fontBodyBold;
 
   @override
   Widget build(BuildContext context) {
@@ -232,7 +226,6 @@ class _LoggedInProfile extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(24, 40, 24, 32),
                 child: Column(
                   children: [
-                    // Initials avatar
                     Container(
                       width: 72,
                       height: 72,
@@ -246,10 +239,11 @@ class _LoggedInProfile extends StatelessWidget {
                       child: Text(
                         auth.initials,
                         style: const TextStyle(
+                          fontFamily: _fBold,
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
                           color: _primary,
-                          letterSpacing: 1,
+                          // letterSpacing: 1,
                         ),
                       ),
                     ),
@@ -260,14 +254,14 @@ class _LoggedInProfile extends StatelessWidget {
                           ? 'Hey, ${auth.firstName}!'
                           : 'Hey!',
                       style: const TextStyle(
-                        fontSize: 17,
+                        fontFamily: _fHead,
+                        fontSize: 22,
                         fontWeight: FontWeight.w500,
                         color: _primary,
                       ),
                     ),
                     const SizedBox(height: 28),
 
-                    // Quick-action row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
@@ -302,7 +296,7 @@ class _LoggedInProfile extends StatelessWidget {
               ),
 
               const SizedBox(height: 12),
-              _MoreSection(showSignOut: true),
+              const _MoreSection(showSignOut: true),
             ],
           ),
         ),
@@ -311,12 +305,11 @@ class _LoggedInProfile extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Shared "More" section
-// ---------------------------------------------------------------------------
 class _MoreSection extends StatelessWidget {
   const _MoreSection({required this.showSignOut});
   final bool showSignOut;
+
+  static const String _fHead = ShopifyConstants.fontHeading;
 
   @override
   Widget build(BuildContext context) {
@@ -325,14 +318,16 @@ class _MoreSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 20, 20, 6),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
             child: Text(
               'More',
               style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF111111)),
+                fontFamily: _fHead,
+                fontSize: 22,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF111111),
+              ),
             ),
           ),
           _MoreTile(label: 'Data & Privacy',
@@ -364,9 +359,11 @@ class _MoreSection extends StatelessWidget {
 class _MoreTile extends StatelessWidget {
   const _MoreTile({required this.label, required this.onTap, this.icon});
 
-  final String   label;
+  final String       label;
   final VoidCallback onTap;
-  final IconData? icon;
+  final IconData?    icon;
+
+  static const String _fBody = ShopifyConstants.fontBody;
 
   @override
   Widget build(BuildContext context) {
@@ -382,11 +379,15 @@ class _MoreTile extends StatelessWidget {
                   Icon(icon, size: 18, color: const Color(0xFF555555)),
                   const SizedBox(width: 10),
                 ],
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF333333),
-                        fontWeight: FontWeight.w400)),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontFamily: _fBody,
+                    fontSize: 14,
+                    color: Color(0xFF333333),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
               ],
             ),
           ),
@@ -405,10 +406,12 @@ class _QuickAction extends StatelessWidget {
     required this.onTap,
   });
 
-  final IconData icon;
-  final String   label;
-  final Color    color;
+  final IconData     icon;
+  final String       label;
+  final Color        color;
   final VoidCallback onTap;
+
+  static const String _fBody = ShopifyConstants.fontBody;
 
   @override
   Widget build(BuildContext context) {
@@ -426,10 +429,16 @@ class _QuickAction extends StatelessWidget {
             child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(height: 8),
-          Text(label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 11, color: Color(0xFF555555), height: 1.35)),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontFamily: _fBody,
+              fontSize: 11,
+              color: Color(0xFF555555),
+              height: 1.35,
+            ),
+          ),
         ],
       ),
     );

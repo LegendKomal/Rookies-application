@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
-import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/collections/collections.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
-import 'package:rookies_jeans/screens/products/products.dart';
 import 'package:rookies_jeans/services/wishlist_service.dart';
 
 class WishlistPage extends StatefulWidget {
@@ -17,50 +15,55 @@ class WishlistPage extends StatefulWidget {
 }
 
 class _WishlistPageState extends State<WishlistPage> {
-  static const Color primary = Color(ShopifyConstants.primaryColorHex);
-  static const Color bgColor = Color(ShopifyConstants.bgColorHex);
-  static const Color cardColor = Color(ShopifyConstants.cardColorHex);
+  static const Color primary      = Color(ShopifyConstants.primaryColorHex);
+  static const Color bgColor      = Color(ShopifyConstants.bgColorHex);
+  static const Color cardColor    = Color(ShopifyConstants.cardColorHex);
   static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
-  static const Color borderColor = Color(ShopifyConstants.borderColorHex);
+  static const Color borderColor  = Color(ShopifyConstants.borderColorHex);
+
+  static const String _fHead = ShopifyConstants.fontHeading;
+  static const String _fBody = ShopifyConstants.fontBody;
+  static const String _fBold = ShopifyConstants.fontBodyBold;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgColor,
-     appBar: AppBar(
-  backgroundColor: cardColor,
-  elevation: 0,
-  centerTitle: false,
-  automaticallyImplyLeading: false,
-  titleSpacing: 0,
-  title: Row(
-    children: [
-      IconButton(
-        icon: const Icon(
-          Icons.arrow_back_ios_new_rounded,
-          size: 18,
-          color: primary,
+      appBar: AppBar(
+        backgroundColor: cardColor,
+        elevation: 0,
+        centerTitle: false,
+        automaticallyImplyLeading: false,
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 18,
+                color: primary,
+              ),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/home');
+                }
+              },
+            ),
+            const Text(
+              'MY WISHLIST',
+              style: TextStyle(
+                fontFamily: _fBold,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: primary,
+                // letterSpacing: 1.4,
+              ),
+            ),
+          ],
         ),
-        onPressed: () {
-  if (context.canPop()) {
-    context.pop();
-  } else {
-    context.go('/home');
-  }
-},
       ),
-      const Text(
-        'MY WISHLIST',
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w800,
-          color: primary,
-          letterSpacing: 1.4,
-        ),
-      ),
-    ],
-  ),
-),
       body: AnimatedBuilder(
         animation: WishlistService.instance,
         builder: (context, _) {
@@ -105,8 +108,9 @@ class _WishlistPageState extends State<WishlistPage> {
             const Text(
               'No wishlist items yet',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
+                fontFamily: _fHead,
+                fontSize: 22,
+                fontWeight: FontWeight.w500,
                 color: primary,
               ),
             ),
@@ -115,6 +119,7 @@ class _WishlistPageState extends State<WishlistPage> {
               'Products you like will appear here.',
               textAlign: TextAlign.center,
               style: TextStyle(
+                fontFamily: _fBody,
                 fontSize: 13,
                 color: secondaryTxt,
                 height: 1.5,
@@ -129,10 +134,7 @@ class _WishlistPageState extends State<WishlistPage> {
                 style: OutlinedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   foregroundColor: primary,
-                  side: const BorderSide(
-                    color: primary,
-                    width: 1.1,
-                  ),
+                  side: const BorderSide(color: primary, width: 1.1),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(6),
                   ),
@@ -141,9 +143,10 @@ class _WishlistPageState extends State<WishlistPage> {
                 child: const Text(
                   'EXPLORE PRODUCT',
                   style: TextStyle(
+                    fontFamily: _fBold,
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 1.1,
+                    // letterSpacing: 1.1,
                     color: primary,
                   ),
                 ),
@@ -156,14 +159,6 @@ class _WishlistPageState extends State<WishlistPage> {
   }
 
   void _openExploreProducts() {
-    // final collection = ShopifyCollection(
-    //   id: 'wishlist-explore',
-    //   title: 'TRENDING NOW',
-    //   handle: ShopifyConstants.trendingNowHandle,
-    //   imageUrl: null,
-    //   label: 'TRENDING NOW',
-    // );
-
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -173,7 +168,8 @@ class _WishlistPageState extends State<WishlistPage> {
   }
 
   Widget _wishlistCard(ShopifyProduct product) {
-    final imageUrl = product.imageUrls.isNotEmpty ? product.imageUrls.first : null;
+    final imageUrl =
+        product.imageUrls.isNotEmpty ? product.imageUrls.first : null;
 
     return GestureDetector(
       onTap: () {
@@ -210,9 +206,8 @@ class _WishlistPageState extends State<WishlistPage> {
                           ? CachedNetworkImage(
                               imageUrl: imageUrl,
                               fit: BoxFit.cover,
-                              placeholder: (_, __) => Container(
-                                color: const Color(0xFFEEEEEE),
-                              ),
+                              placeholder: (_, __) =>
+                                  Container(color: const Color(0xFFEEEEEE)),
                               errorWidget: (_, __, ___) => Container(
                                 color: const Color(0xFFEEEEEE),
                                 alignment: Alignment.center,
@@ -240,9 +235,7 @@ class _WishlistPageState extends State<WishlistPage> {
                       left: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
-                        ),
+                            horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
                           color: const Color(0xFFD32F2F),
                           borderRadius: BorderRadius.circular(4),
@@ -250,10 +243,11 @@ class _WishlistPageState extends State<WishlistPage> {
                         child: Text(
                           _discountPercent(product),
                           style: const TextStyle(
+                            fontFamily: _fBold,
                             color: Colors.white,
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
+                            // letterSpacing: 0.5,
                           ),
                         ),
                       ),
@@ -294,6 +288,7 @@ class _WishlistPageState extends State<WishlistPage> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
+                      fontFamily: _fBold,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: primary,
@@ -316,6 +311,7 @@ class _WishlistPageState extends State<WishlistPage> {
       return Text(
         _formattedPrice(product),
         style: const TextStyle(
+          fontFamily: _fBold,
           fontSize: 14,
           fontWeight: FontWeight.w800,
           color: primary,
@@ -338,6 +334,7 @@ class _WishlistPageState extends State<WishlistPage> {
             Text(
               _formattedCompareAtPrice(product),
               style: const TextStyle(
+                fontFamily: _fBody,
                 fontSize: 10,
                 color: Color(0xFF9A9A9A),
                 decoration: TextDecoration.lineThrough,
@@ -348,6 +345,7 @@ class _WishlistPageState extends State<WishlistPage> {
             Text(
               _formattedPrice(product),
               style: const TextStyle(
+                fontFamily: _fBold,
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
                 color: primary,
@@ -359,6 +357,7 @@ class _WishlistPageState extends State<WishlistPage> {
         Text(
           'Save $savedStr',
           style: const TextStyle(
+            fontFamily: _fBold,
             fontSize: 9,
             fontWeight: FontWeight.w600,
             color: Color(0xFF2E7D32),
@@ -382,7 +381,6 @@ class _WishlistPageState extends State<WishlistPage> {
   String _formattedCompareAtPrice(ShopifyProduct product) {
     final compareAtPrice = product.compareAtPrice;
     if (compareAtPrice == null) return '';
-
     return product.currencyCode == 'INR'
         ? '₹${compareAtPrice.toStringAsFixed(0)}'
         : '${product.currencyCode} ${compareAtPrice.toStringAsFixed(2)}';
@@ -390,10 +388,7 @@ class _WishlistPageState extends State<WishlistPage> {
 
   String _discountPercent(ShopifyProduct product) {
     final compareAtPrice = product.compareAtPrice;
-    if (compareAtPrice == null || compareAtPrice <= 0) {
-      return 'SALE';
-    }
-
+    if (compareAtPrice == null || compareAtPrice <= 0) return 'SALE';
     final pct = ((1 - (product.price / compareAtPrice)) * 100).round();
     return '$pct% OFF';
   }

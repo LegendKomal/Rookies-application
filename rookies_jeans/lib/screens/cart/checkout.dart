@@ -3,16 +3,6 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 
-/// In-app checkout screen. Loads Shopify's hosted checkout (with Razorpay
-/// configured as a payment method in Shopify Admin) inside a WebView so the
-/// user never leaves the app.
-///
-/// Payment apps (Google Pay, PhonePe, Paytm, etc.) are launched via UPI deep
-/// links (upi://, gpay://, phonepe://, tez://, paytmmp://) rather than
-/// regular http(s) navigation. webview_flutter cannot open those itself, so
-/// this screen intercepts any non-http(s) navigation request and hands it to
-/// url_launcher, which opens the actual payment app. The user completes
-/// payment there and is returned to this WebView automatically.
 class CheckoutWebView extends StatefulWidget {
   const CheckoutWebView({super.key, required this.checkoutUrl});
 
@@ -26,8 +16,11 @@ class _CheckoutWebViewState extends State<CheckoutWebView> {
   static const Color primary = Color(ShopifyConstants.primaryColorHex);
   static const Color bgColor = Color(ShopifyConstants.bgColorHex);
 
+  static const String _fBold = ShopifyConstants.fontBodyBold;
+  static const String _fBody = ShopifyConstants.fontBody;
+
   late final WebViewController _controller;
-  bool _isLoading = true;
+  bool _isLoading      = true;
   bool _orderCompleted = false;
 
   @override
@@ -53,16 +46,10 @@ class _CheckoutWebViewState extends State<CheckoutWebView> {
       ..loadRequest(Uri.parse(widget.checkoutUrl));
   }
 
-  /// Shopify's order confirmation page URL contains "thank_you". Once we
-  /// land there, the order has been created in Shopify — pop back to the
-  /// cart with a success result so the rest of the app can react (clear
-  /// cart UI, show confirmation, etc).
   void _checkForOrderCompletion(String url) {
     if (_orderCompleted) return;
     if (url.contains('thank_you') || url.contains('thank-you')) {
       _orderCompleted = true;
-      // Slight delay so the confirmation page is visible for a moment
-      // before we pop, rather than yanking the user away instantly.
       Future.delayed(const Duration(milliseconds: 900), () {
         if (mounted) Navigator.of(context).pop(true);
       });
@@ -75,25 +62,24 @@ class _CheckoutWebViewState extends State<CheckoutWebView> {
     final uri = Uri.tryParse(request.url);
     if (uri == null) return NavigationDecision.navigate;
 
-    final scheme = uri.scheme.toLowerCase();
+    final scheme      = uri.scheme.toLowerCase();
     final isWebScheme = scheme == 'http' || scheme == 'https';
 
-    if (isWebScheme) {
-      return NavigationDecision.navigate;
-    }
+    if (isWebScheme) return NavigationDecision.navigate;
 
-    // Non-web scheme (upi://, gpay://, phonepe://, tez://, paytmmp://,
-    // intent://, etc.) — these are app handoffs for completing payment.
-    // webview_flutter can't load these directly, so launch them externally.
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final launched =
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           backgroundColor: primary,
           behavior: SnackBarBehavior.floating,
           content: Text(
             'Could not open payment app for this method.',
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(
+              fontFamily: _fBody,
+              color: Colors.white,
+            ),
           ),
         ),
       );
@@ -133,10 +119,11 @@ class _CheckoutWebViewState extends State<CheckoutWebView> {
           title: const Text(
             'CHECKOUT',
             style: TextStyle(
+              fontFamily: _fBold,
               fontSize: 13,
               fontWeight: FontWeight.w800,
               color: primary,
-              letterSpacing: 1.8,
+              // letterSpacing: 1.8,
             ),
           ),
           centerTitle: true,

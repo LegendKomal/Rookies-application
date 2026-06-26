@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
@@ -32,14 +34,29 @@ class _ProductsPageState extends State<ProductsPage> {
   bool _isLoadingMore = false;
   bool _hasNextPage = true;
   final Set<String> _addingToCartProductIds = {};
+  final Map<String, bool> _fillAnimatingIds = {};
   String? _endCursor;
   String? _error;
+
+  static const String _fHead = ShopifyConstants.fontHeading;
+  static const String _fBody = ShopifyConstants.fontBody;
+  static const String _fBold = ShopifyConstants.fontBodyBold;
+  static const String _fBodyBold = ShopifyConstants.fontAlteBold;
 
   ProductSortOption _sortOption = ProductSortOption.defaultSort;
 
   final Map<String, Set<String>> _selectedFilterInputs = {};
   final Map<String, bool> _expandedFilters = {};
   int _activeFilterSectionIndex = 0;
+
+  final Map<String, PageController> _imagePageControllers = {};
+
+  // FIX: use ValueNotifier per product so only the dot indicator rebuilds,
+  // not the entire grid, when a page changes.
+  final Map<String, ValueNotifier<int>> _currentImageIndex = {};
+
+  Timer? _autoScrollTimer;
+  final Random _random = Random();
 
   List<ShopifyFilter> get _visibleFilters {
     return _availableFilters
@@ -48,12 +65,12 @@ class _ProductsPageState extends State<ProductsPage> {
   }
 
   final List<_PriceOption> _priceOptions = const [
-    _PriceOption(label: 'Under ₹999', min: null, max: 999),
-    _PriceOption(label: '₹999 - ₹1,499', min: 999, max: 1499),
-    _PriceOption(label: '₹1,499 - ₹1,999', min: 1499, max: 1999),
-    _PriceOption(label: '₹1,999 - ₹2,499', min: 1999, max: 2499),
-    _PriceOption(label: '₹2,499 - ₹2,999', min: 2499, max: 2999),
-    _PriceOption(label: 'Above ₹2,999', min: 2999, max: null),
+    _PriceOption(label: 'Under ₹999', min: null, max: 999.0),
+    _PriceOption(label: '₹999 - ₹1,499', min: 999.0, max: 1499.0),
+    _PriceOption(label: '₹1,499 - ₹1,999', min: 1499.0, max: 1999.0),
+    _PriceOption(label: '₹1,999 - ₹2,499', min: 1999.0, max: 2499.0),
+    _PriceOption(label: '₹2,499 - ₹2,999', min: 2499.0, max: 2999.0),
+    _PriceOption(label: 'Above ₹2,999', min: 2999.0, max: null),
   ];
 
   @override
@@ -74,8 +91,113 @@ class _ProductsPageState extends State<ProductsPage> {
 
   @override
   void dispose() {
+    _autoScrollTimer?.cancel();
+    for (final c in _imagePageControllers.values) {
+      c.dispose();
+    }
+    // FIX: dispose all ValueNotifiers
+    for (final n in _currentImageIndex.values) {
+      n.dispose();
+    }
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _syncPageControllers() {
+    final currentIds = _products.map((p) => p.id).toSet();
+
+    final removed = _imagePageControllers.keys
+        .where((id) => !currentIds.contains(id))
+        .toList();
+    for (final id in removed) {
+      _imagePageControllers.remove(id)?.dispose();
+      // FIX: dispose and remove the ValueNotifier for removed products
+      _currentImageIndex.remove(id)?.dispose();
+    }
+
+    for (final product in _products) {
+      if (!_imagePageControllers.containsKey(product.id)) {
+        _imagePageControllers[product.id] = PageController();
+        // FIX: create a ValueNotifier instead of storing a plain int
+        _currentImageIndex[product.id] = ValueNotifier<int>(0);
+      }
+    }
+  }
+
+  void _startAutoScrollTimer() {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      _autoScrollRandomCard();
+    });
+  }
+
+  List<int> _visibleProductIndices() {
+    if (!_scrollController.hasClients || !mounted) return [];
+
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    const crossAxisCount = 2;
+    const mainAxisSpacing = 14.0;
+    const horizontalPadding = 12.0;
+    const crossAxisSpacing = 12.0;
+    const topPadding = 12.0;
+    const childAspectRatio = 0.52;
+
+    final availableWidth =
+        screenWidth - (horizontalPadding * 2) - crossAxisSpacing * (crossAxisCount - 1);
+    final cardWidth = availableWidth / crossAxisCount;
+    final cardHeight = cardWidth / childAspectRatio;
+    final rowHeight = cardHeight + mainAxisSpacing;
+
+    final scrollOffset = _scrollController.offset;
+
+    final firstVisibleRow =
+        ((scrollOffset - topPadding) / rowHeight).floor().clamp(0, 999999);
+    final lastVisibleRow =
+        ((scrollOffset - topPadding + screenHeight) / rowHeight).ceil().clamp(0, 999999);
+
+    final indices = <int>[];
+    for (int row = firstVisibleRow; row <= lastVisibleRow; row++) {
+      for (int col = 0; col < crossAxisCount; col++) {
+        final index = row * crossAxisCount + col;
+        if (index >= 0 && index < _products.length) {
+          indices.add(index);
+        }
+      }
+    }
+    return indices;
+  }
+
+  void _autoScrollRandomCard() {
+    if (_products.isEmpty) return;
+
+    final visibleIndices = _visibleProductIndices();
+    if (visibleIndices.isEmpty) return;
+
+    final eligible = visibleIndices
+        .map((i) => _products[i])
+        .where((p) => p.imageUrls.length > 1)
+        .toList();
+
+    if (eligible.isEmpty) return;
+
+    final product = eligible[_random.nextInt(eligible.length)];
+    final controller = _imagePageControllers[product.id];
+    if (controller == null || !controller.hasClients) return;
+
+    final imageCount = product.imageUrls.length;
+    final currentIndex = _currentImageIndex[product.id]?.value ?? 0;
+    final nextIndex = (currentIndex + 1) % imageCount;
+
+    controller.animateToPage(
+      nextIndex,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
+
+    // FIX: update the ValueNotifier directly — no setState, no grid rebuild
+    _currentImageIndex[product.id]?.value = nextIndex;
   }
 
   int get _activeFilterCount =>
@@ -116,9 +238,11 @@ class _ProductsPageState extends State<ProductsPage> {
         }
         _isLoading = false;
       });
+
+      _syncPageControllers();
+      _startAutoScrollTimer();
     } catch (e) {
       if (!mounted) return;
-
       setState(() {
         _error = 'Failed to load products. Pull down to retry.';
         _isLoading = false;
@@ -152,9 +276,10 @@ class _ProductsPageState extends State<ProductsPage> {
         _endCursor = response.endCursor;
         _isLoadingMore = false;
       });
+
+      _syncPageControllers();
     } catch (e) {
       if (!mounted) return;
-
       setState(() {
         _isLoadingMore = false;
       });
@@ -162,6 +287,7 @@ class _ProductsPageState extends State<ProductsPage> {
   }
 
   Future<void> _refreshProducts() async {
+    _autoScrollTimer?.cancel();
     ShopifyStorefrontService.instance.clearCache();
     await _fetchInitialProducts();
   }
@@ -220,9 +346,6 @@ class _ProductsPageState extends State<ProductsPage> {
         ),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
-        // action: success
-        //     ? SnackBarAction(label: 'GO TO CART', onPressed: _goToCart)
-        //     : null,
       ),
     );
   }
@@ -230,7 +353,7 @@ class _ProductsPageState extends State<ProductsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: Colors.white,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: _floatingFilterButton(context),
       body: SafeArea(
@@ -290,9 +413,10 @@ class _ProductsPageState extends State<ProductsPage> {
                       : 'FILTERS',
                   style: const TextStyle(
                     color: Colors.white,
+                    fontFamily: _fBody,
                     fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.8,
+                    // fontWeight: FontWeight.w800,
+                    // letterSpacing: 0.8,
                   ),
                 ),
               ],
@@ -317,10 +441,11 @@ class _ProductsPageState extends State<ProductsPage> {
               child: Text(
                 widget.collection.label.toUpperCase(),
                 style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  fontFamily: _fHead,
+                  fontSize: 35,
+                  // fontWeight: FontWeight.w800,
                   color: primary,
-                  letterSpacing: 1.8,
+                  // letterSpacing: 1.8,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -349,10 +474,11 @@ class _ProductsPageState extends State<ProductsPage> {
                 Text(
                   'SORT',
                   style: TextStyle(
+                    fontFamily: _fBody,
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     color: primary,
-                    letterSpacing: 0.8,
+                    // letterSpacing: 0.8,
                   ),
                 ),
               ],
@@ -410,7 +536,7 @@ class _ProductsPageState extends State<ProductsPage> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
+                        // letterSpacing: 1.2,
                         color: primary,
                       ),
                     ),
@@ -428,9 +554,8 @@ class _ProductsPageState extends State<ProductsPage> {
                           option.label,
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: isSelected
-                                ? FontWeight.w800
-                                : FontWeight.w500,
+                            fontWeight:
+                                isSelected ? FontWeight.w800 : FontWeight.w500,
                             color: primary,
                           ),
                         ),
@@ -519,8 +644,9 @@ class _ProductsPageState extends State<ProductsPage> {
                           const Text(
                             'Filters',
                             style: TextStyle(
+                              fontFamily: _fBody,
                               fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                              // fontWeight: FontWeight.w700,
                               color: primary,
                             ),
                           ),
@@ -664,8 +790,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                             ),
                                             itemBuilder: (context, index) {
                                               if (canShowMore &&
-                                                  index ==
-                                                      visibleValues.length) {
+                                                  index == visibleValues.length) {
                                                 return InkWell(
                                                   onTap: () {
                                                     setSheetState(() {
@@ -694,16 +819,14 @@ class _ProductsPageState extends State<ProductsPage> {
                                                 );
                                               }
 
-                                              final value =
-                                                  visibleValues[index];
+                                              final value = visibleValues[index];
                                               final isSelected = selected
                                                   .contains(value.input);
 
                                               return InkWell(
                                                 onTap: () {
                                                   setSheetState(() {
-                                                    final set = draft
-                                                        .putIfAbsent(
+                                                    final set = draft.putIfAbsent(
                                                       activeFilter.id,
                                                       () => <String>{},
                                                     );
@@ -728,8 +851,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                                       Container(
                                                         width: 18,
                                                         height: 18,
-                                                        decoration:
-                                                            BoxDecoration(
+                                                        decoration: BoxDecoration(
                                                           border: Border.all(
                                                             color: isSelected
                                                                 ? primary
@@ -746,8 +868,8 @@ class _ProductsPageState extends State<ProductsPage> {
                                                             ? const Icon(
                                                                 Icons.check,
                                                                 size: 13,
-                                                                color: Colors
-                                                                    .white,
+                                                                color:
+                                                                    Colors.white,
                                                               )
                                                             : null,
                                                       ),
@@ -931,24 +1053,26 @@ class _ProductsPageState extends State<ProductsPage> {
 
   Widget _productCard(ShopifyProduct product) {
     final colorHexes = product.colorHexCodes;
+    final controller = _imagePageControllers[product.id];
+    final images = product.imageUrls.take(2).toList();
+    final hasMultipleImages = images.length > 1;
 
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProductDetailPage(
-              handle: product.handle,
-              title: product.title,
-              heroImageUrl: product.primaryImageUrl,
-            ),
+    return _LongPressZoomCard(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProductDetailPage(
+            handle: product.handle,
+            title: product.title,
+            heroImageUrl: product.primaryImageUrl,
           ),
-        );
-      },
+        ),
+      ),
+      onLongPress: () => _showProductPeek(product),
       child: Container(
         decoration: BoxDecoration(
           color: cardColor,
-          borderRadius: BorderRadius.circular(10),
+          // borderRadius: BorderRadius.circular(10),
           border: Border.all(color: borderColor, width: 0.8),
         ),
         child: Column(
@@ -956,20 +1080,45 @@ class _ProductsPageState extends State<ProductsPage> {
           children: [
             Expanded(
               child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(10)),
+                // borderRadius:
+                //     const BorderRadius.vertical(top: Radius.circular(10)),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    product.primaryImageUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: product.primaryImageUrl!,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) =>
-                                Container(color: const Color(0xFFEEEEEE)),
-                            errorWidget: (_, __, ___) => _imagePlaceholder(),
-                          )
-                        : _imagePlaceholder(),
+                    if (hasMultipleImages && controller != null)
+                      PageView.builder(
+                        controller: controller,
+                        physics: const BouncingScrollPhysics(),
+                        // FIX: update ValueNotifier directly — no setState,
+                        // so the grid does NOT rebuild on every page swipe.
+                        onPageChanged: (index) {
+                          _currentImageIndex[product.id]?.value = index;
+                        },
+                        itemCount: images.length,
+                        itemBuilder: (_, idx) {
+                          final url = images[idx];
+                          return url != null
+                              ? CachedNetworkImage(
+                                  imageUrl: url,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) =>
+                                      Container(color: const Color(0xFFEEEEEE)),
+                                  errorWidget: (_, __, ___) =>
+                                      _imagePlaceholder(),
+                                )
+                              : _imagePlaceholder();
+                        },
+                      )
+                    else
+                      (product.primaryImageUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: product.primaryImageUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) =>
+                                  Container(color: const Color(0xFFEEEEEE)),
+                              errorWidget: (_, __, ___) => _imagePlaceholder(),
+                            )
+                          : _imagePlaceholder()),
                     if (product.isOnSale)
                       Positioned(
                         top: 8,
@@ -980,18 +1129,32 @@ class _ProductsPageState extends State<ProductsPage> {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFD32F2F),
-                            borderRadius: BorderRadius.circular(4),
+                            color: const Color.fromARGB(255, 194, 0, 0),
+                            // borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             _discountPercent(product),
                             style: const TextStyle(
+                              fontFamily: _fBold,
                               color: Colors.white,
                               fontSize: 9,
                               fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
+                              // letterSpacing: 0.5,
                             ),
                           ),
+                        ),
+                      ),
+                    if (hasMultipleImages)
+                      Positioned(
+                        bottom: 6,
+                        left: 0,
+                        right: 0,
+                        // FIX: dot indicator uses ValueListenableBuilder so
+                        // only THIS widget rebuilds when the page changes,
+                        // not the whole product grid.
+                        child: _imageDotIndicator(
+                          product: product,
+                          count: images.length,
                         ),
                       ),
                   ],
@@ -1009,10 +1172,11 @@ class _ProductsPageState extends State<ProductsPage> {
                     overflow: TextOverflow.ellipsis,
                     softWrap: false,
                     style: const TextStyle(
+                      fontFamily: _fBodyBold,
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w900,
                       color: primary,
-                      height: 1.3,
+                      // height: 1.3,
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -1032,47 +1196,179 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
+  void _showProductPeek(ShopifyProduct product) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss',
+      barrierColor: Colors.black.withOpacity(0.55),
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (_, __, ___) => const SizedBox.shrink(),
+      transitionBuilder: (ctx, anim, _, __) {
+        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutBack);
+        return ScaleTransition(
+          scale: curved,
+          child: FadeTransition(
+            opacity: anim,
+            child: _ProductPeekDialog(
+              product: product,
+              primary: primary,
+              cardColor: cardColor,
+              bgColor: bgColor,
+              borderColor: borderColor,
+              secondaryTxt: secondaryTxt,
+              onAddToCart: (variantId) async {
+                Navigator.of(ctx).pop();
+                final success =
+                    await CartService.instance.addLine(variantId: variantId);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(SnackBar(
+                    content: Text(success
+                        ? '${product.title} added to cart'
+                        : 'Failed to add item to cart'),
+                    duration: const Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                  ));
+              },
+              onOpenDetail: () {
+                Navigator.of(ctx).pop();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProductDetailPage(
+                      handle: product.handle,
+                      title: product.title,
+                      heroImageUrl: product.primaryImageUrl,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // FIX: uses ValueListenableBuilder so only the dots rebuild on page change,
+  // not the entire grid.
+  Widget _imageDotIndicator({
+    required ShopifyProduct product,
+    required int count,
+  }) {
+    final notifier = _currentImageIndex[product.id];
+    if (notifier == null) return const SizedBox.shrink();
+
+    final dotCount = count.clamp(0, 5);
+
+    return ValueListenableBuilder<int>(
+      valueListenable: notifier,
+      builder: (_, currentIndex, __) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(dotCount, (i) {
+            final isActive = i == currentIndex % dotCount;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              width: isActive ? 14 : 5,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isActive ? primary : Colors.white.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+
   Widget _cartButtonForProduct(ShopifyProduct product) {
-    final isAdding = _addingToCartProductIds.contains(product.id);
-    final variantId = product.variants.isNotEmpty ? product.variants.first.id : null;
+    final variantId =
+        product.variants.isNotEmpty ? product.variants.first.id : null;
 
     return AnimatedBuilder(
       animation: CartService.instance,
       builder: (context, _) {
-        final inCart = variantId != null && CartService.instance.isInCart(variantId);
+        final inCart =
+            variantId != null && CartService.instance.isInCart(variantId);
+        final isFilling = _fillAnimatingIds[product.id] ?? false;
+        final isBusy = _addingToCartProductIds.contains(product.id);
 
         return SizedBox(
           width: double.infinity,
           height: 30,
-          child: OutlinedButton(
-            onPressed: isAdding
-                ? null
-                : inCart
-                    ? _goToCart
-                    : () => _handleAddToCart(product),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: primary, width: 1.2),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-              ),
-              padding: EdgeInsets.zero,
-              foregroundColor: primary,
-            ),
-            child: isAdding
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(
-                    inCart ? 'GO TO CART' : 'SHOP NOW',
-                    style: const TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.2,
-                      color: primary,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0, end: isFilling ? 1 : 0),
+            duration: const Duration(milliseconds: 450),
+            curve: Curves.easeInOut,
+            builder: (context, value, child) {
+              return Stack(
+                children: [
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FractionallySizedBox(
+                          widthFactor: value,
+                          child: Container(color: primary),
+                        ),
+                      ),
                     ),
                   ),
+                  Positioned.fill(
+                    child: OutlinedButton(
+                      onPressed: isBusy
+                          ? null
+                          : inCart
+                              ? _goToCart
+                              : () async {
+                                  setState(() {
+                                    _fillAnimatingIds[product.id] = true;
+                                  });
+
+                                  await Future.delayed(
+                                    const Duration(milliseconds: 450),
+                                  );
+
+                                  await _handleAddToCart(product);
+
+                                  if (!mounted) return;
+
+                                  setState(() {
+                                    _fillAnimatingIds[product.id] = false;
+                                  });
+                                },
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: primary, width: 1.2),
+                        shape: RoundedRectangleBorder(
+                          // borderRadius: BorderRadius.circular(5),
+                        ),
+                        padding: EdgeInsets.zero,
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: isFilling ? Colors.white : primary,
+                        disabledForegroundColor:
+                            isFilling ? Colors.white : primary,
+                      ),
+                      child: Text(
+                        inCart ? 'GO TO CART' : 'SHOP NOW',
+                        style: TextStyle(
+                          fontFamily: _fBodyBold,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          // letterSpacing: 1.2,
+                          color: isFilling ? Colors.white : primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         );
       },
@@ -1094,6 +1390,7 @@ class _ProductsPageState extends State<ProductsPage> {
       return Text(
         product.formattedPrice,
         style: const TextStyle(
+          fontFamily: _fBold,
           fontSize: 12,
           fontWeight: FontWeight.w700,
           color: primary,
@@ -1116,6 +1413,7 @@ class _ProductsPageState extends State<ProductsPage> {
             Text(
               product.formattedCompareAtPrice,
               style: const TextStyle(
+                fontFamily: _fBold,
                 fontSize: 10,
                 color: Color(0xFF9A9A9A),
                 decoration: TextDecoration.lineThrough,
@@ -1126,6 +1424,7 @@ class _ProductsPageState extends State<ProductsPage> {
             Text(
               product.formattedPrice,
               style: const TextStyle(
+                fontFamily: _fBold,
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
                 color: primary,
@@ -1135,9 +1434,10 @@ class _ProductsPageState extends State<ProductsPage> {
             Text(
               'Save $savedStr',
               style: const TextStyle(
-                fontSize: 9,
+                fontFamily: _fBold,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF2E7D32),
+                color: Color.fromARGB(255, 53, 168, 59),
               ),
             ),
           ],
@@ -1262,6 +1562,10 @@ class _ProductsPageState extends State<ProductsPage> {
       );
 }
 
+// ---------------------------------------------------------------------------
+// Supporting classes
+// ---------------------------------------------------------------------------
+
 class _PriceOption {
   final String label;
   final double? min;
@@ -1294,4 +1598,489 @@ enum ProductSortOption {
   final String label;
   final String shopifyKey;
   final bool reverse;
+}
+
+class _LongPressZoomCard extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  const _LongPressZoomCard({
+    required this.child,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  @override
+  State<_LongPressZoomCard> createState() => _LongPressZoomCardState();
+}
+
+class _LongPressZoomCardState extends State<_LongPressZoomCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+  Timer? _holdTimer;
+  bool _longPressFired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+    _scale = Tween<double>(begin: 1.0, end: 1.06).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails _) {
+    _longPressFired = false;
+    _ctrl.forward();
+    _holdTimer = Timer(const Duration(milliseconds: 1000), () {
+      _longPressFired = true;
+      _ctrl.reverse();
+      widget.onLongPress();
+    });
+  }
+
+  void _onTapUp(TapUpDetails _) {
+    _holdTimer?.cancel();
+    _ctrl.reverse();
+    if (!_longPressFired) widget.onTap();
+  }
+
+  void _onTapCancel() {
+    _holdTimer?.cancel();
+    _ctrl.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: ScaleTransition(scale: _scale, child: widget.child),
+    );
+  }
+}
+
+class _ProductPeekDialog extends StatefulWidget {
+  final ShopifyProduct product;
+  final Color primary;
+  final Color cardColor;
+  final Color bgColor;
+  final Color borderColor;
+  final Color secondaryTxt;
+  final Future<void> Function(String variantId) onAddToCart;
+  final VoidCallback onOpenDetail;
+
+  const _ProductPeekDialog({
+    required this.product,
+    required this.primary,
+    required this.cardColor,
+    required this.bgColor,
+    required this.borderColor,
+    required this.secondaryTxt,
+    required this.onAddToCart,
+    required this.onOpenDetail,
+  });
+
+  @override
+  State<_ProductPeekDialog> createState() => _ProductPeekDialogState();
+}
+
+class _ProductPeekDialogState extends State<_ProductPeekDialog> {
+  late final PageController _pageCtrl;
+  int _currentPage = 0;
+  String? _selectedVariantId;
+  bool _isAddingToCart = false;
+
+  List<_PeekOption> get _peekOptions {
+    final product = widget.product;
+    final result = <_PeekOption>[];
+
+    for (final opt in product.options) {
+      final name = opt.name.toUpperCase();
+      if (name == 'COLOR' || name == 'COLOUR') continue;
+      result.add(_PeekOption(
+        label: opt.name,
+        values: opt.values,
+      ));
+    }
+    return result;
+  }
+
+  final Map<String, String> _selectedOptions = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _pageCtrl = PageController();
+
+    final product = widget.product;
+    if (product.variants.isNotEmpty) {
+      final first = product.variants.first;
+      _selectedVariantId = first.id;
+      for (final so in first.selectedOptions) {
+        _selectedOptions[so.name] = so.value;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  void _selectOption(String optionName, String value) {
+    setState(() {
+      _selectedOptions[optionName] = value;
+    });
+    for (final v in widget.product.variants) {
+      final match = v.selectedOptions.every(
+        (so) =>
+            _selectedOptions[so.name] == null ||
+            _selectedOptions[so.name] == so.value,
+      );
+      if (match) {
+        setState(() => _selectedVariantId = v.id);
+        break;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.product;
+    final images = product.imageUrls;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final dialogWidth = screenWidth * 0.88;
+
+    return Center(
+      child: GestureDetector(
+        onTap: widget.onOpenDetail,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            width: dialogWidth,
+            constraints: BoxConstraints(maxHeight: screenHeight * 0.82),
+            decoration: BoxDecoration(
+              color: widget.cardColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 24,
+                  offset: Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: dialogWidth * 1.1,
+                    child: Stack(
+                      children: [
+                        PageView.builder(
+                          controller: _pageCtrl,
+                          itemCount: images.isEmpty ? 1 : images.length,
+                          onPageChanged: (i) => setState(() => _currentPage = i),
+                          itemBuilder: (_, i) {
+                            if (images.isEmpty) {
+                              return Container(color: const Color(0xFFEEEEEE));
+                            }
+                            return CachedNetworkImage(
+                              imageUrl: images[i],
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) =>
+                                  Container(color: const Color(0xFFEEEEEE)),
+                              errorWidget: (_, __, ___) =>
+                                  Container(color: const Color(0xFFEEEEEE)),
+                            );
+                          },
+                        ),
+                        if (product.isOnSale)
+                          Positioned(
+                            top: 10,
+                            left: 10,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD32F2F),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                _discountPercent(product),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ),
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.45),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.open_in_new_rounded,
+                                    color: Colors.white, size: 11),
+                                SizedBox(width: 4),
+                                Text(
+                                  'View details',
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 10),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (images.length > 1)
+                          Positioned(
+                            bottom: 8,
+                            left: 0,
+                            right: 0,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(
+                                images.length.clamp(0, 8),
+                                (i) => AnimatedContainer(
+                                  duration: const Duration(milliseconds: 250),
+                                  margin:
+                                      const EdgeInsets.symmetric(horizontal: 3),
+                                  width: i == _currentPage ? 16 : 6,
+                                  height: 5,
+                                  decoration: BoxDecoration(
+                                    color: i == _currentPage
+                                        ? widget.primary
+                                        : Colors.white.withOpacity(0.65),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {},
+                    child: Container(
+                      color: widget.cardColor,
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: widget.primary,
+                              height: 1.3,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          _peekPriceRow(product),
+                          const SizedBox(height: 12),
+                          ..._peekOptions.map((opt) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _peekOptionRow(opt),
+                              )),
+                          const SizedBox(height: 4),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 42,
+                            child: ElevatedButton(
+                              onPressed:
+                                  _isAddingToCart || _selectedVariantId == null
+                                      ? null
+                                      : () async {
+                                          setState(() => _isAddingToCart = true);
+                                          await widget.onAddToCart(
+                                              _selectedVariantId!);
+                                        },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: widget.primary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: _isAddingToCart
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'ADD TO CART',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                        // letterSpacing: 1.0,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _peekPriceRow(ShopifyProduct product) {
+    if (!product.isOnSale) {
+      return Text(
+        product.formattedPrice,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          color: widget.primary,
+        ),
+      );
+    }
+    final saved = (product.compareAtPrice! - product.price).round();
+    final savedStr =
+        product.currencyCode == 'INR' ? '₹$saved' : '${product.currencyCode} $saved';
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 8,
+      children: [
+        Text(
+          product.formattedCompareAtPrice,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF9A9A9A),
+            decoration: TextDecoration.lineThrough,
+            decorationColor: Color(0xFF9A9A9A),
+          ),
+        ),
+        Text(
+          product.formattedPrice,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: widget.primary,
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F5E9),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            'Save $savedStr',
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: Color.fromARGB(255, 84, 184, 89),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _peekOptionRow(_PeekOption opt) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          opt.label.toUpperCase(),
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: widget.secondaryTxt,
+            // letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: opt.values.map((val) {
+            final isSelected = _selectedOptions[opt.label] == val;
+            return GestureDetector(
+              onTap: () => _selectOption(opt.label, val),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isSelected ? widget.primary : Colors.transparent,
+                  border: Border.all(
+                    color: isSelected ? widget.primary : widget.borderColor,
+                    width: 1.2,
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  val,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isSelected ? Colors.white : widget.primary,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  String _discountPercent(ShopifyProduct product) {
+    if (product.compareAtPrice == null || product.compareAtPrice == 0) {
+      return 'SALE';
+    }
+    final pct =
+        ((1 - product.price / product.compareAtPrice!) * 100).round();
+    return '$pct% OFF';
+  }
+}
+
+class _PeekOption {
+  final String label;
+  final List<String> values;
+  const _PeekOption({required this.label, required this.values});
 }

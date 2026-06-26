@@ -197,7 +197,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                               fontSize: 26,
                               fontWeight: FontWeight.w700,
                               color: primary,
-                              letterSpacing: -0.5,
+                              // letterSpacing: -0.5,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -265,7 +265,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.2,
+                                    // letterSpacing: 0.2,
                                   ),
                                 ),
                         ),
@@ -313,7 +313,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
-                              letterSpacing: 0.2,
+                              // letterSpacing: 0.2,
                             ),
                           ),
                         ),

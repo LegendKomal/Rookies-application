@@ -14,6 +14,9 @@ class ExploreCategoriesPage extends StatefulWidget {
 
 class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
   late Future<List<ShopifyCollection>> _future;
+  static const String _fBold = ShopifyConstants.fontBodyBold;
+  static const String _fHead = ShopifyConstants.fontHeading;
+  static const String _fBody = ShopifyConstants.fontBody;
 
   @override
   void initState() {
@@ -35,53 +38,38 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
     return Scaffold(
       backgroundColor: const Color(ShopifyConstants.bgColorHex),
       appBar: AppBar(
-        backgroundColor: const Color(ShopifyConstants.bgColorHex),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          color: const Color(ShopifyConstants.primaryColorHex),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            color: const Color(ShopifyConstants.primaryColorHex),
-            onPressed: () {
-              Navigator.push(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (_, animation, __) => const SearchPage(),
-        transitionsBuilder: (_, animation, __, child) {
-          return FadeTransition(
-            opacity: CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOut,
-            ),
-            child: child,
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 200),
-      ),
-    );
-            },
+  backgroundColor: const Color(ShopifyConstants.bgColorHex),
+  elevation: 0,
+  scrolledUnderElevation: 0,
+  automaticallyImplyLeading: false,
+  toolbarHeight: 84,
+  titleSpacing: 0,
+  title: Padding(
+    padding: const EdgeInsets.only(left: 12, right: 16),
+    child: Row(
+      children: [
+        GestureDetector(
+          onTap: () => Navigator.of(context).maybePop(),
+          child: const Icon(
+            Icons.arrow_back_ios_new,
+            size: 22,
+            color: Color(ShopifyConstants.primaryColorHex),
           ),
-          // IconButton(
-          //   icon: const Icon(Icons.favorite_border),
-          //   color: const Color(ShopifyConstants.primaryColorHex),
-          //   onPressed: () {
-          //     // TODO: hook up to your wishlist page/route
-          //   },
-          // ),
-          // IconButton(
-          //   icon: const Icon(Icons.shopping_bag_outlined),
-          //   color: const Color(ShopifyConstants.primaryColorHex),
-          //   onPressed: () {
-          //     // TODO: hook up to your cart page/route
-          //   },
-          // ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 10),
+        const Text(
+          'EXPLORE CATEGORIES',
+          style: TextStyle(
+            fontSize: 34,
+            height: 1,
+            fontFamily: _fHead,
+            color: Color(ShopifyConstants.primaryColorHex),
+          ),
+        ),
+      ],
+    ),
+  ),
+),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _refresh,
@@ -101,20 +89,21 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
               return CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(20, 12, 20, 16),
-                      child: Text(
-                        'EXPLORE CATEGORIES',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
-                          color: Color(ShopifyConstants.primaryColorHex),
-                        ),
-                      ),
-                    ),
-                  ),
+                  // const SliverToBoxAdapter(
+                  //   child: Padding(
+                  //     padding: EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  //     child: Text(
+                  //       'EXPLORE CATEGORIES',
+                  //       style: TextStyle(
+                  //         fontSize: 35,
+                  //         fontFamily: _fHead,
+                  //         // fontWeight: FontWeight.w700,
+                  //         // letterSpacing: 0.5,
+                  //         color: Color(ShopifyConstants.primaryColorHex),
+                  //       ),
+                  //     ),
+                  //   ),
+                  // ),
                   if (categories.isEmpty)
                     const SliverFillRemaining(
                       hasScrollBody: false,
@@ -168,7 +157,7 @@ class _CategoryTile extends StatelessWidget {
         );
       },
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
+        // borderRadius: BorderRadius.circular(4),
         child: Stack(
           fit: StackFit.expand,
           children: [

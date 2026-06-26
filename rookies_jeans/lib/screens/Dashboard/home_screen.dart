@@ -15,6 +15,34 @@ import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:video_player/video_player.dart';
 
+class R {
+  const R._(this._sw, this._sh);
+
+  static const double _baseW = 390.0;
+  static const double _baseH = 844.0;
+
+  static const double _minScale = 0.85;
+  static const double _maxScale = 1.35;
+
+  final double _sw;
+  final double _sh;
+
+  factory R.of(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    return R._(mq.size.width, mq.size.height);
+  }
+
+  double get _wScale => (_sw / _baseW).clamp(_minScale, _maxScale);
+
+  double get _hScale => (_sh / _baseH).clamp(_minScale, _maxScale);
+
+  double sp(double size) => size * _wScale;
+
+  double dp(double size) => size * _wScale;
+
+  double vp(double size) => size * _hScale;
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -23,13 +51,18 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const Color primary = Color(ShopifyConstants.primaryColorHex);
-  static const Color bgColor = Color(ShopifyConstants.bgColorHex);
-  static const Color cardColor = Color(ShopifyConstants.cardColorHex);
+  static const Color primary      = Color(ShopifyConstants.primaryColorHex);
+  static const Color bgColor      = Color(ShopifyConstants.bgColorHex);
+  static const Color cardColor    = Color(ShopifyConstants.cardColorHex);
   static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
-  static const Color borderColor = Color.fromARGB(255, 80, 57, 57);
+  static const Color borderColor  = Color.fromARGB(255, 80, 57, 57);
+
+  static const String _fHead = ShopifyConstants.fontHeading;
+  static const String _fBody = ShopifyConstants.fontBody;
+  static const String _fBold = ShopifyConstants.fontBodyBold;
 
   final Set<String> _addingToCartProductIds = {};
+  final Map<String, bool> _fillAnimatingIds = {};
   bool _isLoading = true;
 
   late VideoPlayerController _videoCtrl;
@@ -40,15 +73,15 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isSnapping = false;
   BuildContext? _scrollableContext;
 
-  List<ShopifyCollection> _latestDrop = [];
-  List<ShopifyCollection> _categories = [];
+  List<ShopifyCollection> _latestDrop    = [];
+  List<ShopifyCollection> _categories    = [];
   List<ShopifyCollection> _ourCollection = [];
-  List<ShopifyProduct> _oversizedShirts = [];
-  List<ShopifyProduct> _hotDeals = [];
-  BalloonBannerData? _balloonBanner;
+  List<ShopifyProduct>    _oversizedShirts = [];
+  List<ShopifyProduct>    _hotDeals       = [];
+  BalloonBannerData?      _balloonBanner;
 
   late final PageController _bannerCtrl;
-  int _currentBanner = 0;
+  int    _currentBanner = 0;
   Timer? _bannerTimer;
 
   final TextEditingController _searchCtrl = TextEditingController();
@@ -127,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _bannerCtrl = PageController(viewportFraction: 1);
-    _videoCtrl = VideoPlayerController.asset('assets/rookies_video.mp4')
+    _videoCtrl  = VideoPlayerController.asset('assets/rookies_video.mp4')
       ..initialize().then((_) {
         if (!mounted) return;
         setState(() => _videoReady = true);
@@ -163,7 +196,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (ctx == null) continue;
       final box = ctx.findRenderObject() as RenderBox?;
       if (box == null || !box.attached) continue;
-      final scrollBox = _scrollableContext?.findRenderObject() as RenderBox?;
+      final scrollBox =
+          _scrollableContext?.findRenderObject() as RenderBox?;
       if (scrollBox == null) continue;
       final position = box.localToGlobal(Offset.zero, ancestor: scrollBox);
       offsets.add(_scrollCtrl.offset + position.dy);
@@ -180,20 +214,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _snapToNearestSection() async {
-    final offsets = _collectSectionOffsets();
+    final offsets   = _collectSectionOffsets();
     if (offsets.isEmpty) return;
 
-    final current = _scrollCtrl.offset;
+    final current   = _scrollCtrl.offset;
     final maxScroll = _scrollCtrl.position.maxScrollExtent;
 
-    double nearest = offsets.first;
+    double nearest   = offsets.first;
     double bestDelta = (offsets.first - current).abs();
 
     for (final o in offsets) {
       final delta = (o - current).abs();
       if (delta < bestDelta) {
         bestDelta = delta;
-        nearest = o;
+        nearest   = o;
       }
     }
 
@@ -234,13 +268,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
 
     setState(() {
-      _latestDrop = results[0] as List<ShopifyCollection>;
-      _categories = results[0] as List<ShopifyCollection>;
-      _ourCollection = results[1] as List<ShopifyCollection>;
+      _latestDrop      = results[0] as List<ShopifyCollection>;
+      _categories      = results[0] as List<ShopifyCollection>;
+      _ourCollection   = results[1] as List<ShopifyCollection>;
       _oversizedShirts = results[2] as List<ShopifyProduct>;
-      _hotDeals = results[3] as List<ShopifyProduct>;
-      _balloonBanner = results[4] as BalloonBannerData?;
-      _isLoading = false;
+      _hotDeals        = results[3] as List<ShopifyProduct>;
+      _balloonBanner   = results[4] as BalloonBannerData?;
+      _isLoading       = false;
     });
   }
 
@@ -260,25 +294,21 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openCollection(ShopifyCollection collection) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ProductsPage(collection: collection),
-      ),
+      MaterialPageRoute(builder: (_) => ProductsPage(collection: collection)),
     );
   }
 
-  void _openCollectionByHandle(String handle, {String? title, String? label}) {
+  void _openCollectionByHandle(String handle,
+      {String? title, String? label}) {
     final collection = ShopifyCollection(
       id: handle,
       title: title ?? label ?? handle,
       handle: handle,
       label: label ?? (title ?? handle).toUpperCase(),
     );
-
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ProductsPage(collection: collection),
-      ),
+      MaterialPageRoute(builder: (_) => ProductsPage(collection: collection)),
     );
   }
 
@@ -289,21 +319,17 @@ class _HomeScreenState extends State<HomeScreen> {
       handle: 'assorted',
       label: 'ASSORTED',
     );
-
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ProductsPage(collection: assortedCollection),
-      ),
+          builder: (_) => ProductsPage(collection: assortedCollection)),
     );
   }
 
   void _goToCart() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const CartScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const CartScreen()),
     );
   }
 
@@ -329,6 +355,10 @@ class _HomeScreenState extends State<HomeScreen> {
           success
               ? '${product.title} added to cart'
               : 'Failed to add product to cart',
+          style: TextStyle(
+            fontFamily: _fBody,
+            fontSize: R.of(context).sp(13),
+          ),
         ),
         duration: const Duration(seconds: 2),
       ),
@@ -415,8 +445,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           const SliverToBoxAdapter(
-                            child: SizedBox(height: 40),
-                          ),
+                              child: SizedBox(height: 40)),
                         ],
                       ),
                     ),
@@ -431,10 +460,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final key = GlobalKey(debugLabel: id);
     _registerAnchor(_SectionAnchor(id: id, key: key));
     return SliverToBoxAdapter(
-      child: KeyedSubtree(
-        key: key,
-        child: child,
-      ),
+      child: KeyedSubtree(key: key, child: child),
     );
   }
 
@@ -443,110 +469,117 @@ class _HomeScreenState extends State<HomeScreen> {
     return mq.size.height - mq.padding.top - mq.padding.bottom;
   }
 
-  Widget _sliverBannerWithOverlayBar() => SizedBox(
-        height: _fullScreenBannerHeight(context),
-        width: double.infinity,
-        child: Stack(
-          children: [
-            _videoBannerItem(),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 80,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.40),
-                      Colors.transparent,
-                    ],
-                  ),
+  Widget _sliverBannerWithOverlayBar() {
+    final r = R.of(context);
+    return SizedBox(
+      height: _fullScreenBannerHeight(context),
+      width: double.infinity,
+      child: Stack(
+        children: [
+          _videoBannerItem(),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: r.dp(80),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.40),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                child: SizedBox(
-                  height: 56,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: IconButton(
-  icon: const Icon(Icons.search, size: 22),
-  color: Colors.white,
-  onPressed: () {
-    Navigator.push(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (_, animation, __) => const SearchPage(),
-        transitionsBuilder: (_, animation, __, child) {
-          return FadeTransition(
-            opacity: CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOut,
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: r.dp(8),
+                vertical: r.dp(6),
+              ),
+              child: SizedBox(
+                height: r.dp(56),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          icon: Icon(Icons.search, size: r.dp(22)),
+                          color: Colors.white,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              PageRouteBuilder(
+                                pageBuilder: (_, animation, __) =>
+                                    const SearchPage(),
+                                transitionsBuilder:
+                                    (_, animation, __, child) =>
+                                        FadeTransition(
+                                          opacity: CurvedAnimation(
+                                            parent: animation,
+                                            curve: Curves.easeOut,
+                                          ),
+                                          child: child,
+                                        ),
+                                transitionDuration:
+                                    const Duration(milliseconds: 200),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    Image.asset(
+                      'assets/logo2.png',
+                      height: r.dp(14),
+                      fit: BoxFit.contain,
+                      color: Colors.white,
+                      colorBlendMode: BlendMode.srcIn,
+                    ),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                Icons.favorite_border_rounded,
+                                size: r.dp(22),
+                              ),
+                              color: Colors.white,
+                              onPressed: () => context.go('/wishlist'),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.person_outline_rounded,
+                                size: r.dp(22),
+                              ),
+                              color: Colors.white,
+                              tooltip: 'Logout',
+                              onPressed: _logout,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            child: child,
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 200),
+          ),
+        ],
       ),
     );
-  },
-),
-                        ),
-                      ),
-                      Image.asset(
-                        'assets/logo2.png',
-                        height: 14,
-                        fit: BoxFit.contain,
-                        color: Colors.white,
-                        colorBlendMode: BlendMode.srcIn,
-                      ),
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.favorite_border_rounded,
-                                  size: 22,
-                                ),
-                                color: Colors.white,
-                                onPressed: () => context.go('/wishlist'),
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.person_outline_rounded,
-                                  size: 22,
-                                ),
-                                color: Colors.white,
-                                tooltip: 'Logout',
-                                onPressed: _logout,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
+  }
 
   Widget _videoBannerItem() => Stack(
         fit: StackFit.expand,
@@ -606,58 +639,67 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       );
 
-  Widget _sliverHeadAsBox(String title) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 22, 16, 10),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: primary,
-              letterSpacing: 1.8,
-            ),
+  Widget _sliverHeadAsBox(String title) {
+    final r = R.of(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(r.dp(16), r.dp(50), r.dp(16), r.dp(10)),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          title,
+          style: TextStyle(
+            fontFamily: _fHead,
+            fontSize: r.sp(35),
+            fontWeight: FontWeight.w500,
+            color: primary,
           ),
         ),
-      );
+      ),
+    );
+  }
 
-  Widget _sliverCenteredHeadAsBox(String title) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 26, 16, 16),
-        child: Center(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w400,
-              color: primary,
-              letterSpacing: 1.2,
-            ),
+  Widget _sliverCenteredHeadAsBox(String title) {
+    final r = R.of(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(r.dp(16), r.dp(50), r.dp(16), r.dp(16)),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          title,
+          style: TextStyle(
+            fontFamily: _fHead,
+            fontSize: r.sp(40),
+            fontWeight: FontWeight.w500,
+            color: primary,
           ),
         ),
-      );
+      ),
+    );
+  }
 
   Widget _sliverBestsellerSalesBlocks() {
-    final Size screenSize = MediaQuery.of(context).size;
-    final double screenWidth = screenSize.width;
-    final double blockHeight =
-        (screenSize.height * 0.40).clamp(220.0, 420.0);
+    final r = R.of(context);
+    final double screenWidth  = MediaQuery.of(context).size.width;
+    final double blockHeight  =
+        (MediaQuery.of(context).size.height * 0.46).clamp(220.0, 420.0);
 
     return Column(
       children: [
         _fullWidthImageBlock(
           assetPath: 'assets/bestseller.jpg',
-          label: 'Bestseller',
+          label: 'Bestsellers',
           width: screenWidth,
           height: blockHeight,
           onTap: () {},
+          r: r,
         ),
         _fullWidthImageBlock(
           assetPath: 'assets/sales.jpg',
-          label: 'Sales',
+          label: 'Sale',
           width: screenWidth,
           height: blockHeight,
           onTap: () {},
+          r: r,
         ),
       ],
     );
@@ -669,6 +711,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required double width,
     required double height,
     required VoidCallback onTap,
+    required R r,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -697,15 +740,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             Positioned(
-              left: 18,
-              bottom: 18,
+              left: r.dp(18),
+              bottom: r.dp(11),
               child: Text(
                 label.toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
+                  fontFamily: _fHead,
                   color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.6,
+                  fontSize: r.sp(35),
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -715,28 +758,30 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _categoriesGridAsBox() => _categories.isEmpty
-      ? _empty()
-      : Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: GridView.builder(
-            physics: const NeverScrollableScrollPhysics(),
-            shrinkWrap: true,
-            itemCount: _categories.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.95,
+  Widget _categoriesGridAsBox() {
+    final r = R.of(context);
+    return _categories.isEmpty
+        ? _empty()
+        : Padding(
+            padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+            child: GridView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              shrinkWrap: true,
+              itemCount: _categories.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: r.dp(10),
+                crossAxisSpacing: r.dp(10),
+                childAspectRatio: 0.80,
+              ),
+              itemBuilder: (_, i) => _categoryTile(_categories[i], r),
             ),
-            itemBuilder: (_, i) => _categoryTile(_categories[i]),
-          ),
-        );
+          );
+  }
 
-  Widget _categoryTile(ShopifyCollection cat) => GestureDetector(
+  Widget _categoryTile(ShopifyCollection cat, R r) => GestureDetector(
         onTap: () => _openCollection(cat),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -763,15 +808,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Positioned(
-                left: 8,
-                bottom: 8,
+                left: r.dp(8),
+                bottom: r.dp(8),
                 child: Text(
                   cat.label,
-                  style: const TextStyle(
+                  style: TextStyle(
+                    fontFamily: _fHead,
                     color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
+                    fontSize: r.sp(25),
                   ),
                 ),
               ),
@@ -781,17 +825,15 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
   Widget _balloonBannerAsBox() {
+    final r      = R.of(context);
     final banner = _balloonBanner;
     return GestureDetector(
       onTap: _openAssortedCollection,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-        height: 150,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        margin: EdgeInsets.fromLTRB(r.dp(16), r.dp(20), r.dp(16), r.dp(4)),
+        height: r.dp(150),
+        decoration: const BoxDecoration(),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
           child: banner?.imageUrl != null
               ? CachedNetworkImage(
                   imageUrl: banner!.imageUrl!,
@@ -812,60 +854,48 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _oversizedShirtsAsBox() => _oversizedShirts.isEmpty
-      ? _empty()
-      : SizedBox(
-          height: 330,
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            scrollDirection: Axis.horizontal,
-            itemCount: _oversizedShirts.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (_, i) => _productTile(_oversizedShirts[i]),
-          ),
-        );
+  Widget _oversizedShirtsAsBox() {
+    final r = R.of(context);
+    return _oversizedShirts.isEmpty
+        ? _empty()
+        : SizedBox(
+            height: r.dp(365),
+            child: ListView.separated(
+              padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+              scrollDirection: Axis.horizontal,
+              itemCount: _oversizedShirts.length,
+              separatorBuilder: (_, __) => SizedBox(width: r.dp(12)),
+              itemBuilder: (_, i) => _productTile(_oversizedShirts[i], r),
+            ),
+          );
+  }
 
-  Widget _latestDropsAsBox() => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          shrinkWrap: true,
-          itemCount: _latestDropTiles.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 0.68,
-          ),
-          itemBuilder: (_, i) => _latestDropCard(_latestDropTiles[i]),
+  Widget _latestDropsAsBox() {
+    final r = R.of(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+      child: GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        itemCount: _latestDropTiles.length,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: r.dp(12),
+          mainAxisSpacing: r.dp(12),
+          childAspectRatio: 0.68,
         ),
-      );
+        itemBuilder: (_, i) => _latestDropCard(_latestDropTiles[i], r),
+      ),
+    );
+  }
 
-  Widget _ourCollectionsAsBox() => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          shrinkWrap: true,
-          itemCount: _ourCollectionPromoTiles.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 0,
-            mainAxisSpacing: 0,
-            childAspectRatio: 0.68,
-          ),
-          itemBuilder: (_, i) =>
-              _ourCollectionCard(_ourCollectionPromoTiles[i], i),
-        ),
-      );
-
-  Widget _latestDropCard(_PromoCollectionTile tile) => GestureDetector(
+  Widget _latestDropCard(_PromoCollectionTile tile, R r) => GestureDetector(
         onTap: () => _openCollectionByHandle(
           tile.handle,
           title: tile.title,
           label: tile.title,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(2),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -888,24 +918,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Positioned(
-                left: 16,
-                right: 16,
-                bottom: 18,
+                left: r.dp(16),
+                right: r.dp(16),
+                bottom: r.dp(18),
                 child: Column(
                   children: [
                     Text(
                       tile.title,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
+                        fontFamily: _fHead,
                         color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
+                        fontSize: r.sp(30),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: r.dp(8)),
                     SizedBox(
-                      height: 42,
+                      height: r.dp(42),
+                      width: double.infinity,
                       child: OutlinedButton(
                         onPressed: () => _openCollectionByHandle(
                           tile.handle,
@@ -918,17 +949,32 @@ class _HomeScreenState extends State<HomeScreen> {
                             width: 1,
                           ),
                           foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                              horizontal: r.dp(10)),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(2),
+                            borderRadius: BorderRadius.zero,
                           ),
                         ),
-                        child: Text(
-                          '${tile.buttonText}  →',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.0,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              tile.buttonText,
+                              style: TextStyle(
+                                fontFamily: _fBold,
+                                fontSize: r.sp(15),
+                              ),
+                            ),
+                            SizedBox(width: r.dp(6)),
+                            Text(
+                              '→',
+                              style: TextStyle(
+                                fontSize: r.sp(11),
+                                height: 1.1,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -940,7 +986,27 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
 
-  Widget _ourCollectionCard(_PromoCollectionTile tile, int index) =>
+  Widget _ourCollectionsAsBox() {
+    final r = R.of(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+      child: GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        itemCount: _ourCollectionPromoTiles.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 0,
+          mainAxisSpacing: 0,
+          childAspectRatio: 0.68,
+        ),
+        itemBuilder: (_, i) =>
+            _ourCollectionCard(_ourCollectionPromoTiles[i], i, r),
+      ),
+    );
+  }
+
+  Widget _ourCollectionCard(_PromoCollectionTile tile, int index, R r) =>
       GestureDetector(
         onTap: () => _openCollectionByHandle(
           tile.handle,
@@ -958,14 +1024,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: borderColor,
                 width: index.isEven ? 1 : 0.4,
               ),
-              right: const BorderSide(
-                color: borderColor,
-                width: 0.8,
-              ),
-              bottom: const BorderSide(
-                color: borderColor,
-                width: 0.8,
-              ),
+              right: const BorderSide(color: borderColor, width: 0.8),
+              bottom: const BorderSide(color: borderColor, width: 0.8),
             ),
           ),
           child: Column(
@@ -973,29 +1033,39 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Container(
                 color: const Color(0xFFF5F5F5),
-                padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+                padding: EdgeInsets.fromLTRB(
+                    r.dp(8), r.dp(12), r.dp(8), r.dp(10)),
                 child: Column(
                   children: [
-                    Text(
-                      tile.title,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: primary,
-                        letterSpacing: 0.8,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        tile.title,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontFamily: _fHead,
+                          fontSize: r.sp(15),
+                          fontWeight: FontWeight.w500,
+                          color: primary,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      tile.subtitle,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 9,
-                        color: secondaryTxt,
-                        height: 1.3,
+                    SizedBox(height: r.dp(4)),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: r.dp(4)),
+                      child: Text(
+                        tile.subtitle,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                        style: TextStyle(
+                          fontFamily: _fBold,
+                          fontSize: r.sp(13),
+                          color: secondaryTxt,
+                          height: 1.2,
+                        ),
                       ),
                     ),
                   ],
@@ -1014,13 +1084,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
 
-  Widget _productTile(ShopifyProduct product) {
-    const double tileWidth = 160.0;
-    const double imageHeight = 185.0;
+  Widget _productTile(ShopifyProduct product, R r) {
+    final double tileWidth   = r.dp(160);
+    final double imageHeight = r.dp(185);
     final colorHexes = product.colorHexCodes;
-    final isAdding = _addingToCartProductIds.contains(product.id);
-    final variantId =
-        product.variants.isNotEmpty ? product.variants.first.id : null;
 
     return GestureDetector(
       onTap: () => _openProductDetail(product),
@@ -1030,7 +1097,6 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
               child: SizedBox(
                 width: tileWidth,
                 height: imageHeight,
@@ -1046,87 +1112,128 @@ class _HomeScreenState extends State<HomeScreen> {
                     : Container(color: const Color(0xFFE0E0E0)),
               ),
             ),
-            const SizedBox(height: 7),
+            SizedBox(height: r.dp(7)),
             Text(
               product.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 11,
+              style: TextStyle(
+                fontFamily: _fBody,
+                fontSize: r.sp(13),
                 fontWeight: FontWeight.w600,
                 color: primary,
               ),
             ),
-            const SizedBox(height: 5),
-            _priceBlock(product),
-            const SizedBox(height: 6),
-            if (colorHexes.isNotEmpty) _colorSwatches(colorHexes),
-            const SizedBox(height: 8),
-            AnimatedBuilder(
-              animation: CartService.instance,
-              builder: (context, _) {
-                final isAddedToCart =
-                    variantId != null && CartService.instance.isInCart(variantId);
-
-                return SizedBox(
-                  width: tileWidth,
-                  height: 30,
-                  child: OutlinedButton(
-                    onPressed: isAdding
-                        ? null
-                        : () async {
-                            if (isAddedToCart) {
-                              _goToCart();
-                            } else {
-                              await _addToCart(product);
-                            }
-                          },
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: primary, width: 1.2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      padding: EdgeInsets.zero,
-                      foregroundColor: primary,
-                    ),
-                    child: isAdding
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(
-                            isAddedToCart ? 'GO TO CART' : 'SHOP NOW',
-                            style: const TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
-                              color: primary,
-                            ),
-                          ),
-                  ),
-                );
-              },
-            ),
+            SizedBox(height: r.dp(5)),
+            _priceBlock(product, r),
+            SizedBox(height: r.dp(6)),
+            if (colorHexes.isNotEmpty) _colorSwatches(colorHexes, r),
+            SizedBox(height: r.dp(8)),
+            _cartButtonForProduct(product, r),
           ],
         ),
       ),
     );
   }
 
-  Widget _priceBlock(ShopifyProduct product) {
+  Widget _cartButtonForProduct(ShopifyProduct product, R r) {
+    final variantId =
+        product.variants.isNotEmpty ? product.variants.first.id : null;
+
+    return AnimatedBuilder(
+      animation: CartService.instance,
+      builder: (context, _) {
+        final inCart =
+            variantId != null && CartService.instance.isInCart(variantId);
+        final isFilling = _fillAnimatingIds[product.id] ?? false;
+        final isBusy = _addingToCartProductIds.contains(product.id);
+
+        return SizedBox(
+          width: double.infinity,
+          height: r.dp(32),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0, end: isFilling ? 1 : 0),
+            duration: const Duration(milliseconds: 450),
+            curve: Curves.easeInOut,
+            builder: (context, value, child) {
+              return Stack(
+                children: [
+                  Positioned.fill(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FractionallySizedBox(
+                        widthFactor: value,
+                        child: Container(color: primary),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: OutlinedButton(
+                      onPressed: isBusy
+                          ? null
+                          : inCart
+                              ? _goToCart
+                              : () async {
+                                  setState(() {
+                                    _fillAnimatingIds[product.id] = true;
+                                  });
+
+                                  await Future.delayed(
+                                    const Duration(milliseconds: 450),
+                                  );
+
+                                  await _addToCart(product);
+
+                                  if (!mounted) return;
+
+                                  setState(() {
+                                    _fillAnimatingIds[product.id] = false;
+                                  });
+                                },
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: primary, width: 1.2),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero,
+                        ),
+                        padding: EdgeInsets.zero,
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: isFilling ? Colors.white : primary,
+                        disabledForegroundColor:
+                            isFilling ? Colors.white : primary,
+                      ),
+                      child: Text(
+                        inCart ? 'GO TO CART' : 'SHOP NOW',
+                        style: TextStyle(
+                          fontFamily: _fBold,
+                          fontSize: r.sp(11),
+                          letterSpacing: 1.2,
+                          color: isFilling ? Colors.white : primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _priceBlock(ShopifyProduct product, R r) {
     if (!product.isOnSale) {
       return Text(
         product.formattedPrice,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
+        style: TextStyle(
+          fontFamily: _fBold,
+          fontSize: r.sp(14),
           color: primary,
         ),
       );
     }
 
-    final saved = (product.compareAtPrice! - product.price).round();
+    final saved    = (product.compareAtPrice! - product.price).round();
     final savedStr = product.currencyCode == 'INR'
         ? '₹$saved'
         : '${product.currencyCode} $saved';
@@ -1136,44 +1243,46 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Row(
           children: [
-            const Text(
+            Text(
               'MRP ',
               style: TextStyle(
-                fontSize: 9,
+                fontFamily: _fBody,
+                fontSize: r.sp(11),
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF9A9A9A),
+                color: const Color(0xFF9A9A9A),
               ),
             ),
             Text(
               product.formattedCompareAtPrice,
-              style: const TextStyle(
-                fontSize: 10,
-                color: Color(0xFF9A9A9A),
+              style: TextStyle(
+                fontFamily: _fBody,
+                fontSize: r.sp(12),
+                color: const Color(0xFF9A9A9A),
                 decoration: TextDecoration.lineThrough,
-                decorationColor: Color(0xFF9A9A9A),
+                decorationColor: const Color(0xFF9A9A9A),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 2),
+        SizedBox(height: r.dp(2)),
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
               product.formattedPrice,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
+              style: TextStyle(
+                fontFamily: _fBold,
+                fontSize: r.sp(15),
                 color: primary,
               ),
             ),
-            const SizedBox(width: 6),
+            SizedBox(width: r.dp(6)),
             Text(
               'Save $savedStr',
-              style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF2E7D32),
+              style: TextStyle(
+                fontFamily: _fBold,
+                fontSize: r.sp(11),
+                color: const Color(0xFF2E7D32),
               ),
             ),
           ],
@@ -1182,7 +1291,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _colorSwatches(List<String> hexCodes) {
+  Widget _colorSwatches(List<String> hexCodes, R r) {
     final visible = hexCodes.take(5).toList();
     return Row(
       children: visible.map((hex) {
@@ -1194,9 +1303,9 @@ class _HomeScreenState extends State<HomeScreen> {
           color = const Color(0xFFCCCCCC);
         }
         return Container(
-          margin: const EdgeInsets.only(right: 5),
-          width: 18,
-          height: 18,
+          margin: EdgeInsets.only(right: r.dp(5)),
+          width:  r.dp(18),
+          height: r.dp(18),
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,
@@ -1210,64 +1319,69 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _shimmer() => ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _sh(200, radius: 0),
-          const SizedBox(height: 16),
-          _sh(14, width: 160),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _sh(190, width: 150),
-              const SizedBox(width: 12),
-              _sh(190, width: 150),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _sh(14, width: 200),
-          const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 3,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            children: List.generate(6, (_) => _sh(double.infinity)),
-          ),
-        ],
-      );
+  Widget _shimmer() {
+    final r = R.of(context);
+    return ListView(
+      padding: EdgeInsets.all(r.dp(16)),
+      children: [
+        _sh(r.dp(200), r, radius: 0),
+        SizedBox(height: r.dp(16)),
+        _sh(r.dp(14), r, width: r.dp(160)),
+        SizedBox(height: r.dp(12)),
+        Row(
+          children: [
+            _sh(r.dp(190), r, width: r.dp(150)),
+            SizedBox(width: r.dp(12)),
+            _sh(r.dp(190), r, width: r.dp(150)),
+          ],
+        ),
+        SizedBox(height: r.dp(20)),
+        _sh(r.dp(14), r, width: r.dp(200)),
+        SizedBox(height: r.dp(12)),
+        GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: r.dp(8),
+          mainAxisSpacing: r.dp(8),
+          children: List.generate(6, (_) => _sh(double.infinity, r)),
+        ),
+      ],
+    );
+  }
 
-  Widget _sh(double height, {double? width, double radius = 8}) => Container(
+  Widget _sh(double height, R r, {double? width, double radius = 0}) =>
+      Container(
         height: height,
         width: width,
-        decoration: BoxDecoration(
-          color: const Color(0xFFE0E0E0),
-          borderRadius: BorderRadius.circular(radius),
+        decoration: const BoxDecoration(
+          color: Color(0xFFE0E0E0),
         ),
       );
 
-  Widget _empty() => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-        child: Center(
-          child: Text(
-            'Nothing here yet.',
-            style: TextStyle(color: secondaryTxt, fontSize: 13),
+  Widget _empty() {
+    final r = R.of(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(
+          vertical: r.dp(24), horizontal: r.dp(16)),
+      child: Center(
+        child: Text(
+          'Nothing here yet.',
+          style: TextStyle(
+            fontFamily: _fBody,
+            color: secondaryTxt,
+            fontSize: r.sp(14),
           ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _SectionAnchor {
-  final String id;
+  final String    id;
   final GlobalKey key;
   const _SectionAnchor({required this.id, required this.key});
-}
-
-class _Bucket {
-  final String label;
-  final Color labelColor;
-  const _Bucket(this.label, this.labelColor);
 }
 
 class _PromoCollectionTile {

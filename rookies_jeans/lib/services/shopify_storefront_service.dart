@@ -181,7 +181,7 @@ class ShopifyStorefrontService {
               handle
               priceRange { minVariantPrice { amount currencyCode } }
               compareAtPriceRange { minVariantPrice { amount currencyCode } }
-              images(first: 2) { edges { node { url altText } } }
+              images(first: 10) { edges { node { url altText } } }
               options {
                 name
                 values

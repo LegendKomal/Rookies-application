@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class ShopifyConstants {
   ShopifyConstants._();
 
@@ -13,6 +15,30 @@ class ShopifyConstants {
         'X-Shopify-Storefront-Access-Token': storefrontAccessToken,
       };
 
+  // ─── Font families ────────────────────────────────────────────────────────
+  static const String fontHeading  = 'BebasNene';      // headings
+  static const String fontBody     = 'AlteHaasGroteskRegular'; // body text
+  static const String fontBodyBold = 'SplineSansMono';    // highlighted / emphasis
+  static const String fontAlteBold = 'AlteHaasGroteskBold';
+
+  // ─── Base TextStyles ──────────────────────────────────────────────────────
+  // Use these as roots and extend with .copyWith() where needed.
+  static const TextStyle tsHeading = TextStyle(
+    fontFamily: fontHeading,
+    color: Color(primaryColorHex),
+  );
+
+  static const TextStyle tsBody = TextStyle(
+    fontFamily: fontBody,
+    color: Color(primaryColorHex),
+  );
+
+  static const TextStyle tsBold = TextStyle(
+    fontFamily: fontBodyBold,
+    color: Color(primaryColorHex),
+  );
+
+  // ─── Collection handles ───────────────────────────────────────────────────
   static const String latestDropHandle       = 'new-arrivals';
   static const String cargosHandle           = 'CARGOS';
   static const String jeansHandle            = 'JEANS';
@@ -25,33 +51,25 @@ class ShopifyConstants {
   static const String trendingNowHandle      = 'trending-now';
   static const String balloonCargosHandle    = 'BALLOON FIT CARGO';
   static const String oversizedShirtsHandle  = 'oversized-shirts';
-  // static const String shacketsHandle         = 'SHACKETS';
-  // static const String flatknitsHandle        = 'FLATKNITS';
-  // static const String jacketsHandle          = 'JACKETS';
-  // static const String sweatersHandle         = 'SWEATERS';
 
   static const List<Map<String, String>> exploreCategories = [
-  {'handle': cargosHandle,   'label': 'CARGOS'},
-  {'handle': jeansHandle,    'label': 'JEANS'},
-  {'handle': shirtsHandle,   'label': 'SHIRTS'},
-  {'handle': tshirtsHandle,  'label': 'TSHIRTS'},
-  {'handle': linensHandle,   'label': 'LINENS'},
-  {'handle': 'CHINOS',       'label': 'CHINOS'},
-  {'handle': shortsHandle,   'label': 'SHORTS'},
-  {'handle': 'polo-tees',    'label': 'POLO TEES'},
-  // {'handle': shacketsHandle,  'label': 'SHACKETS'},
-  // {'handle': flatknitsHandle, 'label': 'FLATKNITS'},
-  // {'handle': jacketsHandle,   'label': 'JACKETS'},
-  // {'handle': sweatersHandle,  'label': 'SWEATERS'},
-];
+    {'handle': cargosHandle,   'label': 'CARGOS'},
+    {'handle': jeansHandle,    'label': 'JEANS'},
+    {'handle': shirtsHandle,   'label': 'SHIRTS'},
+    {'handle': tshirtsHandle,  'label': 'TSHIRTS'},
+    {'handle': linensHandle,   'label': 'LINENS'},
+    {'handle': 'CHINOS',       'label': 'CHINOS'},
+    {'handle': shortsHandle,   'label': 'SHORTS'},
+    {'handle': 'polo-tees',    'label': 'POLO TEES'},
+  ];
 
   static const List<Map<String, String>> latestDropCollections = [
-    {'handle': tshirtsHandle,  'label': 'Oversized Tees'},
-    {'handle': cargosHandle,   'label': 'Balloon Fit Pants'},
-    {'handle': linensHandle,   'label': 'Linens'},
-    {'handle': shortsHandle,   'label': 'Shorts'},
-    {'handle': jeansHandle,    'label': 'Jeans'},
-    {'handle': shirtsHandle,   'label': 'Shirts'},
+    {'handle': tshirtsHandle,       'label': 'Oversized Tees'},
+    {'handle': cargosHandle,        'label': 'Balloon Fit Pants'},
+    {'handle': linensHandle,        'label': 'Linens'},
+    {'handle': shortsHandle,        'label': 'Shorts'},
+    {'handle': jeansHandle,         'label': 'Jeans'},
+    {'handle': shirtsHandle,        'label': 'Shirts'},
     {'handle': balloonCargosHandle, 'label': 'Balloon Fit Pants'},
   ];
 
@@ -60,12 +78,13 @@ class ShopifyConstants {
     {'handle': hotDealsHandle,    'label': 'HOT DEALS'},
     {'handle': trendingNowHandle, 'label': 'TRENDING NOW'},
   ];
-  
 
+  // ─── Fetch limits ─────────────────────────────────────────────────────────
   static const int latestDropCount      = 6;
   static const int hotDealsCount        = 4;
   static const int oversizedShirtsCount = 10;
 
+  // ─── Colors ───────────────────────────────────────────────────────────────
   static const int primaryColorHex   = 0xFF111111;
   static const int accentOrangeHex   = 0xFFFF6B00;
   static const int bgColorHex        = 0xFFF5F5F5;

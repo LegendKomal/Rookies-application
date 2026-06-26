@@ -15,10 +15,14 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage>
     with SingleTickerProviderStateMixin {
-  static const Color primary = Color(ShopifyConstants.primaryColorHex);
-  static const Color bgColor = Color(ShopifyConstants.bgColorHex);
-  static const Color cardColor = Color(ShopifyConstants.cardColorHex);
+  static const Color primary      = Color(ShopifyConstants.primaryColorHex);
+  static const Color bgColor      = Color(ShopifyConstants.bgColorHex);
+  static const Color cardColor    = Color(ShopifyConstants.cardColorHex);
   static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
+
+  static const String _fHead = ShopifyConstants.fontHeading;
+  static const String _fBody = ShopifyConstants.fontBody;
+  static const String _fBold = ShopifyConstants.fontBodyBold;
 
   final TextEditingController _searchCtrl = TextEditingController();
   final FocusNode _focusNode = FocusNode();
@@ -88,7 +92,7 @@ class _SearchPageState extends State<SearchPage>
       final result =
           await ShopifyStorefrontService.instance.searchProducts(query);
       if (!mounted) return;
-      if (_searchCtrl.text.trim() != query) return; // stale
+      if (_searchCtrl.text.trim() != query) return;
 
       setState(() {
         _suggestions = result;
@@ -142,9 +146,7 @@ class _SearchPageState extends State<SearchPage>
         child: Column(
           children: [
             _buildSearchBar(),
-            Expanded(
-              child: _buildBody(),
-            ),
+            Expanded(child: _buildBody()),
           ],
         ),
       ),
@@ -165,7 +167,6 @@ class _SearchPageState extends State<SearchPage>
       ),
       child: Row(
         children: [
-          // Back button
           IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
             color: primary,
@@ -175,7 +176,6 @@ class _SearchPageState extends State<SearchPage>
           ),
           const SizedBox(width: 4),
 
-          // Search field
           Expanded(
             child: Container(
               height: 44,
@@ -191,7 +191,8 @@ class _SearchPageState extends State<SearchPage>
                 controller: _searchCtrl,
                 focusNode: _focusNode,
                 textAlignVertical: TextAlignVertical.center,
-                style: TextStyle(
+                style: const TextStyle(
+                  fontFamily: _fBody,
                   fontSize: 14,
                   color: primary,
                   fontWeight: FontWeight.w500,
@@ -199,6 +200,7 @@ class _SearchPageState extends State<SearchPage>
                 decoration: InputDecoration(
                   hintText: 'Search products...',
                   hintStyle: TextStyle(
+                    fontFamily: _fBody,
                     fontSize: 14,
                     color: secondaryTxt.withOpacity(0.6),
                     fontWeight: FontWeight.w400,
@@ -233,25 +235,11 @@ class _SearchPageState extends State<SearchPage>
   Widget _buildBody() {
     final query = _searchCtrl.text.trim();
 
-    if (query.isEmpty) {
-      return _buildIdleState();
-    }
-
-    if (query.length < 3) {
-      return _buildTypeMoreHint(query.length);
-    }
-
-    if (_isSearching) {
-      return _buildLoadingState();
-    }
-
-    if (_hasSearched && _suggestions.isEmpty) {
-      return _buildEmptyState(query);
-    }
-
-    if (_suggestions.isNotEmpty) {
-      return _buildResultsList();
-    }
+    if (query.isEmpty) return _buildIdleState();
+    if (query.length < 3) return _buildTypeMoreHint(query.length);
+    if (_isSearching) return _buildLoadingState();
+    if (_hasSearched && _suggestions.isEmpty) return _buildEmptyState(query);
+    if (_suggestions.isNotEmpty) return _buildResultsList();
 
     return const SizedBox.shrink();
   }
@@ -270,16 +258,18 @@ class _SearchPageState extends State<SearchPage>
           Text(
             'SEARCH PRODUCTS',
             style: TextStyle(
+              fontFamily: _fBold,
               fontSize: 12,
               fontWeight: FontWeight.w800,
               color: primary.withOpacity(0.35),
-              letterSpacing: 2.0,
+              // letterSpacing: 2.0,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Start typing to find what you\'re looking for',
             style: TextStyle(
+              fontFamily: _fBody,
               fontSize: 12,
               color: secondaryTxt.withOpacity(0.55),
             ),
@@ -298,6 +288,7 @@ class _SearchPageState extends State<SearchPage>
           Text(
             'Type $remaining more ${remaining == 1 ? 'character' : 'characters'}',
             style: TextStyle(
+              fontFamily: _fBody,
               fontSize: 13,
               color: secondaryTxt.withOpacity(0.55),
               fontWeight: FontWeight.w500,
@@ -307,6 +298,7 @@ class _SearchPageState extends State<SearchPage>
           Text(
             'to see suggestions',
             style: TextStyle(
+              fontFamily: _fBody,
               fontSize: 12,
               color: secondaryTxt.withOpacity(0.35),
             ),
@@ -379,6 +371,7 @@ class _SearchPageState extends State<SearchPage>
           Text(
             'No results for',
             style: TextStyle(
+              fontFamily: _fBody,
               fontSize: 13,
               color: secondaryTxt.withOpacity(0.55),
             ),
@@ -387,6 +380,7 @@ class _SearchPageState extends State<SearchPage>
           Text(
             '"$query"',
             style: TextStyle(
+              fontFamily: _fBold,
               fontSize: 15,
               fontWeight: FontWeight.w700,
               color: primary.withOpacity(0.75),
@@ -396,6 +390,7 @@ class _SearchPageState extends State<SearchPage>
           Text(
             'Try a different search term',
             style: TextStyle(
+              fontFamily: _fBody,
               fontSize: 12,
               color: secondaryTxt.withOpacity(0.4),
             ),
@@ -416,10 +411,11 @@ class _SearchPageState extends State<SearchPage>
             child: Text(
               '${_suggestions.length} RESULT${_suggestions.length == 1 ? '' : 'S'}',
               style: TextStyle(
+                fontFamily: _fBold,
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
                 color: primary.withOpacity(0.45),
-                letterSpacing: 1.6,
+                // letterSpacing: 1.6,
               ),
             ),
           ),
@@ -448,7 +444,6 @@ class _SearchPageState extends State<SearchPage>
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
-            // Product image
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: SizedBox(
@@ -470,14 +465,11 @@ class _SearchPageState extends State<SearchPage>
                           ),
                         ),
                       )
-                    : Container(
-                        color: primary.withOpacity(0.07),
-                      ),
+                    : Container(color: primary.withOpacity(0.07)),
               ),
             ),
             const SizedBox(width: 14),
 
-            // Product info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -487,6 +479,7 @@ class _SearchPageState extends State<SearchPage>
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
+                      fontFamily: _fBold,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: primary,
@@ -503,7 +496,6 @@ class _SearchPageState extends State<SearchPage>
               ),
             ),
 
-            // Arrow
             Padding(
               padding: const EdgeInsets.only(left: 8),
               child: Icon(
@@ -523,6 +515,7 @@ class _SearchPageState extends State<SearchPage>
       return Text(
         product.formattedPrice,
         style: const TextStyle(
+          fontFamily: _fBold,
           fontSize: 13,
           fontWeight: FontWeight.w700,
           color: primary,
@@ -535,6 +528,7 @@ class _SearchPageState extends State<SearchPage>
         Text(
           product.formattedPrice,
           style: const TextStyle(
+            fontFamily: _fBold,
             fontSize: 13,
             fontWeight: FontWeight.w700,
             color: primary,
@@ -544,6 +538,7 @@ class _SearchPageState extends State<SearchPage>
         Text(
           product.formattedCompareAtPrice,
           style: const TextStyle(
+            fontFamily: _fBody,
             fontSize: 11,
             color: Color(0xFF9A9A9A),
             decoration: TextDecoration.lineThrough,

@@ -190,7 +190,7 @@ class _LoginState extends State<Login> {
                               fontSize: 30,
                               fontWeight: FontWeight.w700,
                               color: primary,
-                              letterSpacing: -0.5,
+                              // letterSpacing: -0.5,
                             ),
                           ),
                           SizedBox(height: 8),
@@ -285,7 +285,8 @@ class _LoginState extends State<Login> {
                                 style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.2)),
+                                    // letterSpacing: 0.2
+                                    )),
                       ),
                     ),
                     const SizedBox(height: 22),
