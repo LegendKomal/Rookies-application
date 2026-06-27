@@ -54,19 +54,19 @@ class _LoginState extends State<Login> {
       contentPadding:
           const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        // borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: borderColor),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        // borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: borderColor, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        // borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: primary, width: 1.2),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        // borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Colors.redAccent),
       ),
     );
@@ -167,7 +167,7 @@ class _LoginState extends State<Login> {
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: cardColor,
-                  borderRadius: BorderRadius.circular(24),
+                  // borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: borderColor),
                   boxShadow: [
                     BoxShadow(
@@ -271,8 +271,8 @@ class _LoginState extends State<Login> {
                           foregroundColor: Colors.white,
                           disabledBackgroundColor: const Color(0xff2d2d2d),
                           elevation: 0,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14)),
+                          // shape: RoundedRectangleBorder(
+                          //     borderRadius: BorderRadius.circular(14)),
                         ),
                         child: isLoading
                             ? const SizedBox(

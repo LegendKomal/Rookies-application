@@ -48,19 +48,19 @@ class _ForgotPasswordState extends State<ForgotPassword> {
       fillColor: fieldFill,
       contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        // borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: borderColor),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        // borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: borderColor, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        // borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: primary, width: 1.2),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        // borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Colors.redAccent),
       ),
     );
@@ -145,7 +145,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: cardColor,
-                  borderRadius: BorderRadius.circular(24),
+                  // borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: borderColor),
                   boxShadow: [
                     BoxShadow(
@@ -248,7 +248,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                             disabledBackgroundColor: const Color(0xff2d2d2d),
                             elevation: 0,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              // borderRadius: BorderRadius.circular(14),
                             ),
                           ),
                           child: isLoading
@@ -282,7 +282,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                             foregroundColor: primary,
                             side: const BorderSide(color: borderColor),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              // borderRadius: BorderRadius.circular(14),
                             ),
                           ),
                           child: const Text(
@@ -305,7 +305,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              // borderRadius: BorderRadius.circular(14),
                             ),
                           ),
                           child: const Text(

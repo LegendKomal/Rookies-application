@@ -1310,7 +1310,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 children: [
                   Positioned.fill(
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(5),
+                      // borderRadius: BorderRadius.circular(5),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: FractionallySizedBox(
@@ -1534,7 +1534,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: primary,
                   side: const BorderSide(color: primary),
-                  shape: RoundedRectangleBorder(
+                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(6),
                   ),
                 ),
@@ -1556,7 +1556,7 @@ class _ProductsPageState extends State<ProductsPage> {
         itemBuilder: (_, __) => Container(
           decoration: BoxDecoration(
             color: const Color(0xFFE0E0E0),
-            borderRadius: BorderRadius.circular(10),
+            // borderRadius: BorderRadius.circular(10),
           ),
         ),
       );
@@ -1777,7 +1777,7 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
             constraints: BoxConstraints(maxHeight: screenHeight * 0.82),
             decoration: BoxDecoration(
               color: widget.cardColor,
-              borderRadius: BorderRadius.circular(16),
+              // borderRadius: BorderRadius.circular(16),
               boxShadow: const [
                 BoxShadow(
                   color: Colors.black26,
@@ -1787,7 +1787,7 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
+              // borderRadius: BorderRadius.circular(16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1822,7 +1822,7 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFD32F2F),
-                                borderRadius: BorderRadius.circular(4),
+                                // borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
                                 _discountPercent(product),
@@ -1842,7 +1842,7 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                                 horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: Colors.black.withOpacity(0.45),
-                              borderRadius: BorderRadius.circular(20),
+                              // borderRadius: BorderRadius.circular(20),
                             ),
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1878,7 +1878,7 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                                     color: i == _currentPage
                                         ? widget.primary
                                         : Colors.white.withOpacity(0.65),
-                                    borderRadius: BorderRadius.circular(3),
+                                    // borderRadius: BorderRadius.circular(3),
                                   ),
                                 ),
                               ),
@@ -1929,7 +1929,7 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: widget.primary,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                  // borderRadius: BorderRadius.circular(8),
                                 ),
                                 elevation: 0,
                               ),
@@ -2005,7 +2005,7 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
             color: const Color(0xFFE8F5E9),
-            borderRadius: BorderRadius.circular(4),
+            // borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
             'Save $savedStr',
@@ -2051,7 +2051,7 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                     color: isSelected ? widget.primary : widget.borderColor,
                     width: 1.2,
                   ),
-                  borderRadius: BorderRadius.circular(6),
+                  // borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   val,

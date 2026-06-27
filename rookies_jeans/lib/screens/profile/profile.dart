@@ -1,7 +1,135 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
+
+// ─────────────────────────────────────────────
+//  WebView Screen
+// ─────────────────────────────────────────────
+
+class WebViewScreen extends StatefulWidget {
+  const WebViewScreen({
+    super.key,
+    required this.title,
+    required this.url,
+  });
+
+  final String title;
+  final String url;
+
+  @override
+  State<WebViewScreen> createState() => _WebViewScreenState();
+}
+
+class _WebViewScreenState extends State<WebViewScreen> {
+  static const _primary = Color(ShopifyConstants.primaryColorHex);
+
+  late final WebViewController _controller;
+  bool _isLoading = true;
+  bool _hasError  = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (_) => setState(() {
+            _isLoading = true;
+            _hasError  = false;
+          }),
+          onPageFinished: (_) => setState(() => _isLoading = false),
+          onWebResourceError: (_) => setState(() {
+            _isLoading = false;
+            _hasError  = true;
+          }),
+        ),
+      )
+      ..loadRequest(Uri.parse(widget.url));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        shadowColor: const Color(0xFFEEEEEE),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              size: 18, color: Color(0xFF333333)),
+          onPressed: () => context.pop(),
+        ),
+        title: Text(
+          widget.title,
+          style: const TextStyle(
+            fontFamily: ShopifyConstants.fontHeading,
+            fontSize: 17,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF111111),
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: Stack(
+        children: [
+          // ── Error state ──────────────────────────────
+          if (_hasError)
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.wifi_off_rounded,
+                      size: 48, color: Color(0xFFBBBBBB)),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Failed to load page',
+                    style: TextStyle(
+                      fontFamily: ShopifyConstants.fontBody,
+                      fontSize: 14,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => _controller.reload(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        // borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
+
+          // ── WebView ──────────────────────────────────
+          else
+            WebViewWidget(controller: _controller),
+
+          // ── Loading indicator ────────────────────────
+          if (_isLoading && !_hasError)
+            const LinearProgressIndicator(
+              minHeight: 2,
+              backgroundColor: Colors.transparent,
+              color: _primary,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  AuthService  (unchanged)
+// ─────────────────────────────────────────────
 
 class AuthService extends ChangeNotifier {
   static final AuthService instance = AuthService._();
@@ -59,6 +187,10 @@ class AuthService extends ChangeNotifier {
   }
 }
 
+// ─────────────────────────────────────────────
+//  ProfileScreen  (unchanged)
+// ─────────────────────────────────────────────
+
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -74,6 +206,10 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────
+//  _LoggedOutProfile  (unchanged)
+// ─────────────────────────────────────────────
 
 class _LoggedOutProfile extends StatelessWidget {
   const _LoggedOutProfile();
@@ -107,8 +243,8 @@ class _LoggedOutProfile extends StatelessWidget {
                     alignment: Alignment.topCenter,
                     errorBuilder: (_, __, ___) => Container(
                       color: const Color(0xFFE0E0E0),
-                      child: const Icon(Icons.person, size: 96,
-                          color: Color(0xFFBBBBBB)),
+                      child: const Icon(Icons.person,
+                          size: 96, color: Color(0xFFBBBBBB)),
                     ),
                   ),
                 ),
@@ -127,7 +263,6 @@ class _LoggedOutProfile extends StatelessWidget {
                           color: _primary,
                           fontSize: 26,
                           fontWeight: FontWeight.w500,
-                          // letterSpacing: 1.5,
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -140,9 +275,9 @@ class _LoggedOutProfile extends StatelessWidget {
                             backgroundColor: _primary,
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                            // shape: RoundedRectangleBorder(
+                            //   borderRadius: BorderRadius.circular(8),
+                            // ),
                           ),
                           child: Text(
                             'Sign In',
@@ -200,6 +335,10 @@ class _LoggedOutProfile extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────
+//  _LoggedInProfile  (unchanged)
+// ─────────────────────────────────────────────
+
 class _LoggedInProfile extends StatelessWidget {
   const _LoggedInProfile();
 
@@ -207,7 +346,6 @@ class _LoggedInProfile extends StatelessWidget {
   static const _bg      = Color(0xFFF5F5F3);
 
   static const String _fHead = ShopifyConstants.fontHeading;
-  static const String _fBody = ShopifyConstants.fontBody;
   static const String _fBold = ShopifyConstants.fontBodyBold;
 
   @override
@@ -243,7 +381,6 @@ class _LoggedInProfile extends StatelessWidget {
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
                           color: _primary,
-                          // letterSpacing: 1,
                         ),
                       ),
                     ),
@@ -311,6 +448,17 @@ class _MoreSection extends StatelessWidget {
 
   static const String _fHead = ShopifyConstants.fontHeading;
 
+  void _openWebView(BuildContext context, {
+    required String title,
+    required String url,
+  }) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WebViewScreen(title: title, url: url),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -330,16 +478,52 @@ class _MoreSection extends StatelessWidget {
               ),
             ),
           ),
-          _MoreTile(label: 'Data & Privacy',
-              onTap: () => context.push('/data-privacy')),
-          _MoreTile(label: 'Return & Refund Policy',
-              onTap: () => context.push('/refund-policy')),
-          _MoreTile(label: 'Shipping Policy',
-              onTap: () => context.push('/shipping-policy')),
-          _MoreTile(label: 'Store Locator',
-              onTap: () => context.push('/store-locator')),
-          _MoreTile(label: 'Track Your Order',
-              onTap: () => context.push('/track-order')),
+
+          _MoreTile(
+            label: 'Data & Privacy',
+            onTap: () => _openWebView(
+              context,
+              title: 'Data & Privacy',
+              url: 'https://rookiesjeans.com/policies/privacy-policy',
+            ),
+          ),
+
+          _MoreTile(
+            label: 'Return & Refund Policy',
+            onTap: () => _openWebView(
+              context,
+              title: 'Return & Refund Policy',
+              url: 'https://rookiesjeans.com/policies/refund-policy',
+            ),
+          ),
+
+          _MoreTile(
+            label: 'Shipping Policy',
+            onTap: () => _openWebView(
+              context,
+              title: 'Shipping Policy',
+              url: 'https://rookiesjeans.com/policies/shipping-policy',
+            ),
+          ),
+
+          _MoreTile(
+            label: 'Store Locator',
+            onTap: () => _openWebView(
+              context,
+              title: 'Store Locator',
+              url: 'https://rookiesjeans.com/pages/store-locator',
+            ),
+          ),
+
+          _MoreTile(
+            label: 'Track Your Order',
+            onTap: () => _openWebView(
+              context,
+              title: 'Track Your Order',
+              url: 'https://rookiesjeans.shiprocket.co/',
+            ),
+          ),
+
           if (showSignOut)
             _MoreTile(
               label: 'Sign Out',
@@ -349,6 +533,7 @@ class _MoreSection extends StatelessWidget {
                 if (context.mounted) context.go('/home');
               },
             ),
+
           const SizedBox(height: 8),
         ],
       ),
@@ -388,6 +573,9 @@ class _MoreTile extends StatelessWidget {
                     fontWeight: FontWeight.w400,
                   ),
                 ),
+                const Spacer(),
+                const Icon(Icons.chevron_right_rounded,
+                    size: 18, color: Color(0xFFBBBBBB)),
               ],
             ),
           ),
@@ -397,6 +585,10 @@ class _MoreTile extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────
+//  _QuickAction  (unchanged)
+// ─────────────────────────────────────────────
 
 class _QuickAction extends StatelessWidget {
   const _QuickAction({

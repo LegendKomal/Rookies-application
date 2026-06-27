@@ -181,7 +181,7 @@ class _SearchPageState extends State<SearchPage>
               height: 44,
               decoration: BoxDecoration(
                 color: cardColor,
-                borderRadius: BorderRadius.circular(6),
+                // borderRadius: BorderRadius.circular(6),
                 border: Border.all(
                   color: primary.withOpacity(0.15),
                   width: 0.8,
@@ -325,7 +325,7 @@ class _SearchPageState extends State<SearchPage>
           height: 88,
           decoration: BoxDecoration(
             color: primary.withOpacity(0.07),
-            borderRadius: BorderRadius.circular(6),
+            // borderRadius: BorderRadius.circular(6),
           ),
         ),
         const SizedBox(width: 14),
@@ -338,7 +338,7 @@ class _SearchPageState extends State<SearchPage>
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: primary.withOpacity(0.07),
-                  borderRadius: BorderRadius.circular(4),
+                  // borderRadius: BorderRadius.circular(4),
                 ),
               ),
               const SizedBox(height: 8),
@@ -347,7 +347,7 @@ class _SearchPageState extends State<SearchPage>
                 width: 100,
                 decoration: BoxDecoration(
                   color: primary.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(4),
+                  // borderRadius: BorderRadius.circular(4),
                 ),
               ),
             ],
@@ -445,7 +445,7 @@ class _SearchPageState extends State<SearchPage>
         child: Row(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              // borderRadius: BorderRadius.circular(6),
               child: SizedBox(
                 width: 72,
                 height: 88,

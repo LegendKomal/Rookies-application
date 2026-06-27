@@ -136,7 +136,7 @@ class _WishlistPageState extends State<WishlistPage> {
                   foregroundColor: primary,
                   side: const BorderSide(color: primary, width: 1.1),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
+                    // borderRadius: BorderRadius.circular(6),
                   ),
                   elevation: 0,
                 ),
@@ -187,7 +187,7 @@ class _WishlistPageState extends State<WishlistPage> {
       child: Container(
         decoration: BoxDecoration(
           color: cardColor,
-          borderRadius: BorderRadius.circular(10),
+          // borderRadius: BorderRadius.circular(10),
           border: Border.all(color: borderColor, width: 0.8),
         ),
         child: Column(
@@ -197,9 +197,9 @@ class _WishlistPageState extends State<WishlistPage> {
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(10),
-                    ),
+                    // borderRadius: const BorderRadius.vertical(
+                    //   top: Radius.circular(10),
+                    // ),
                     child: SizedBox(
                       width: double.infinity,
                       child: imageUrl != null
@@ -238,7 +238,7 @@ class _WishlistPageState extends State<WishlistPage> {
                             horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
                           color: const Color(0xFFD32F2F),
-                          borderRadius: BorderRadius.circular(4),
+                          // borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           _discountPercent(product),

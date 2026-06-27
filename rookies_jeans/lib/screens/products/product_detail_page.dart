@@ -847,7 +847,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           const SizedBox(height: 7),
           Text(
             product.title,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontFamily: _fBold,
@@ -986,7 +986,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
             color: const Color(0xFF2E7D32).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(4),
+            // borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
             'You save $savedStr',
@@ -1046,7 +1046,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: isSelected ? primary : cardColor,
-                  borderRadius: BorderRadius.circular(6),
+                  // borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                     color: isSelected ? primary : borderColor,
                     width: isSelected ? 1.5 : 0.8,
@@ -1119,8 +1119,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: primary,
               disabledBackgroundColor: const Color(0xFFCCCCCC),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+              // shape: RoundedRectangleBorder(
+              //     borderRadius: BorderRadius.circular(8)),
               elevation: 0,
             ),
             child: _isAddingToCart
@@ -1260,8 +1260,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: primary,
                     side: const BorderSide(color: primary),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6)),
+                    // shape: RoundedRectangleBorder(
+                    //     borderRadius: BorderRadius.circular(6)),
                   ),
                 ),
               ],

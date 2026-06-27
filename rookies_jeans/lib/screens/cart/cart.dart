@@ -274,7 +274,7 @@ class _CartScreenState extends State<CartScreen> {
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(10),
+        // borderRadius: BorderRadius.circular(10),
         border: Border.all(color: borderColor, width: 0.8),
       ),
       padding: const EdgeInsets.all(10),
@@ -288,7 +288,7 @@ class _CartScreenState extends State<CartScreen> {
             child: Hero(
               tag: heroTag,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                // borderRadius: BorderRadius.circular(8),
                 child: SizedBox(
                   width: 80,
                   height: 100,
@@ -396,7 +396,7 @@ class _CartScreenState extends State<CartScreen> {
   Widget _qtyStepper(ShopifyCartLine line, bool isPending) => Container(
         decoration: BoxDecoration(
           border: Border.all(color: borderColor),
-          borderRadius: BorderRadius.circular(6),
+          // borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -485,7 +485,7 @@ class _CartScreenState extends State<CartScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primary,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    // borderRadius: BorderRadius.circular(8),
                   ),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(

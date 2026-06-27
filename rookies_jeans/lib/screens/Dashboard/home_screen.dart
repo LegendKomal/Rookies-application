@@ -952,7 +952,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: EdgeInsets.symmetric(
                               horizontal: r.dp(10)),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.zero,
+                            // borderRadius: BorderRadius.zero,
                           ),
                         ),
                         child: Row(
@@ -1193,7 +1193,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: primary, width: 1.2),
                         shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
+                          // borderRadius: BorderRadius.zero,
                         ),
                         padding: EdgeInsets.zero,
                         backgroundColor: Colors.transparent,
