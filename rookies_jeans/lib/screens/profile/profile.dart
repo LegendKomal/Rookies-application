@@ -4,9 +4,6 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
-// ─────────────────────────────────────────────
-//  WebView Screen
-// ─────────────────────────────────────────────
 
 class WebViewScreen extends StatefulWidget {
   const WebViewScreen({
@@ -76,7 +73,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
       ),
       body: Stack(
         children: [
-          // ── Error state ──────────────────────────────
           if (_hasError)
             Center(
               child: Column(
@@ -101,7 +97,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        // borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                     child: const Text('Retry'),
@@ -110,11 +105,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
               ),
             )
 
-          // ── WebView ──────────────────────────────────
           else
             WebViewWidget(controller: _controller),
 
-          // ── Loading indicator ────────────────────────
           if (_isLoading && !_hasError)
             const LinearProgressIndicator(
               minHeight: 2,
@@ -127,9 +120,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 }
 
-// ─────────────────────────────────────────────
-//  AuthService  (unchanged)
-// ─────────────────────────────────────────────
 
 class AuthService extends ChangeNotifier {
   static final AuthService instance = AuthService._();
@@ -187,9 +177,6 @@ class AuthService extends ChangeNotifier {
   }
 }
 
-// ─────────────────────────────────────────────
-//  ProfileScreen  (unchanged)
-// ─────────────────────────────────────────────
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -207,9 +194,6 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-//  _LoggedOutProfile  (unchanged)
-// ─────────────────────────────────────────────
 
 class _LoggedOutProfile extends StatelessWidget {
   const _LoggedOutProfile();
@@ -275,9 +259,6 @@ class _LoggedOutProfile extends StatelessWidget {
                             backgroundColor: _primary,
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            // shape: RoundedRectangleBorder(
-                            //   borderRadius: BorderRadius.circular(8),
-                            // ),
                           ),
                           child: Text(
                             'Sign In',
@@ -335,15 +316,12 @@ class _LoggedOutProfile extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-//  _LoggedInProfile  (unchanged)
-// ─────────────────────────────────────────────
 
 class _LoggedInProfile extends StatelessWidget {
   const _LoggedInProfile();
 
   static const _primary = Color(ShopifyConstants.primaryColorHex);
-  static const _bg      = Color(0xFFF5F5F3);
+  static const _bg      = Color(0xFFFFFFFF);
 
   static const String _fHead = ShopifyConstants.fontHeading;
   static const String _fBold = ShopifyConstants.fontBodyBold;
@@ -586,9 +564,6 @@ class _MoreTile extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-//  _QuickAction  (unchanged)
-// ─────────────────────────────────────────────
 
 class _QuickAction extends StatelessWidget {
   const _QuickAction({

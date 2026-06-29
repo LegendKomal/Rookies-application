@@ -3,8 +3,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/models/address_model.dart';
 import 'package:rookies_jeans/models/cart_model.dart';
 import 'package:rookies_jeans/screens/cart/checkout.dart';
+import 'package:rookies_jeans/screens/profile/address_book.dart';
+import 'package:rookies_jeans/services/address_service.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 import 'package:rookies_jeans/screens/authentication/login.dart';
@@ -77,10 +80,11 @@ class _CartScreenState extends State<CartScreen> {
   Future<void> _checkout() async {
     if (_isCheckingOut) return;
     setState(() => _isCheckingOut = true);
-
+ 
     try {
+      // ── Step 1: Ensure the user is logged in ──────────────────────────────
       final isLoggedIn = await ShopifyAuthService.instance.isLoggedIn();
-
+ 
       if (!isLoggedIn) {
         final loggedInNow = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
@@ -90,7 +94,39 @@ class _CartScreenState extends State<CartScreen> {
         if (!mounted) return;
         if (loggedInNow != true) return;
       }
-
+ 
+      // ── Step 2: Address selection ─────────────────────────────────────────
+      // Fetch the customer's saved addresses.
+      await AddressService.instance.fetchAddresses();
+      if (!mounted) return;
+ 
+      ShopifyAddress? selectedAddress;
+ 
+      if (AddressService.instance.addresses.isNotEmpty) {
+        // Show the address picker screen; it returns the chosen address
+        // or null if the user cancelled (tapped back).
+        selectedAddress = await Navigator.of(context).push<ShopifyAddress>(
+          MaterialPageRoute(
+            builder: (_) => const AddressBookScreen(pickMode: true),
+            fullscreenDialog: true,
+          ),
+        );
+        if (!mounted) return;
+ 
+        // User cancelled → abort checkout
+        if (selectedAddress == null) return;
+ 
+        // Make the selected address the default so Shopify's hosted checkout
+        // pre-fills it for the customer.
+        if (!selectedAddress.isDefault) {
+          await AddressService.instance.setDefaultAddress(selectedAddress.id);
+          if (!mounted) return;
+        }
+      }
+      // If the customer has no saved addresses we skip address selection and
+      // let them fill in the address inside Shopify's checkout WebView.
+ 
+      // ── Step 3: Link the customer token to the checkout cart ──────────────
       final token = await ShopifyAuthService.instance.getSavedCustomerToken();
       if (token != null && token.isNotEmpty) {
         final linked = await CartService.instance.linkCheckoutToCustomer(
@@ -104,14 +140,15 @@ class _CartScreenState extends State<CartScreen> {
           );
         }
       }
-
+ 
+      // ── Step 4: Open the Shopify checkout WebView ─────────────────────────
       final url = CartService.instance.cart.checkoutUrl;
       if (url == null) {
         if (!mounted) return;
         _showToast('Checkout is not available right now.', isError: true);
         return;
       }
-
+ 
       final result = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
           builder: (_) => CheckoutWebView(checkoutUrl: url),
@@ -119,7 +156,7 @@ class _CartScreenState extends State<CartScreen> {
         ),
       );
       if (!mounted) return;
-
+ 
       if (result == true) {
         await CartService.instance.refresh();
         if (!mounted) return;
@@ -129,6 +166,7 @@ class _CartScreenState extends State<CartScreen> {
       if (mounted) setState(() => _isCheckingOut = false);
     }
   }
+ 
 
   void _openImageViewer(String imageUrl, String heroTag) {
     Navigator.of(context).push(
@@ -201,10 +239,10 @@ class _CartScreenState extends State<CartScreen> {
                     ? 'MY CART (${cart.totalQuantity})'
                     : 'MY CART',
                 style: const TextStyle(
-                  fontFamily: _fBold,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: primary,
+                  fontSize: 34,
+            height: 1,
+            fontFamily: _fHead,
+            color: Color(ShopifyConstants.primaryColorHex),
                   // letterSpacing: 1.8,
                 ),
                 overflow: TextOverflow.ellipsis,

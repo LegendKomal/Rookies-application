@@ -15,6 +15,9 @@ class ShopifyConstants {
         'X-Shopify-Storefront-Access-Token': storefrontAccessToken,
       };
 
+  static const String storeUrl      = 'https://rookiesjeans.com';
+  static const String shiprocketUrl  = 'https://rookiesjeans.shiprocket.co/';
+
   // ─── Font families ────────────────────────────────────────────────────────
   static const String fontHeading  = 'BebasNene';      // headings
   static const String fontBody     = 'AlteHaasGroteskRegular'; // body text

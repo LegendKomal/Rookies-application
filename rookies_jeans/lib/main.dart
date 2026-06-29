@@ -4,8 +4,11 @@ import 'package:rookies_jeans/screens/Navigation/bottom_navigation.dart';
 import 'package:rookies_jeans/screens/Dashboard/home_screen.dart';
 import 'package:rookies_jeans/screens/authentication/login.dart';
 import 'package:rookies_jeans/screens/collections/collections.dart';
+import 'package:rookies_jeans/screens/orders/orders.dart';
 import 'package:rookies_jeans/screens/products/Wishlist.dart';
 import 'package:rookies_jeans/screens/cart/cart.dart';
+import 'package:rookies_jeans/screens/profile/address_book.dart';
+import 'package:rookies_jeans/screens/profile/change_password_screen.dart';
 import 'package:rookies_jeans/screens/profile/profile.dart';
 import 'package:rookies_jeans/screens/splashscreen/splashscreen.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
@@ -45,21 +48,15 @@ final GoRouter _appRouter = GoRouter(
       builder: (context, state) =>
           const Scaffold(body: Center(child: Text('Create Account'))),
     ),
+    GoRoute(path: '/orders', builder: (_, __) => const OrdersScreen()),
     GoRoute(
-      path: '/orders',
-      builder: (context, state) =>
-          const Scaffold(body: Center(child: Text('Order History'))),
-    ),
+  path: '/addresses',
+  builder: (_, __) => const AddressBookScreen(),
+),
     GoRoute(
-      path: '/addresses',
-      builder: (context, state) =>
-          const Scaffold(body: Center(child: Text('Address Book'))),
-    ),
-    GoRoute(
-      path: '/change-password',
-      builder: (context, state) =>
-          const Scaffold(body: Center(child: Text('Change Password'))),
-    ),
+  path: '/change-password',
+  builder: (context, state) => const ChangePasswordScreen(),
+),
     GoRoute(
       path: '/data-privacy',
       builder: (context, state) =>

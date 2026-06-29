@@ -54,10 +54,10 @@ class _WishlistPageState extends State<WishlistPage> {
             const Text(
               'MY WISHLIST',
               style: TextStyle(
-                fontFamily: _fBold,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: primary,
+                fontSize: 34,
+            height: 1,
+            fontFamily: _fHead,
+            color: Color(ShopifyConstants.primaryColorHex),
                 // letterSpacing: 1.4,
               ),
             ),
