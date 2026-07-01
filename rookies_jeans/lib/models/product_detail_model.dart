@@ -30,13 +30,13 @@ class ShopifyProductDetail {
   bool get isOnSale => compareAtPrice != null && compareAtPrice! > price;
 
   String get formattedPrice => currencyCode == 'INR'
-      ? '₹${price.toStringAsFixed(0)}'
-      : '$currencyCode ${price.toStringAsFixed(2)}';
+    ? price.toStringAsFixed(0)
+    : '$currencyCode ${price.toStringAsFixed(2)}';
 
   String get formattedCompareAtPrice {
     if (compareAtPrice == null) return '';
     return currencyCode == 'INR'
-        ? '₹${compareAtPrice!.toStringAsFixed(0)}'
+        ? compareAtPrice!.toStringAsFixed(0)
         : '$currencyCode ${compareAtPrice!.toStringAsFixed(2)}';
   }
 

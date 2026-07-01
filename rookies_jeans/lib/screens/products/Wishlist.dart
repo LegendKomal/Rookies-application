@@ -6,6 +6,7 @@ import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/collections/collections.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/services/wishlist_service.dart';
+import 'package:rookies_jeans/widget/price_text.dart';
 
 class WishlistPage extends StatefulWidget {
   const WishlistPage({super.key});
@@ -307,65 +308,29 @@ class _WishlistPageState extends State<WishlistPage> {
   }
 
   Widget _priceBlock(ShopifyProduct product) {
-    if (!_isOnSale(product)) {
-      return Text(
-        _formattedPrice(product),
-        style: const TextStyle(
-          fontFamily: _fBold,
-          fontSize: 14,
-          fontWeight: FontWeight.w800,
-          color: primary,
-        ),
-      );
-    }
-
-    final saved = ((product.compareAtPrice ?? 0) - product.price).round();
-    final savedStr = product.currencyCode == 'INR'
-        ? '₹$saved'
-        : '${product.currencyCode} $saved';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              _formattedCompareAtPrice(product),
-              style: const TextStyle(
-                fontFamily: _fBody,
-                fontSize: 10,
-                color: Color(0xFF9A9A9A),
-                decoration: TextDecoration.lineThrough,
-                decorationColor: Color(0xFF9A9A9A),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              _formattedPrice(product),
-              style: const TextStyle(
-                fontFamily: _fBold,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: primary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Save $savedStr',
-          style: const TextStyle(
-            fontFamily: _fBold,
-            fontSize: 9,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF2E7D32),
-          ),
-        ),
-      ],
-    );
+  if (!_isOnSale(product)) {
+    return PriceText(_formattedPrice(product), currencyCode: product.currencyCode, fontSize: 14, fontWeight: FontWeight.w800, amountFontFamily: _fBold, color: primary);
   }
+
+  final saved = ((product.compareAtPrice ?? 0) - product.price).round();
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          PriceText(_formattedCompareAtPrice(product), currencyCode: product.currencyCode, fontSize: 10, color: const Color(0xFF9A9A9A), amountFontFamily: _fBody, decoration: TextDecoration.lineThrough),
+          const SizedBox(width: 6),
+          PriceText(_formattedPrice(product), currencyCode: product.currencyCode, fontSize: 12, fontWeight: FontWeight.w800, amountFontFamily: _fBold, color: primary),
+        ],
+      ),
+      const SizedBox(height: 4),
+      SavedAmountText(saved.toString(), currencyCode: product.currencyCode, fontSize: 9, fontWeight: FontWeight.w600, color: const Color(0xFF2E7D32), fontFamily: _fBold),
+    ],
+  );
+}
 
   bool _isOnSale(ShopifyProduct product) {
     return product.compareAtPrice != null &&
@@ -373,18 +338,18 @@ class _WishlistPageState extends State<WishlistPage> {
   }
 
   String _formattedPrice(ShopifyProduct product) {
-    return product.currencyCode == 'INR'
-        ? '₹${product.price.toStringAsFixed(0)}'
-        : '${product.currencyCode} ${product.price.toStringAsFixed(2)}';
-  }
+  return product.currencyCode == 'INR'
+      ? product.price.toStringAsFixed(0)
+      : '${product.currencyCode} ${product.price.toStringAsFixed(2)}';
+}
 
-  String _formattedCompareAtPrice(ShopifyProduct product) {
-    final compareAtPrice = product.compareAtPrice;
-    if (compareAtPrice == null) return '';
-    return product.currencyCode == 'INR'
-        ? '₹${compareAtPrice.toStringAsFixed(0)}'
-        : '${product.currencyCode} ${compareAtPrice.toStringAsFixed(2)}';
-  }
+String _formattedCompareAtPrice(ShopifyProduct product) {
+  final compareAtPrice = product.compareAtPrice;
+  if (compareAtPrice == null) return '';
+  return product.currencyCode == 'INR'
+      ? compareAtPrice.toStringAsFixed(0)
+      : '${product.currencyCode} ${compareAtPrice.toStringAsFixed(2)}';
+}
 
   String _discountPercent(ShopifyProduct product) {
     final compareAtPrice = product.compareAtPrice;

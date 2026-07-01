@@ -64,3 +64,11 @@ flutter:
     fonts:
       - asset: assets/fonts/AlteHaasGroteskBold.ttf
         weight: 700
+
+  - family: Typist
+    fonts:
+      - asset: assets/fonts/Typist.ttf
+
+  - family: Serif4
+    fonts:
+      - asset: assets/fonts/SourceSerif4.ttf

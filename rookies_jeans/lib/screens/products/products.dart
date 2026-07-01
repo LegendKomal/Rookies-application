@@ -42,6 +42,10 @@ class _ProductsPageState extends State<ProductsPage> {
   static const String _fBody = ShopifyConstants.fontBody;
   static const String _fBold = ShopifyConstants.fontBodyBold;
   static const String _fBodyBold = ShopifyConstants.fontAlteBold;
+  // FIX: dedicated fonts for numerals and the rupee symbol, pulled from
+  // the constants file so prices render with distinct typography.
+  static const String _fNumber = ShopifyConstants.fontNumber;
+  static const String _fRupee = ShopifyConstants.fontRupee;
 
   ProductSortOption _sortOption = ProductSortOption.defaultSort;
 
@@ -1034,12 +1038,16 @@ class _ProductsPageState extends State<ProductsPage> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    option.label,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: primary,
-                      fontWeight: FontWeight.w500,
+                  // FIX: split price-range labels so numerals/₹ render in
+                  // their dedicated fonts instead of plain Text.
+                  child: RichText(
+                    text: TextSpan(
+                      children: _priceSpans(
+                        option.label,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: primary,
+                      ),
                     ),
                   ),
                 ),
@@ -1049,6 +1057,123 @@ class _ProductsPageState extends State<ProductsPage> {
         );
       },
     );
+  }
+
+  // FIX: formats a raw numeric amount with Indian-style comma grouping
+  // (e.g. 1499 -> "1,499", 199999 -> "1,99,999"), with NO currency symbol.
+  // The symbol is added separately in _amountSpans so it never depends on
+  // whatever string the model/API hands back.
+  String _formatAmount(num amount) {
+    final rounded = amount.round();
+    final isNegative = rounded < 0;
+    final str = rounded.abs().toString();
+
+    if (str.length <= 3) return '${isNegative ? '-' : ''}$str';
+
+    final lastThree = str.substring(str.length - 3);
+    final rest = str.substring(0, str.length - 3);
+    final restWithCommas = rest.replaceAllMapped(
+      RegExp(r'\B(?=(\d{2})+(?!\d))'),
+      (m) => ',',
+    );
+    return '${isNegative ? '-' : ''}$restWithCommas,$lastThree';
+  }
+
+  // FIX: builds the rupee symbol + amount as two spans, with the symbol
+  // hardcoded here (not taken from the model). Symbol uses _fRupee, the
+  // number uses _fNumber.
+  List<InlineSpan> _amountSpans({
+    required num amount,
+    required String currencyCode,
+    required double fontSize,
+    required FontWeight fontWeight,
+    required Color color,
+    TextDecoration? decoration,
+    Color? decorationColor,
+  }) {
+    final isInr = currencyCode.toUpperCase() == 'INR';
+    final symbol = isInr ? '₹' : '$currencyCode ';
+    final symbolFont = isInr ? _fRupee : _fBold;
+
+    return [
+      TextSpan(
+        text: symbol,
+        style: TextStyle(
+          fontFamily: symbolFont,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: color,
+          decoration: decoration,
+          decorationColor: decorationColor,
+        ),
+      ),
+      TextSpan(
+        text: _formatAmount(amount),
+        style: TextStyle(
+          fontFamily: _fNumber,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: color,
+          decoration: decoration,
+          decorationColor: decorationColor,
+        ),
+      ),
+    ];
+  }
+
+  // FIX: splits a price-bearing string into TextSpans so the rupee symbol,
+  // digits/decimal separators, and any surrounding text each render with
+  // the fonts defined in ShopifyConstants (fontRupee / fontNumber / fBold).
+  // Still used for locally-authored strings (price filter labels) where
+  // the ₹ is hardcoded in this file already, not sourced from the model.
+  List<InlineSpan> _priceSpans(
+    String text, {
+    required double fontSize,
+    required FontWeight fontWeight,
+    required Color color,
+    TextDecoration? decoration,
+    Color? decorationColor,
+  }) {
+    final spans = <InlineSpan>[];
+    final buffer = StringBuffer();
+    String? currentFont;
+
+    void flush() {
+      if (buffer.isEmpty) return;
+      spans.add(TextSpan(
+        text: buffer.toString(),
+        style: TextStyle(
+          fontFamily: currentFont,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: color,
+          decoration: decoration,
+          decorationColor: decorationColor,
+        ),
+      ));
+      buffer.clear();
+    }
+
+    for (final rune in text.runes) {
+      final char = String.fromCharCode(rune);
+      final isRupeeSymbol = char == '₹';
+      final isDigitOrSeparator = RegExp(r'[0-9,.]').hasMatch(char);
+
+      final font = isRupeeSymbol
+          ? _fRupee
+          : isDigitOrSeparator
+              ? _fNumber
+              : _fBold;
+
+      if (font != currentFont) {
+        flush();
+        currentFont = font;
+      }
+      buffer.write(char);
+    }
+    flush();
+
+    return spans;
   }
 
   Widget _productCard(ShopifyProduct product) {
@@ -1132,14 +1257,16 @@ class _ProductsPageState extends State<ProductsPage> {
                             color: const Color.fromARGB(255, 194, 0, 0),
                             // borderRadius: BorderRadius.circular(4),
                           ),
-                          child: Text(
-                            _discountPercent(product),
-                            style: const TextStyle(
-                              fontFamily: _fBold,
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              // letterSpacing: 0.5,
+                          // FIX: discount badge ("20% OFF") now splits the
+                          // numeral through the dedicated number font.
+                          child: RichText(
+                            text: TextSpan(
+                              children: _priceSpans(
+                                _discountPercent(product),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
@@ -1217,6 +1344,9 @@ class _ProductsPageState extends State<ProductsPage> {
               bgColor: bgColor,
               borderColor: borderColor,
               secondaryTxt: secondaryTxt,
+              numberFont: _fNumber,
+              rupeeFont: _fRupee,
+              bodyFont: _fBold,
               onAddToCart: (variantId) async {
                 Navigator.of(ctx).pop();
                 final success =
@@ -1387,21 +1517,22 @@ class _ProductsPageState extends State<ProductsPage> {
 
   Widget _priceBlock(ShopifyProduct product) {
     if (!product.isOnSale) {
-      return Text(
-        product.formattedPrice,
-        style: const TextStyle(
-          fontFamily: _fBold,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: primary,
+      // FIX: ₹ symbol + number built locally from product.price via
+      // _amountSpans, instead of using product.formattedPrice from the model.
+      return RichText(
+        text: TextSpan(
+          children: _amountSpans(
+            amount: product.price,
+            currencyCode: product.currencyCode,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: primary,
+          ),
         ),
       );
     }
 
-    final saved = (product.compareAtPrice! - product.price).round();
-    final savedStr = product.currencyCode == 'INR'
-        ? '₹$saved'
-        : '${product.currencyCode} $saved';
+    final saved = product.compareAtPrice! - product.price;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1410,34 +1541,56 @@ class _ProductsPageState extends State<ProductsPage> {
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            Text(
-              product.formattedCompareAtPrice,
-              style: const TextStyle(
-                fontFamily: _fBold,
-                fontSize: 10,
-                color: Color(0xFF9A9A9A),
-                decoration: TextDecoration.lineThrough,
-                decorationColor: Color(0xFF9A9A9A),
+            // FIX: struck-through compare-at price, built locally.
+            RichText(
+              text: TextSpan(
+                children: _amountSpans(
+                  amount: product.compareAtPrice!,
+                  currencyCode: product.currencyCode,
+                  fontSize: 10,
+                  fontWeight: FontWeight.normal,
+                  color: const Color(0xFF9A9A9A),
+                  decoration: TextDecoration.lineThrough,
+                  decorationColor: const Color(0xFF9A9A9A),
+                ),
               ),
             ),
             const SizedBox(width: 6),
-            Text(
-              product.formattedPrice,
-              style: const TextStyle(
-                fontFamily: _fBold,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: primary,
+            // FIX: active price, built locally.
+            RichText(
+              text: TextSpan(
+                children: _amountSpans(
+                  amount: product.price,
+                  currencyCode: product.currencyCode,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: primary,
+                ),
               ),
             ),
             const SizedBox(width: 6),
-            Text(
-              'Save $savedStr',
-              style: const TextStyle(
-                fontFamily: _fBold,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Color.fromARGB(255, 53, 168, 59),
+            // FIX: "Save ₹X" text — "Save " stays on the body font, the
+            // amount (symbol + number) is built locally via _amountSpans.
+            RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'Save ',
+                    style: TextStyle(
+                      fontFamily: _fBold,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: const Color.fromARGB(255, 53, 168, 59),
+                    ),
+                  ),
+                  ..._amountSpans(
+                    amount: saved,
+                    currencyCode: product.currencyCode,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: const Color.fromARGB(255, 53, 168, 59),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1680,6 +1833,11 @@ class _ProductPeekDialog extends StatefulWidget {
   final Color bgColor;
   final Color borderColor;
   final Color secondaryTxt;
+  // FIX: fonts passed in from the parent so the dialog uses the same
+  // number/rupee fonts defined in ShopifyConstants.
+  final String numberFont;
+  final String rupeeFont;
+  final String bodyFont;
   final Future<void> Function(String variantId) onAddToCart;
   final VoidCallback onOpenDetail;
 
@@ -1690,6 +1848,9 @@ class _ProductPeekDialog extends StatefulWidget {
     required this.bgColor,
     required this.borderColor,
     required this.secondaryTxt,
+    required this.numberFont,
+    required this.rupeeFont,
+    required this.bodyFont,
     required this.onAddToCart,
     required this.onOpenDetail,
   });
@@ -1759,6 +1920,117 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
     }
   }
 
+  // FIX: same Indian-comma formatter as the grid, scoped to this dialog.
+  String _formatAmount(num amount) {
+    final rounded = amount.round();
+    final isNegative = rounded < 0;
+    final str = rounded.abs().toString();
+
+    if (str.length <= 3) return '${isNegative ? '-' : ''}$str';
+
+    final lastThree = str.substring(str.length - 3);
+    final rest = str.substring(0, str.length - 3);
+    final restWithCommas = rest.replaceAllMapped(
+      RegExp(r'\B(?=(\d{2})+(?!\d))'),
+      (m) => ',',
+    );
+    return '${isNegative ? '-' : ''}$restWithCommas,$lastThree';
+  }
+
+  // FIX: builds the rupee symbol + amount locally (not from the model),
+  // using the fonts passed in via widget.
+  List<InlineSpan> _amountSpans({
+    required num amount,
+    required String currencyCode,
+    required double fontSize,
+    required FontWeight fontWeight,
+    required Color color,
+    TextDecoration? decoration,
+    Color? decorationColor,
+  }) {
+    final isInr = currencyCode.toUpperCase() == 'INR';
+    final symbol = isInr ? '₹' : '$currencyCode ';
+    final symbolFont = isInr ? widget.rupeeFont : widget.bodyFont;
+
+    return [
+      TextSpan(
+        text: symbol,
+        style: TextStyle(
+          fontFamily: symbolFont,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: color,
+          decoration: decoration,
+          decorationColor: decorationColor,
+        ),
+      ),
+      TextSpan(
+        text: _formatAmount(amount),
+        style: TextStyle(
+          fontFamily: widget.numberFont,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: color,
+          decoration: decoration,
+          decorationColor: decorationColor,
+        ),
+      ),
+    ];
+  }
+
+  // FIX: same splitter as the grid, scoped to this dialog using the fonts
+  // passed in via the widget. Used for the discount badge ("20% OFF"),
+  // which has no currency symbol.
+  List<InlineSpan> _priceSpans(
+    String text, {
+    required double fontSize,
+    required FontWeight fontWeight,
+    required Color color,
+    TextDecoration? decoration,
+    Color? decorationColor,
+  }) {
+    final spans = <InlineSpan>[];
+    final buffer = StringBuffer();
+    String? currentFont;
+
+    void flush() {
+      if (buffer.isEmpty) return;
+      spans.add(TextSpan(
+        text: buffer.toString(),
+        style: TextStyle(
+          fontFamily: currentFont,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: color,
+          decoration: decoration,
+          decorationColor: decorationColor,
+        ),
+      ));
+      buffer.clear();
+    }
+
+    for (final rune in text.runes) {
+      final char = String.fromCharCode(rune);
+      final isRupeeSymbol = char == '₹';
+      final isDigitOrSeparator = RegExp(r'[0-9,.]').hasMatch(char);
+
+      final font = isRupeeSymbol
+          ? widget.rupeeFont
+          : isDigitOrSeparator
+              ? widget.numberFont
+              : widget.bodyFont;
+
+      if (font != currentFont) {
+        flush();
+        currentFont = font;
+      }
+      buffer.write(char);
+    }
+    flush();
+
+    return spans;
+  }
+
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
@@ -1824,12 +2096,15 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                                 color: const Color(0xFFD32F2F),
                                 // borderRadius: BorderRadius.circular(4),
                               ),
-                              child: Text(
-                                _discountPercent(product),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
+                              // FIX: discount badge split across fonts.
+                              child: RichText(
+                                text: TextSpan(
+                                  children: _priceSpans(
+                                    _discountPercent(product),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                             ),
@@ -1968,37 +2243,48 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
 
   Widget _peekPriceRow(ShopifyProduct product) {
     if (!product.isOnSale) {
-      return Text(
-        product.formattedPrice,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w800,
-          color: widget.primary,
+      // FIX: ₹ symbol + number built locally from product.price.
+      return RichText(
+        text: TextSpan(
+          children: _amountSpans(
+            amount: product.price,
+            currencyCode: product.currencyCode,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: widget.primary,
+          ),
         ),
       );
     }
-    final saved = (product.compareAtPrice! - product.price).round();
-    final savedStr =
-        product.currencyCode == 'INR' ? '₹$saved' : '${product.currencyCode} $saved';
+    final saved = product.compareAtPrice! - product.price;
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: 8,
       children: [
-        Text(
-          product.formattedCompareAtPrice,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xFF9A9A9A),
-            decoration: TextDecoration.lineThrough,
-            decorationColor: Color(0xFF9A9A9A),
+        // FIX: struck-through compare-at price, built locally.
+        RichText(
+          text: TextSpan(
+            children: _amountSpans(
+              amount: product.compareAtPrice!,
+              currencyCode: product.currencyCode,
+              fontSize: 12,
+              fontWeight: FontWeight.normal,
+              color: const Color(0xFF9A9A9A),
+              decoration: TextDecoration.lineThrough,
+              decorationColor: const Color(0xFF9A9A9A),
+            ),
           ),
         ),
-        Text(
-          product.formattedPrice,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: widget.primary,
+        // FIX: active price, built locally.
+        RichText(
+          text: TextSpan(
+            children: _amountSpans(
+              amount: product.price,
+              currencyCode: product.currencyCode,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: widget.primary,
+            ),
           ),
         ),
         Container(
@@ -2007,12 +2293,28 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
             color: const Color(0xFFE8F5E9),
             // borderRadius: BorderRadius.circular(4),
           ),
-          child: Text(
-            'Save $savedStr',
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: Color.fromARGB(255, 84, 184, 89),
+          // FIX: "Save ₹X" text — "Save " on the body font, amount built
+          // locally via _amountSpans.
+          child: RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Save ',
+                  style: TextStyle(
+                    fontFamily: widget.bodyFont,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: const Color.fromARGB(255, 84, 184, 89),
+                  ),
+                ),
+                ..._amountSpans(
+                  amount: saved,
+                  currencyCode: product.currencyCode,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: const Color.fromARGB(255, 84, 184, 89),
+                ),
+              ],
             ),
           ),
         ),

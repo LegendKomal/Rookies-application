@@ -7,6 +7,7 @@ import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/services/wishlist_service.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/screens/cart/cart.dart';
+import 'package:rookies_jeans/widget/price_text.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final String handle;
@@ -34,6 +35,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   static const String _fHead = ShopifyConstants.fontHeading;
   static const String _fBody = ShopifyConstants.fontBody;
   static const String _fBold = ShopifyConstants.fontBodyBold;
+  static const String _fBodyBold = ShopifyConstants.fontAlteBold;
+  static const String _fNumber = ShopifyConstants.fontNumber;
 
   ShopifyProductDetail? _product;
   bool _isLoading = true;
@@ -469,7 +472,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           Text(
             p.title,
             style: const TextStyle(
-              fontFamily: _fHead,
+              fontFamily: _fBold,
               fontSize: 22,
               //fontWeight: //fontWeight.w500,
               color: primary,
@@ -492,7 +495,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               'DESCRIPTION',
               style: TextStyle(
                 fontFamily: _fBold,
-                fontSize: 11,
+                fontSize: 25,
                 //fontWeight: //fontWeight.w800,
                 color: primary,
                 // letterSpacing: 1.5,
@@ -516,64 +519,88 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     );
   }
 
-  Widget _buildHighlightedDescription(String raw) {
-    final lines   = raw.split('\n');
-    final widgets = <Widget>[];
+  String _preprocessDescription(String raw) {
+  var text = raw.trim();
 
-    for (final line in lines) {
-      final trimmed = line.trim();
-      if (trimmed.isEmpty) continue;
+  final labelPattern = RegExp(
+    r'(?<=\S)\s+(?=(?:[A-Z][a-zA-Z]*(?:\s*(?:&|\/)\s*[A-Z][a-zA-Z]*)*(?:\s[A-Z][A-Za-z]*){0,3})\s?:\s)',
+  );
+  text = text.replaceAllMapped(labelPattern, (_) => '\n');
 
-      final isBullet =
-          trimmed.startsWith('•') || trimmed.startsWith('-');
-      final content =
-          isBullet ? trimmed.replaceFirst(RegExp(r'^[•\-]\s*'), '') : trimmed;
-
-      if (isBullet) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(top: 3, right: 8),
-                child: Icon(Icons.circle, size: 5, color: secondaryTxt),
-              ),
-              Expanded(child: _highlightedText(content)),
-            ],
-          ),
-        ));
-      } else {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Text(
-            trimmed,
-            style: const TextStyle(
-              fontFamily: _fBody,
-              fontSize: 13,
-              color: secondaryTxt,
-              // height: 1.6,
-            ),
-          ),
-        ));
+  text = text.split('\n').map((line) {
+    if (line.contains('|')) {
+      final colonIdx = line.indexOf(':');
+      if (colonIdx > 0) {
+        final label = line.substring(0, colonIdx + 1).trim();
+        final items = line
+            .substring(colonIdx + 1)
+            .split('|')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty && s != '"');
+        return '$label ${items.first}\n'
+            '${items.skip(1).map((i) => '• $i').join('\n')}';
       }
     }
+    return line;
+  }).join('\n');
 
-    if (widgets.isEmpty || (widgets.length == 1 && !raw.contains('\n'))) {
-      return _highlightedText(raw,
-          style: const TextStyle(
-            fontFamily: _fBody,
-            fontSize: 13,
-            color: secondaryTxt,
-            height: 1.6,
-          ));
+  text = text.replaceAll(RegExp(r'\|\s*"?\s*$', multiLine: true), '');
+  text = text.replaceAll(RegExp(r'\s+$', multiLine: true), '');
+
+  return text;
+}
+
+Widget _buildHighlightedDescription(String raw) {
+  final cleaned = _preprocessDescription(raw); 
+  final lines   = cleaned.split('\n'); 
+  final widgets = <Widget>[];
+
+  for (final line in lines) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) continue;
+
+    final isBullet =
+        trimmed.startsWith('•') || trimmed.startsWith('-');
+    final content =
+        isBullet ? trimmed.replaceFirst(RegExp(r'^[•\-]\s*'), '') : trimmed;
+
+    if (isBullet) {
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 3, right: 8),
+              child: Icon(Icons.circle, size: 5, color: secondaryTxt),
+            ),
+            Expanded(child: _highlightedText(content)),
+          ],
+        ),
+      ));
+    } else {
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: _highlightedText(trimmed),
+      ));
     }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: widgets,
-    );
   }
+
+  if (widgets.isEmpty) {
+    return _highlightedText(cleaned,
+        style: const TextStyle(
+          fontFamily: _fBody,
+          fontSize: 13,
+          color: secondaryTxt,
+          height: 1.6,
+        ));
+  }
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: widgets,
+  );
+}
 
   Widget _highlightedText(String text, {TextStyle? style}) {
     final base = style ??
@@ -595,7 +622,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             TextSpan(
               text: '$label ',
               style: const TextStyle(
-                fontFamily: _fBold,
+                fontFamily: _fBody,
                 //fontWeight: //fontWeight.w700,
                 color: primary,
               ),
@@ -658,7 +685,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               'GOES WELL WITH',
               style: TextStyle(
                 fontFamily: _fBold,
-                fontSize: 11,
+                fontSize: 25,
                 //fontWeight: //fontWeight.w800,
                 color: primary,
                 // letterSpacing: 1.5,
@@ -727,42 +754,17 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _pairingPriceText(ShopifyProduct product) {
-    if (!product.isOnSale) {
-      return Text(
-        product.formattedPrice,
-        style: const TextStyle(
-          fontFamily: _fBold,
-          fontSize: 12,
-          //fontWeight: //fontWeight.w700,
-          color: primary,
-        ),
-      );
-    }
-    return Row(
-      children: [
-        Text(
-          product.formattedPrice,
-          style: const TextStyle(
-            fontFamily: _fBold,
-            fontSize: 12,
-            //fontWeight: //fontWeight.w700,
-            color: primary,
-          ),
-        ),
-        const SizedBox(width: 5),
-        Text(
-          product.formattedCompareAtPrice,
-          style: const TextStyle(
-            fontFamily: _fBold,
-            fontSize: 11,
-            color: Color(0xFF9A9A9A),
-            decoration: TextDecoration.lineThrough,
-            decorationColor: Color(0xFF9A9A9A),
-          ),
-        ),
-      ],
-    );
+  if (!product.isOnSale) {
+    return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 12, color: primary, amountFontFamily: _fBold);
   }
+  return Row(
+    children: [
+      PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 15, color: primary),
+      const SizedBox(width: 5),
+      PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: 15, color: const Color(0xFF9A9A9A), decoration: TextDecoration.lineThrough),
+    ],
+  );
+}
 
   Widget _youMayAlsoLikeSection() {
     return Padding(
@@ -774,7 +776,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             'YOU MAY ALSO LIKE',
             style: TextStyle(
               fontFamily: _fBold,
-              fontSize: 11,
+              fontSize: 25,
               //fontWeight: //fontWeight.w800,
               color: primary,
               // letterSpacing: 1.5,
@@ -799,108 +801,85 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _alsoLikeCard(ShopifyProduct product) {
-    return GestureDetector(
-      onTap: () => _openProductDetail(product),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: product.primaryImageUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: product.primaryImageUrl!,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) =>
-                              Container(color: const Color(0xFFEEEEEE)),
-                          errorWidget: (_, __, ___) =>
-                              Container(color: const Color(0xFFEEEEEE)),
-                        )
-                      : Container(color: const Color(0xFFEEEEEE)),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () {
-                      WishlistService.instance.toggleProduct(product);
-                      setState(() {});
-                    },
-                    child: Icon(
-                      WishlistService.instance.isWishlisted(product.id)
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      size: 18,
-                      color: WishlistService.instance.isWishlisted(product.id)
-                          ? Colors.red
-                          : Colors.white,
-                      shadows: const [
-                        Shadow(blurRadius: 4, color: Colors.black38)
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            product.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: _fBold,
-              fontSize: 12,
-              //fontWeight: //fontWeight.w700,
-              color: primary,
-              height: 1.3,
-            ),
-          ),
-          const SizedBox(height: 4),
-          _alsoLikePriceRow(product),
-        ],
-      ),
-    );
-  }
-
-  Widget _alsoLikePriceRow(ShopifyProduct product) {
-    if (!product.isOnSale) {
-      return Text(
-        product.formattedPrice,
-        style: const TextStyle(
-          fontFamily: _fBold,
-          fontSize: 13,
-          //fontWeight: //fontWeight.w700,
-          color: primary,
-        ),
-      );
-    }
-    return Column(
+  return GestureDetector(
+    onTap: () => _openProductDetail(product),
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Responsive image — height is always width * ratio, regardless of title length
+        AspectRatio(
+          aspectRatio: 0.78, // tweak to match your design (width / height)
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: product.primaryImageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: product.primaryImageUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) =>
+                            Container(color: const Color(0xFFEEEEEE)),
+                        errorWidget: (_, __, ___) =>
+                            Container(color: const Color(0xFFEEEEEE)),
+                      )
+                    : Container(color: const Color(0xFFEEEEEE)),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: () {
+                    WishlistService.instance.toggleProduct(product);
+                    setState(() {});
+                  },
+                  child: Icon(
+                    WishlistService.instance.isWishlisted(product.id)
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    size: 18,
+                    color: WishlistService.instance.isWishlisted(product.id)
+                        ? Colors.red
+                        : Colors.white,
+                    shadows: const [
+                      Shadow(blurRadius: 4, color: Colors.black38)
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 7),
         Text(
-          product.formattedPrice,
+          product.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            fontFamily: _fBold,
-            fontSize: 13,
-            //fontWeight: //fontWeight.w700,
+            fontFamily: _fBodyBold,
+            fontSize: 12,
             color: primary,
+            height: 1.3,
           ),
         ),
-        Text(
-          product.formattedCompareAtPrice,
-          style: const TextStyle(
-            fontFamily: _fBold,
-            fontSize: 11,
-            color: Color(0xFF9A9A9A),
-            decoration: TextDecoration.lineThrough,
-            decorationColor: Color(0xFF9A9A9A),
-          ),
-        ),
+        const SizedBox(height: 4),
+        _alsoLikePriceRow(product),
       ],
-    );
+    ),
+  );
+}
+
+  Widget _alsoLikePriceRow(ShopifyProduct product) {
+  if (!product.isOnSale) {
+    return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 15, color: primary);
   }
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 15, color: primary),
+      const SizedBox(width: 5),
+      PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: 11, color: const Color(0xFF9A9A9A), amountFontFamily: _fBold, decoration: TextDecoration.lineThrough),
+    ],
+  );
+}
 
   Widget _infoTile(String label, String content) {
     return Theme(
@@ -938,69 +917,31 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _priceBlock(ShopifyProductDetail p) {
-    if (!p.isOnSale) {
-      return Text(
-        p.formattedPrice,
-        style: const TextStyle(
-          fontFamily: _fBold,
-          fontSize: 20,
-          //fontWeight: //fontWeight.w800,
-          color: primary,
-        ),
-      );
-    }
-    final saved    = (p.compareAtPrice! - p.price).round();
-    final savedStr =
-        p.currencyCode == 'INR' ? '₹$saved' : '${p.currencyCode} $saved';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              p.formattedPrice,
-              style: const TextStyle(
-                fontFamily: _fBold,
-                fontSize: 20,
-                //fontWeight: //fontWeight.w800,
-                color: primary,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              p.formattedCompareAtPrice,
-              style: const TextStyle(
-                fontFamily: _fBold,
-                fontSize: 14,
-                color: Color(0xFF9A9A9A),
-                decoration: TextDecoration.lineThrough,
-                decorationColor: Color(0xFF9A9A9A),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: const Color(0xFF2E7D32).withOpacity(0.1),
-            // borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            'You save $savedStr',
-            style: const TextStyle(
-              fontFamily: _fBold,
-              fontSize: 11,
-              //fontWeight: //fontWeight.w700,
-              color: Color(0xFF2E7D32),
-            ),
-          ),
-        ),
-      ],
-    );
+  if (!p.isOnSale) {
+    return PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: 20, color: primary, amountFontFamily: _fNumber);
   }
+  final saved = (p.compareAtPrice! - p.price).round();
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: 20, color: primary, amountFontFamily: _fNumber),
+          const SizedBox(width: 10),
+          PriceText(p.formattedCompareAtPrice, currencyCode: p.currencyCode, fontSize: 14, color: const Color(0xFF9A9A9A), amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
+        ],
+      ),
+      const SizedBox(height: 4),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(color: const Color(0xFF2E7D32).withOpacity(0.1)),
+        child: SavedAmountText(saved.toString(), currencyCode: p.currencyCode, fontSize: 11, color: const Color(0xFF2E7D32), fontFamily: _fNumber),
+      ),
+    ],
+  );
+}
 
   Widget _optionSelector(ProductDetailOption opt) {
     return Column(

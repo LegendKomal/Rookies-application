@@ -13,6 +13,7 @@ import 'package:rookies_jeans/screens/search/search.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
+import 'package:rookies_jeans/widget/price_text.dart';
 import 'package:video_player/video_player.dart';
 
 class R {
@@ -60,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
   static const String _fHead = ShopifyConstants.fontHeading;
   static const String _fBody = ShopifyConstants.fontBody;
   static const String _fBold = ShopifyConstants.fontBodyBold;
+  static const String _fNumber = ShopifyConstants.fontNumber;
 
   final Set<String> _addingToCartProductIds = {};
   final Map<String, bool> _fillAnimatingIds = {};
@@ -1222,74 +1224,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _priceBlock(ShopifyProduct product, R r) {
-    if (!product.isOnSale) {
-      return Text(
-        product.formattedPrice,
-        style: TextStyle(
-          fontFamily: _fBold,
-          fontSize: r.sp(14),
-          color: primary,
-        ),
-      );
-    }
-
-    final saved    = (product.compareAtPrice! - product.price).round();
-    final savedStr = product.currencyCode == 'INR'
-        ? '₹$saved'
-        : '${product.currencyCode} $saved';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              'MRP ',
-              style: TextStyle(
-                fontFamily: _fBody,
-                fontSize: r.sp(11),
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF9A9A9A),
-              ),
-            ),
-            Text(
-              product.formattedCompareAtPrice,
-              style: TextStyle(
-                fontFamily: _fBody,
-                fontSize: r.sp(12),
-                color: const Color(0xFF9A9A9A),
-                decoration: TextDecoration.lineThrough,
-                decorationColor: const Color(0xFF9A9A9A),
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: r.dp(2)),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              product.formattedPrice,
-              style: TextStyle(
-                fontFamily: _fBold,
-                fontSize: r.sp(15),
-                color: primary,
-              ),
-            ),
-            SizedBox(width: r.dp(6)),
-            Text(
-              'Save $savedStr',
-              style: TextStyle(
-                fontFamily: _fBold,
-                fontSize: r.sp(11),
-                color: const Color(0xFF2E7D32),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
+  if (!product.isOnSale) {
+    return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: r.sp(14), color: primary, amountFontFamily: _fNumber);
   }
+
+  final saved = (product.compareAtPrice! - product.price).round();
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Text('MRP ', style: TextStyle(fontFamily: _fBody, fontSize: r.sp(11), fontWeight: FontWeight.w500, color: const Color(0xFF9A9A9A))),
+          PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: r.sp(12), color: const Color(0xFF9A9A9A), amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
+        ],
+      ),
+      SizedBox(height: r.dp(2)),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: r.sp(15), color: primary, amountFontFamily: _fNumber),
+          SizedBox(width: r.dp(6)),
+          SavedAmountText(saved.toString(), currencyCode: product.currencyCode, fontSize: r.sp(11), color: const Color(0xFF2E7D32), fontFamily: _fNumber),
+        ],
+      ),
+    ],
+  );
+}
 
   Widget _colorSwatches(List<String> hexCodes, R r) {
     final visible = hexCodes.take(5).toList();

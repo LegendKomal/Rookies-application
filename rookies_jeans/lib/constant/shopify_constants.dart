@@ -23,6 +23,8 @@ class ShopifyConstants {
   static const String fontBody     = 'AlteHaasGroteskRegular'; // body text
   static const String fontBodyBold = 'SplineSansMono';    // highlighted / emphasis
   static const String fontAlteBold = 'AlteHaasGroteskBold';
+  static const String fontNumber = 'Typist';
+  static const String fontRupee = 'Serif4';
 
   // ─── Base TextStyles ──────────────────────────────────────────────────────
   // Use these as roots and extend with .copyWith() where needed.
