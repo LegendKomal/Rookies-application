@@ -857,20 +857,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _oversizedShirtsAsBox() {
-    final r = R.of(context);
-    return _oversizedShirts.isEmpty
-        ? _empty()
-        : SizedBox(
-            height: r.dp(365),
-            child: ListView.separated(
-              padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-              scrollDirection: Axis.horizontal,
-              itemCount: _oversizedShirts.length,
-              separatorBuilder: (_, __) => SizedBox(width: r.dp(12)),
-              itemBuilder: (_, i) => _productTile(_oversizedShirts[i], r),
-            ),
-          );
-  }
+  final r = R.of(context);
+  return _oversizedShirts.isEmpty
+      ? _empty()
+      : SizedBox(
+          height: r.dp(185) + r.dp(7) + r.dp(18) + r.dp(5) + r.dp(30) + 
+                  r.dp(6) + r.dp(18) + r.dp(8) + r.dp(32), // sum of actual children
+          child: ListView.separated(
+            padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+            scrollDirection: Axis.horizontal,
+            itemCount: _oversizedShirts.length,
+            separatorBuilder: (_, __) => SizedBox(width: r.dp(12)),
+            itemBuilder: (_, i) => _productTile(_oversizedShirts[i], r),
+          ),
+        );
+}
 
   Widget _latestDropsAsBox() {
     final r = R.of(context);

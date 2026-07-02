@@ -55,12 +55,17 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   List<ShopifyProduct> _youMayAlsoLike = [];
   bool _isLoadingRelated = false;
 
-  static const List<String> _highlightKeywords = [
-    'COTTON', '100%', 'OVERSIZE', 'OVERSIZED', 'DROP SHOULDER',
-    'HALF SLEEVES', 'FULL SLEEVES', 'HALF ZIP', 'CARGO', 'LINEN',
-    'STRETCH', 'SLIM FIT', 'REGULAR FIT', 'LOOSE FIT', 'BOOTCUT',
-    'BALLOON FIT', 'WHITE', 'BLACK', 'BLUE', 'GREEN', 'BEIGE',
-    'MACHINE WASH', 'DRY CLEAN', 'HAND WASH',
+  /// Which accordion tile is open. null = all collapsed.
+  /// 0 = Description, 1 = Shipping & Returns, 2 = Care Instructions.
+  int? _expandedTileIndex;
+
+  /// Known labels in Shopify descriptions. Longest first is handled at
+  /// runtime, so order here doesn't matter — just add new labels as needed.
+  static const List<String> _descLabels = [
+    'STYLE NO & COLOR', 'STYLE NO', 'COLLAR/NECK', 'COLLAR / NECK',
+    'STRETCH METER', 'WASH CARE', 'FABRIC', 'SLEEVES', 'DESIGN',
+    'OCCASION', 'PATTERN', 'POCKETS', 'CLOSURE', 'LENGTH',
+    'COLOR', 'CARE', 'FIT',
   ];
 
   static const Map<String, _PairingConfig> _categoryPairings = {
@@ -309,6 +314,22 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     );
   }
 
+  void _openImageViewer(List<String> images) async {
+    final returnedIndex = await Navigator.push<int>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FullScreenImageViewer(
+          imageUrls: images,
+          initialIndex: _currentImageIndex,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (returnedIndex != null && returnedIndex != _currentImageIndex) {
+      _pageController.jumpToPage(returnedIndex);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -374,16 +395,19 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 controller: _pageController,
                 itemCount: images.length,
                 onPageChanged: (i) => setState(() => _currentImageIndex = i),
-                itemBuilder: (_, i) => CachedNetworkImage(
-                  imageUrl: images[i],
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) =>
-                      Container(color: const Color(0xFFEEEEEE)),
-                  errorWidget: (_, __, ___) => Container(
-                    color: const Color(0xFFEEEEEE),
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.image_not_supported_outlined,
-                        size: 52, color: Color(0xFFBBBBBB)),
+                itemBuilder: (_, i) => GestureDetector(
+                  onTap: () => _openImageViewer(images),
+                  child: CachedNetworkImage(
+                    imageUrl: images[i],
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) =>
+                        Container(color: const Color(0xFFEEEEEE)),
+                    errorWidget: (_, __, ___) => Container(
+                      color: const Color(0xFFEEEEEE),
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.image_not_supported_outlined,
+                          size: 52, color: Color(0xFFBBBBBB)),
+                    ),
                   ),
                 ),
               ),
@@ -474,7 +498,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             style: const TextStyle(
               fontFamily: _fBold,
               fontSize: 22,
-              //fontWeight: //fontWeight.w500,
               color: primary,
               height: 1.3,
             ),
@@ -488,189 +511,197 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           const SizedBox(height: 20),
           _addToCartButton(),
           const SizedBox(height: 24),
+          const Divider(height: 1),
           if (p.description.isNotEmpty) ...[
+            _descriptionTile(p.description, 0),
             const Divider(height: 1),
-            const SizedBox(height: 16),
-            const Text(
-              'DESCRIPTION',
-              style: TextStyle(
-                fontFamily: _fBold,
-                fontSize: 25,
-                //fontWeight: //fontWeight.w800,
-                color: primary,
-                // letterSpacing: 1.5,
-              ),
-            ),
-            const SizedBox(height: 8),
-            _buildHighlightedDescription(p.description),
-            const SizedBox(height: 32),
           ],
-          if (p.shippingInfo != null && p.shippingInfo!.isNotEmpty) ...[
-            const Divider(height: 1),
-            _infoTile('SHIPPING', p.shippingInfo!),
-          ],
-          if (p.careInstructions != null && p.careInstructions!.isNotEmpty) ...[
-            const Divider(height: 1),
-            _infoTile('CARE INSTRUCTIONS', p.careInstructions!),
-            const SizedBox(height: 16),
-          ],
+          _infoTile(
+            'Shipping & Returns',
+            (p.shippingInfo?.isNotEmpty ?? false)
+                ? p.shippingInfo!
+                : 'Free shipping on prepaid orders. Easy returns within 7 days.',
+            1,
+          ),
+          const Divider(height: 1),
+          _infoTile(
+            'Care Instructions',
+            (p.careInstructions?.isNotEmpty ?? false)
+                ? p.careInstructions!
+                : 'Machine wash cold. Do not bleach. Tumble dry low.',
+            2,
+          ),
+          const Divider(height: 1),
+          const SizedBox(height: 16),
         ],
       ),
     );
   }
 
   String _preprocessDescription(String raw) {
-  var text = raw.trim();
+    // 1. Collapse ALL whitespace (incl. Shopify's raw newlines) to spaces.
+    var text = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
 
-  final labelPattern = RegExp(
-    r'(?<=\S)\s+(?=(?:[A-Z][a-zA-Z]*(?:\s*(?:&|\/)\s*[A-Z][a-zA-Z]*)*(?:\s[A-Z][A-Za-z]*){0,3})\s?:\s)',
-  );
-  text = text.replaceAllMapped(labelPattern, (_) => '\n');
+    // 2. Insert a line break ONLY before known labels (longest first so
+    //    "STYLE NO & COLOR" isn't matched as just "COLOR").
+    final sorted = [..._descLabels]
+      ..sort((a, b) => b.length.compareTo(a.length));
+    final labelPattern = RegExp(
+      r'\s*\b(' + sorted.map(RegExp.escape).join('|') + r')\s*:\s*',
+      caseSensitive: false,
+    );
+    text = text.replaceAllMapped(
+      labelPattern,
+      (m) => '\n${m.group(1)!.toUpperCase()} : ',
+    );
 
-  text = text.split('\n').map((line) {
-    if (line.contains('|')) {
-      final colonIdx = line.indexOf(':');
-      if (colonIdx > 0) {
-        final label = line.substring(0, colonIdx + 1).trim();
-        final items = line
-            .substring(colonIdx + 1)
-            .split('|')
-            .map((s) => s.trim())
-            .where((s) => s.isNotEmpty && s != '"');
-        return '$label ${items.first}\n'
-            '${items.skip(1).map((i) => '• $i').join('\n')}';
+    // 3. Keep pipes inline (like the website), just normalize spacing
+    //    and strip trailing pipe/quote junk.
+    text = text.replaceAll(RegExp(r'\s*\|\s*'), ' | ');
+    text = text.replaceAll(RegExp(r'(\s*\|\s*)?"?\s*$', multiLine: true), '');
+    text = text.replaceAll(RegExp(r'\s+$', multiLine: true), '');
+
+    return text.trim();
+  }
+
+  /// Description accordion tile: intro paragraph as plain text, then each
+  /// "LABEL : value" line as a bullet with only the label bolded.
+  Widget _descriptionTile(String raw, int index) {
+    final cleaned = _preprocessDescription(raw);
+    final lines =
+        cleaned.split('\n').where((l) => l.trim().isNotEmpty).toList();
+
+    final children = <Widget>[];
+    for (final line in lines) {
+      final trimmed = line.trim().replaceFirst(RegExp(r'^[•\-]\s*'), '');
+      final hasLabel = RegExp(r'^[A-Za-z][A-Za-z\s&/]*:').hasMatch(trimmed);
+
+      if (hasLabel) {
+        final colonIdx = trimmed.indexOf(':');
+        final label = trimmed.substring(0, colonIdx + 1).trim();
+        final value = trimmed.substring(colonIdx + 1).trim();
+        children.add(Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 6, right: 8),
+                child: Icon(Icons.circle, size: 5, color: secondaryTxt),
+              ),
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style: const TextStyle(
+                      fontFamily: _fBody,
+                      fontSize: 13,
+                      color: secondaryTxt,
+                      height: 1.5,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: '$label ',
+                        style: const TextStyle(
+                          fontFamily: _fBold,
+                          color: primary,
+                        ),
+                      ),
+                      TextSpan(text: value),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ));
+      } else {
+        children.add(Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            trimmed,
+            style: const TextStyle(
+              fontFamily: _fBody,
+              fontSize: 13,
+              color: secondaryTxt,
+              height: 1.6,
+            ),
+          ),
+        ));
       }
     }
-    return line;
-  }).join('\n');
 
-  text = text.replaceAll(RegExp(r'\|\s*"?\s*$', multiLine: true), '');
-  text = text.replaceAll(RegExp(r'\s+$', multiLine: true), '');
-
-  return text;
-}
-
-Widget _buildHighlightedDescription(String raw) {
-  final cleaned = _preprocessDescription(raw); 
-  final lines   = cleaned.split('\n'); 
-  final widgets = <Widget>[];
-
-  for (final line in lines) {
-    final trimmed = line.trim();
-    if (trimmed.isEmpty) continue;
-
-    final isBullet =
-        trimmed.startsWith('•') || trimmed.startsWith('-');
-    final content =
-        isBullet ? trimmed.replaceFirst(RegExp(r'^[•\-]\s*'), '') : trimmed;
-
-    if (isBullet) {
-      widgets.add(Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.only(top: 3, right: 8),
-              child: Icon(Icons.circle, size: 5, color: secondaryTxt),
-            ),
-            Expanded(child: _highlightedText(content)),
-          ],
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: ValueKey('tile-$index-${_expandedTileIndex == index}'),
+        initiallyExpanded: _expandedTileIndex == index,
+        onExpansionChanged: (expanded) {
+          setState(() => _expandedTileIndex = expanded ? index : null);
+        },
+        tilePadding: EdgeInsets.zero,
+        iconColor: primary,
+        collapsedIconColor: secondaryTxt,
+        title: const Text(
+          'Description',
+          style: TextStyle(
+            fontFamily: _fBold,
+            fontSize: 14,
+            color: primary,
+          ),
         ),
-      ));
-    } else {
-      widgets.add(Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: _highlightedText(trimmed),
-      ));
-    }
-  }
-
-  if (widgets.isEmpty) {
-    return _highlightedText(cleaned,
-        style: const TextStyle(
-          fontFamily: _fBody,
-          fontSize: 13,
-          color: secondaryTxt,
-          height: 1.6,
-        ));
-  }
-
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: widgets,
-  );
-}
-
-  Widget _highlightedText(String text, {TextStyle? style}) {
-    final base = style ??
-        const TextStyle(
-          fontFamily: _fBody,
-          fontSize: 13,
-          color: secondaryTxt,
-          height: 1.5,
-        );
-
-    final colonIdx = text.indexOf(':');
-    if (colonIdx > 0 && colonIdx < text.length - 1) {
-      final label = text.substring(0, colonIdx + 1).trim();
-      final value = text.substring(colonIdx + 1).trim();
-      return RichText(
-        text: TextSpan(
-          style: base,
-          children: [
-            TextSpan(
-              text: '$label ',
-              style: const TextStyle(
-                fontFamily: _fBody,
-                //fontWeight: //fontWeight.w700,
-                color: primary,
-              ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children,
             ),
-            ..._buildHighlightSpans(value, base),
-          ],
-        ),
-      );
-    }
-
-    return RichText(
-      text: TextSpan(
-        style: base,
-        children: _buildHighlightSpans(text, base),
+          ),
+        ],
       ),
     );
   }
 
-  List<InlineSpan> _buildHighlightSpans(String text, TextStyle base) {
-    if (text.isEmpty) return [TextSpan(text: text)];
-
-    final pattern = RegExp(
-      _highlightKeywords.map(RegExp.escape).join('|'),
-      caseSensitive: false,
-    );
-
-    final spans  = <InlineSpan>[];
-    int   cursor = 0;
-
-    for (final match in pattern.allMatches(text)) {
-      if (match.start > cursor) {
-        spans.add(TextSpan(text: text.substring(cursor, match.start)));
-      }
-      spans.add(TextSpan(
-        text: match.group(0),
-        style: TextStyle(
-          fontFamily: _fBold,
-          color: primary,
-          //fontWeight: //fontWeight.w700,
-          fontSize: base.fontSize,
+  /// Generic accordion tile for Shipping & Returns / Care Instructions.
+  Widget _infoTile(String label, String content, int index) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: ValueKey('tile-$index-${_expandedTileIndex == index}'),
+        initiallyExpanded: _expandedTileIndex == index,
+        onExpansionChanged: (expanded) {
+          setState(() => _expandedTileIndex = expanded ? index : null);
+        },
+        tilePadding: EdgeInsets.zero,
+        iconColor: primary,
+        collapsedIconColor: secondaryTxt,
+        title: Text(
+          label,
+          style: const TextStyle(
+            fontFamily: _fBold,
+            fontSize: 14,
+            color: primary,
+          ),
         ),
-      ));
-      cursor = match.end;
-    }
-    if (cursor < text.length) {
-      spans.add(TextSpan(text: text.substring(cursor)));
-    }
-    return spans;
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                content,
+                style: const TextStyle(
+                  fontFamily: _fBody,
+                  fontSize: 13,
+                  color: secondaryTxt,
+                  height: 1.6,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _goesWellWithSection() {
@@ -686,9 +717,7 @@ Widget _buildHighlightedDescription(String raw) {
               style: TextStyle(
                 fontFamily: _fBold,
                 fontSize: 25,
-                //fontWeight: //fontWeight.w800,
                 color: primary,
-                // letterSpacing: 1.5,
               ),
             ),
           ),
@@ -740,7 +769,6 @@ Widget _buildHighlightedDescription(String raw) {
               style: const TextStyle(
                 fontFamily: _fBold,
                 fontSize: 11,
-                //fontWeight: //fontWeight.w700,
                 color: primary,
                 height: 1.3,
               ),
@@ -754,17 +782,17 @@ Widget _buildHighlightedDescription(String raw) {
   }
 
   Widget _pairingPriceText(ShopifyProduct product) {
-  if (!product.isOnSale) {
-    return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 12, color: primary, amountFontFamily: _fBold);
+    if (!product.isOnSale) {
+      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 12, color: primary, amountFontFamily: _fBold);
+    }
+    return Row(
+      children: [
+        PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 15, color: primary),
+        const SizedBox(width: 5),
+        PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: 15, color: const Color(0xFF9A9A9A), decoration: TextDecoration.lineThrough),
+      ],
+    );
   }
-  return Row(
-    children: [
-      PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 15, color: primary),
-      const SizedBox(width: 5),
-      PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: 15, color: const Color(0xFF9A9A9A), decoration: TextDecoration.lineThrough),
-    ],
-  );
-}
 
   Widget _youMayAlsoLikeSection() {
     return Padding(
@@ -777,9 +805,7 @@ Widget _buildHighlightedDescription(String raw) {
             style: TextStyle(
               fontFamily: _fBold,
               fontSize: 25,
-              //fontWeight: //fontWeight.w800,
               color: primary,
-              // letterSpacing: 1.5,
             ),
           ),
           const SizedBox(height: 14),
@@ -801,147 +827,111 @@ Widget _buildHighlightedDescription(String raw) {
   }
 
   Widget _alsoLikeCard(ShopifyProduct product) {
-  return GestureDetector(
-    onTap: () => _openProductDetail(product),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Responsive image — height is always width * ratio, regardless of title length
-        AspectRatio(
-          aspectRatio: 0.78, // tweak to match your design (width / height)
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: product.primaryImageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: product.primaryImageUrl!,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) =>
-                            Container(color: const Color(0xFFEEEEEE)),
-                        errorWidget: (_, __, ___) =>
-                            Container(color: const Color(0xFFEEEEEE)),
-                      )
-                    : Container(color: const Color(0xFFEEEEEE)),
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: GestureDetector(
-                  onTap: () {
-                    WishlistService.instance.toggleProduct(product);
-                    setState(() {});
-                  },
-                  child: Icon(
-                    WishlistService.instance.isWishlisted(product.id)
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    size: 18,
-                    color: WishlistService.instance.isWishlisted(product.id)
-                        ? Colors.red
-                        : Colors.white,
-                    shadows: const [
-                      Shadow(blurRadius: 4, color: Colors.black38)
-                    ],
+    return GestureDetector(
+      onTap: () => _openProductDetail(product),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 0.78,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: product.primaryImageUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: product.primaryImageUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) =>
+                              Container(color: const Color(0xFFEEEEEE)),
+                          errorWidget: (_, __, ___) =>
+                              Container(color: const Color(0xFFEEEEEE)),
+                        )
+                      : Container(color: const Color(0xFFEEEEEE)),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: () {
+                      WishlistService.instance.toggleProduct(product);
+                      setState(() {});
+                    },
+                    child: Icon(
+                      WishlistService.instance.isWishlisted(product.id)
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      size: 18,
+                      color: WishlistService.instance.isWishlisted(product.id)
+                          ? Colors.red
+                          : Colors.white,
+                      shadows: const [
+                        Shadow(blurRadius: 4, color: Colors.black38)
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 7),
-        Text(
-          product.title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontFamily: _fBodyBold,
-            fontSize: 12,
-            color: primary,
-            height: 1.3,
-          ),
-        ),
-        const SizedBox(height: 4),
-        _alsoLikePriceRow(product),
-      ],
-    ),
-  );
-}
-
-  Widget _alsoLikePriceRow(ShopifyProduct product) {
-  if (!product.isOnSale) {
-    return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 15, color: primary);
-  }
-  return Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 15, color: primary),
-      const SizedBox(width: 5),
-      PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: 11, color: const Color(0xFF9A9A9A), amountFontFamily: _fBold, decoration: TextDecoration.lineThrough),
-    ],
-  );
-}
-
-  Widget _infoTile(String label, String content) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        iconColor: primary,
-        collapsedIconColor: secondaryTxt,
-        title: Text(
-          label,
-          style: const TextStyle(
-            fontFamily: _fBold,
-            fontSize: 11,
-            //fontWeight: //fontWeight.w800,
-            color: primary,
-            // letterSpacing: 1.5,
-          ),
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Text(
-              content,
-              style: const TextStyle(
-                fontFamily: _fBody,
-                fontSize: 13,
-                color: secondaryTxt,
-                height: 1.6,
-              ),
+              ],
             ),
           ),
+          const SizedBox(height: 7),
+          Text(
+            product.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: _fBodyBold,
+              fontSize: 12,
+              color: primary,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          _alsoLikePriceRow(product),
         ],
       ),
     );
   }
 
-  Widget _priceBlock(ShopifyProductDetail p) {
-  if (!p.isOnSale) {
-    return PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: 20, color: primary, amountFontFamily: _fNumber);
+  Widget _alsoLikePriceRow(ShopifyProduct product) {
+    if (!product.isOnSale) {
+      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 15, color: primary);
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 15, color: primary),
+        const SizedBox(width: 5),
+        PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: 11, color: const Color(0xFF9A9A9A), amountFontFamily: _fBold, decoration: TextDecoration.lineThrough),
+      ],
+    );
   }
-  final saved = (p.compareAtPrice! - p.price).round();
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: 20, color: primary, amountFontFamily: _fNumber),
-          const SizedBox(width: 10),
-          PriceText(p.formattedCompareAtPrice, currencyCode: p.currencyCode, fontSize: 14, color: const Color(0xFF9A9A9A), amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
-        ],
-      ),
-      const SizedBox(height: 4),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(color: const Color(0xFF2E7D32).withOpacity(0.1)),
-        child: SavedAmountText(saved.toString(), currencyCode: p.currencyCode, fontSize: 11, color: const Color(0xFF2E7D32), fontFamily: _fNumber),
-      ),
-    ],
-  );
-}
+
+  Widget _priceBlock(ShopifyProductDetail p) {
+    if (!p.isOnSale) {
+      return PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: 20, color: primary, amountFontFamily: _fNumber);
+    }
+    final saved = (p.compareAtPrice! - p.price).round();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: 20, color: primary, amountFontFamily: _fNumber),
+            const SizedBox(width: 10),
+            PriceText(p.formattedCompareAtPrice, currencyCode: p.currencyCode, fontSize: 14, color: const Color(0xFF9A9A9A), amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(color: const Color(0xFF2E7D32).withOpacity(0.1)),
+          child: SavedAmountText(saved.toString(), currencyCode: p.currencyCode, fontSize: 11, color: const Color(0xFF2E7D32), fontFamily: _fNumber),
+        ),
+      ],
+    );
+  }
 
   Widget _optionSelector(ProductDetailOption opt) {
     return Column(
@@ -952,9 +942,7 @@ Widget _buildHighlightedDescription(String raw) {
             style: const TextStyle(
               fontFamily: _fBold,
               fontSize: 11,
-              //fontWeight: //fontWeight.w700,
               color: primary,
-              // letterSpacing: 1.2,
             ),
             children: [
               TextSpan(text: opt.name.toUpperCase()),
@@ -962,9 +950,7 @@ Widget _buildHighlightedDescription(String raw) {
                 text: ' ${_selectedOptions[opt.name] ?? ''}',
                 style: const TextStyle(
                   fontFamily: _fBody,
-                  //fontWeight: //fontWeight.w500,
                   color: secondaryTxt,
-                  // letterSpacing: 0,
                 ),
               ),
             ],
@@ -987,7 +973,6 @@ Widget _buildHighlightedDescription(String raw) {
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: isSelected ? primary : cardColor,
-                  // borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                     color: isSelected ? primary : borderColor,
                     width: isSelected ? 1.5 : 0.8,
@@ -998,7 +983,6 @@ Widget _buildHighlightedDescription(String raw) {
                   style: TextStyle(
                     fontFamily: _fBody,
                     fontSize: 12,
-                    //fontWeight: //fontWeight.w600,
                     color: isSelected ? Colors.white : primary,
                   ),
                 ),
@@ -1030,7 +1014,6 @@ Widget _buildHighlightedDescription(String raw) {
           style: TextStyle(
             fontFamily: _fBody,
             fontSize: 12,
-            //fontWeight: //fontWeight.w600,
             color: inStock
                 ? const Color(0xFF2E7D32)
                 : const Color(0xFFD32F2F),
@@ -1060,8 +1043,6 @@ Widget _buildHighlightedDescription(String raw) {
             style: ElevatedButton.styleFrom(
               backgroundColor: primary,
               disabledBackgroundColor: const Color(0xFFCCCCCC),
-              // shape: RoundedRectangleBorder(
-              //     borderRadius: BorderRadius.circular(8)),
               elevation: 0,
             ),
             child: _isAddingToCart
@@ -1080,9 +1061,7 @@ Widget _buildHighlightedDescription(String raw) {
                     style: const TextStyle(
                       fontFamily: _fBold,
                       fontSize: 13,
-                      //fontWeight: //fontWeight.w800,
                       color: Colors.white,
-                      // letterSpacing: 1.5,
                     ),
                   ),
           ),
@@ -1114,9 +1093,7 @@ Widget _buildHighlightedDescription(String raw) {
                         style: const TextStyle(
                           fontFamily: _fBold,
                           fontSize: 12,
-                          //fontWeight: //fontWeight.w800,
                           color: primary,
-                          // letterSpacing: 1.5,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1166,9 +1143,7 @@ Widget _buildHighlightedDescription(String raw) {
             style: const TextStyle(
               fontFamily: _fBold,
               fontSize: 12,
-              //fontWeight: //fontWeight.w800,
               color: primary,
-              // letterSpacing: 1.5,
             ),
           ),
         ),
@@ -1201,8 +1176,6 @@ Widget _buildHighlightedDescription(String raw) {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: primary,
                     side: const BorderSide(color: primary),
-                    // shape: RoundedRectangleBorder(
-                    //     borderRadius: BorderRadius.circular(6)),
                   ),
                 ),
               ],
@@ -1222,4 +1195,150 @@ class _PairingConfig {
     required this.collectionHandles,
     required this.displayLabel,
   });
+}
+
+/// Full-screen image gallery: swipe between images, pinch to zoom (up to 4x),
+/// double-tap to zoom in/out at the tap point. Pops with the last viewed
+/// index so the product carousel can sync back.
+class FullScreenImageViewer extends StatefulWidget {
+  final List<String> imageUrls;
+  final int initialIndex;
+
+  const FullScreenImageViewer({
+    super.key,
+    required this.imageUrls,
+    this.initialIndex = 0,
+  });
+
+  @override
+  State<FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
+  late final PageController _pageController;
+  late int _currentIndex;
+
+  final Map<int, TransformationController> _controllers = {};
+  TapDownDetails? _doubleTapDetails;
+  bool _isZoomed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  TransformationController _controllerFor(int index) =>
+      _controllers.putIfAbsent(index, () => TransformationController());
+
+  void _handleDoubleTap(int index) {
+    final controller = _controllerFor(index);
+    if (controller.value != Matrix4.identity()) {
+      controller.value = Matrix4.identity();
+      setState(() => _isZoomed = false);
+    } else if (_doubleTapDetails != null) {
+      final position = _doubleTapDetails!.localPosition;
+      controller.value = Matrix4.identity()
+        ..translate(-position.dx * 1.5, -position.dy * 1.5)
+        ..scale(2.5);
+      setState(() => _isZoomed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _pageController,
+            physics: _isZoomed
+                ? const NeverScrollableScrollPhysics()
+                : const PageScrollPhysics(),
+            itemCount: widget.imageUrls.length,
+            onPageChanged: (i) => setState(() => _currentIndex = i),
+            itemBuilder: (_, i) => GestureDetector(
+              onDoubleTapDown: (details) => _doubleTapDetails = details,
+              onDoubleTap: () => _handleDoubleTap(i),
+              child: InteractiveViewer(
+                transformationController: _controllerFor(i),
+                minScale: 1.0,
+                maxScale: 4.0,
+                onInteractionEnd: (_) {
+                  final zoomed =
+                      _controllerFor(i).value != Matrix4.identity();
+                  if (zoomed != _isZoomed) {
+                    setState(() => _isZoomed = zoomed);
+                  }
+                },
+                child: Center(
+                  child: CachedNetworkImage(
+                    imageUrl: widget.imageUrls[i],
+                    fit: BoxFit.contain,
+                    placeholder: (_, __) => const Center(
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white54),
+                    ),
+                    errorWidget: (_, __, ___) => const Icon(
+                        Icons.image_not_supported_outlined,
+                        size: 52,
+                        color: Colors.white38),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            right: 12,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context, _currentIndex),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(
+                  color: Colors.black45,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close_rounded,
+                    size: 20, color: Colors.white),
+              ),
+            ),
+          ),
+          if (widget.imageUrls.length > 1)
+            Positioned(
+              bottom: MediaQuery.of(context).padding.bottom + 20,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${_currentIndex + 1} / ${widget.imageUrls.length}',
+                    style:
+                        const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
