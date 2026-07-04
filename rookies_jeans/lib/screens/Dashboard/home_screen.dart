@@ -18,35 +18,25 @@ import 'package:video_player/video_player.dart';
 
 class R {
   const R._(this._sw, this._sh);
-
   static const double _baseW = 390.0;
   static const double _baseH = 844.0;
-
   static const double _minScale = 0.85;
   static const double _maxScale = 1.35;
-
   final double _sw;
   final double _sh;
-
   factory R.of(BuildContext context) {
     final mq = MediaQuery.of(context);
     return R._(mq.size.width, mq.size.height);
   }
-
   double get _wScale => (_sw / _baseW).clamp(_minScale, _maxScale);
-
   double get _hScale => (_sh / _baseH).clamp(_minScale, _maxScale);
-
   double sp(double size) => size * _wScale;
-
   double dp(double size) => size * _wScale;
-
   double vp(double size) => size * _hScale;
 }
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -57,37 +47,28 @@ class _HomeScreenState extends State<HomeScreen> {
   static const Color cardColor    = Color(ShopifyConstants.cardColorHex);
   static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
   static const Color borderColor  = Color.fromARGB(255, 80, 57, 57);
-
   static const String _fHead = ShopifyConstants.fontHeading;
   static const String _fBody = ShopifyConstants.fontBody;
   static const String _fBold = ShopifyConstants.fontBodyBold;
   static const String _fNumber = ShopifyConstants.fontNumber;
-
   final Set<String> _addingToCartProductIds = {};
-  final Map<String, bool> _fillAnimatingIds = {};
   bool _isLoading = true;
-
   late VideoPlayerController _videoCtrl;
   bool _videoReady = false;
-
   final ScrollController _scrollCtrl = ScrollController();
   final List<_SectionAnchor> _sectionAnchors = [];
   bool _isSnapping = false;
   BuildContext? _scrollableContext;
-
   List<ShopifyCollection> _latestDrop    = [];
   List<ShopifyCollection> _categories    = [];
   List<ShopifyCollection> _ourCollection = [];
   List<ShopifyProduct>    _oversizedShirts = [];
   List<ShopifyProduct>    _hotDeals       = [];
   BalloonBannerData?      _balloonBanner;
-
   late final PageController _bannerCtrl;
   int    _currentBanner = 0;
   Timer? _bannerTimer;
-
   final TextEditingController _searchCtrl = TextEditingController();
-
   final List<_PromoCollectionTile> _latestDropTiles = const [
     _PromoCollectionTile(
       title: 'NEW ARRIVALS',
@@ -118,7 +99,6 @@ class _HomeScreenState extends State<HomeScreen> {
       buttonText: 'SHOP NOW',
     ),
   ];
-
   final List<_PromoCollectionTile> _ourCollectionPromoTiles = const [
     _PromoCollectionTile(
       title: 'OVERSIZED TEES',
@@ -170,7 +150,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _videoCtrl.setVolume(0);
         _videoCtrl.play();
       });
-
     _fetchAll();
     CartService.instance.initialize();
   }
@@ -218,13 +197,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _snapToNearestSection() async {
     final offsets   = _collectSectionOffsets();
     if (offsets.isEmpty) return;
-
     final current   = _scrollCtrl.offset;
     final maxScroll = _scrollCtrl.position.maxScrollExtent;
-
     double nearest   = offsets.first;
     double bestDelta = (offsets.first - current).abs();
-
     for (final o in offsets) {
       final delta = (o - current).abs();
       if (delta < bestDelta) {
@@ -232,10 +208,8 @@ class _HomeScreenState extends State<HomeScreen> {
         nearest   = o;
       }
     }
-
     final target = nearest.clamp(0.0, maxScroll);
     if ((target - current).abs() < 1.0) return;
-
     _isSnapping = true;
     try {
       await _scrollCtrl.animateTo(
@@ -250,11 +224,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchAll({bool forceRefresh = false}) async {
     if (mounted) setState(() => _isLoading = true);
-
     if (forceRefresh) {
       ShopifyStorefrontService.instance.clearCache();
     }
-
     final results = await Future.wait([
       ShopifyStorefrontService.instance.getLatestDropCollections(),
       ShopifyStorefrontService.instance.getOurCollectionTiles(),
@@ -266,9 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       ShopifyStorefrontService.instance.getBalloonBanner(),
     ]);
-
     if (!mounted) return;
-
     setState(() {
       _latestDrop      = results[0] as List<ShopifyCollection>;
       _categories      = results[0] as List<ShopifyCollection>;
@@ -335,22 +305,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _addToCart(ShopifyProduct product) async {
-    if (_addingToCartProductIds.contains(product.id)) return;
-    if (product.variants.isEmpty) return;
-
+  Future<bool> _addToCart(ShopifyProduct product, String variantId) async {
+    if (_addingToCartProductIds.contains(product.id)) return false;
     setState(() => _addingToCartProductIds.add(product.id));
-
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
-
-    final success = await CartService.instance.addLine(
-      variantId: product.variants.first.id,
-    );
-
-    if (!mounted) return;
+    final success = await CartService.instance.addLine(variantId: variantId);
+    if (!mounted) return success;
     setState(() => _addingToCartProductIds.remove(product.id));
-
     messenger.showSnackBar(
       SnackBar(
         content: Text(
@@ -365,6 +327,171 @@ class _HomeScreenState extends State<HomeScreen> {
         duration: const Duration(seconds: 2),
       ),
     );
+    return success;
+  }
+
+  void _showSizeSelector(ShopifyProduct product) {
+    if (product.variants.isEmpty) return;
+    String? selectedVariantId;
+    bool isAdding = false;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        final r = R.of(sheetContext);
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final selectedVariant = selectedVariantId == null
+                ? null
+                : product.variants
+                    .firstWhere((v) => v.id == selectedVariantId);
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                r.dp(20),
+                r.dp(20),
+                r.dp(20),
+                MediaQuery.of(sheetContext).viewInsets.bottom + r.dp(24),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: _fHead,
+                      fontSize: r.sp(20),
+                      fontWeight: FontWeight.w600,
+                      color: primary,
+                    ),
+                  ),
+                  SizedBox(height: r.dp(4)),
+                  _priceBlock(product, r),
+                  SizedBox(height: r.dp(16)),
+                  Text(
+                    'SELECT SIZE',
+                    style: TextStyle(
+                      fontFamily: _fBold,
+                      fontSize: r.sp(12),
+                      letterSpacing: 1.2,
+                      color: secondaryTxt,
+                    ),
+                  ),
+                  SizedBox(height: r.dp(10)),
+                  Wrap(
+                    spacing: r.dp(10),
+                    runSpacing: r.dp(10),
+                    children: product.variants.map((variant) {
+                      final bool available = variant.availableForSale;
+                      final bool selected = variant.id == selectedVariantId;
+                      return GestureDetector(
+                        onTap: available
+                            ? () => setSheetState(
+                                () => selectedVariantId = variant.id)
+                            : null,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: r.dp(18),
+                            vertical: r.dp(10),
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected ? primary : Colors.transparent,
+                            border: Border.all(
+                              color: available
+                                  ? primary
+                                  : const Color(0xFFCCCCCC),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Text(
+                            variant.title,
+                            style: TextStyle(
+                              fontFamily: _fBold,
+                              fontSize: r.sp(13),
+                              color: selected
+                                  ? Colors.white
+                                  : available
+                                      ? primary
+                                      : const Color(0xFFBBBBBB),
+                              decoration: available
+                                  ? TextDecoration.none
+                                  : TextDecoration.lineThrough,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  SizedBox(height: r.dp(10)),
+                  if (selectedVariant != null)
+                    Text(
+                      selectedVariant.availableForSale
+                          ? 'In stock'
+                          : 'Out of stock',
+                      style: TextStyle(
+                        fontFamily: _fBody,
+                        fontSize: r.sp(12),
+                        color: selectedVariant.availableForSale
+                            ? const Color(0xFF2E7D32)
+                            : Colors.red,
+                      ),
+                    ),
+                  SizedBox(height: r.dp(20)),
+                  SizedBox(
+                    width: double.infinity,
+                    height: r.dp(46),
+                    child: ElevatedButton(
+                      onPressed: (selectedVariantId == null || isAdding)
+                          ? null
+                          : () async {
+                              setSheetState(() => isAdding = true);
+                              final success = await _addToCart(
+                                  product, selectedVariantId!);
+                              if (!sheetContext.mounted) return;
+                              setSheetState(() => isAdding = false);
+                              if (success) {
+                                Navigator.pop(sheetContext);
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primary,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: primary.withOpacity(0.4),
+                        shape: const RoundedRectangleBorder(),
+                        elevation: 0,
+                      ),
+                      child: isAdding
+                          ? SizedBox(
+                              width: r.dp(20),
+                              height: r.dp(20),
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              'ADD TO CART',
+                              style: TextStyle(
+                                fontFamily: _fBold,
+                                fontSize: r.sp(13),
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _logout() async {
@@ -376,7 +503,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     _sectionAnchors.clear();
-
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
@@ -684,7 +810,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final double screenWidth  = MediaQuery.of(context).size.width;
     final double blockHeight  =
         (MediaQuery.of(context).size.height * 0.46).clamp(220.0, 420.0);
-
     return Column(
       children: [
         _fullWidthImageBlock(
@@ -857,21 +982,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _oversizedShirtsAsBox() {
-  final r = R.of(context);
-  return _oversizedShirts.isEmpty
-      ? _empty()
-      : SizedBox(
-          height: r.dp(185) + r.dp(7) + r.dp(18) + r.dp(5) + r.dp(30) + 
-                  r.dp(6) + r.dp(18) + r.dp(8) + r.dp(32), // sum of actual children
-          child: ListView.separated(
-            padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-            scrollDirection: Axis.horizontal,
-            itemCount: _oversizedShirts.length,
-            separatorBuilder: (_, __) => SizedBox(width: r.dp(12)),
-            itemBuilder: (_, i) => _productTile(_oversizedShirts[i], r),
-          ),
-        );
-}
+    final r = R.of(context);
+    return _oversizedShirts.isEmpty
+        ? _empty()
+        : SizedBox(
+            height: r.dp(185) + r.dp(7) + r.dp(18) + r.dp(5) + r.dp(30) +
+                    r.dp(6) + r.dp(18) + r.dp(8) + r.dp(32),
+            child: ListView.separated(
+              padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+              scrollDirection: Axis.horizontal,
+              itemCount: _oversizedShirts.length,
+              separatorBuilder: (_, __) => SizedBox(width: r.dp(12)),
+              itemBuilder: (_, i) => _productTile(_oversizedShirts[i], r),
+            ),
+          );
+  }
 
   Widget _latestDropsAsBox() {
     final r = R.of(context);
@@ -954,9 +1079,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           foregroundColor: Colors.white,
                           padding: EdgeInsets.symmetric(
                               horizontal: r.dp(10)),
-                          shape: RoundedRectangleBorder(
-                            // borderRadius: BorderRadius.zero,
-                          ),
+                          shape: RoundedRectangleBorder(),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1091,7 +1214,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final double tileWidth   = r.dp(160);
     final double imageHeight = r.dp(185);
     final colorHexes = product.colorHexCodes;
-
     return GestureDetector(
       onTap: () => _openProductDetail(product),
       child: SizedBox(
@@ -1140,84 +1262,35 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _cartButtonForProduct(ShopifyProduct product, R r) {
-    final variantId =
-        product.variants.isNotEmpty ? product.variants.first.id : null;
-
     return AnimatedBuilder(
       animation: CartService.instance,
       builder: (context, _) {
-        final inCart =
-            variantId != null && CartService.instance.isInCart(variantId);
-        final isFilling = _fillAnimatingIds[product.id] ?? false;
+        final inCart = product.variants
+            .any((v) => CartService.instance.isInCart(v.id));
         final isBusy = _addingToCartProductIds.contains(product.id);
-
         return SizedBox(
           width: double.infinity,
           height: r.dp(32),
-          child: TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0, end: isFilling ? 1 : 0),
-            duration: const Duration(milliseconds: 450),
-            curve: Curves.easeInOut,
-            builder: (context, value, child) {
-              return Stack(
-                children: [
-                  Positioned.fill(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: FractionallySizedBox(
-                        widthFactor: value,
-                        child: Container(color: primary),
-                      ),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: OutlinedButton(
-                      onPressed: isBusy
-                          ? null
-                          : inCart
-                              ? _goToCart
-                              : () async {
-                                  setState(() {
-                                    _fillAnimatingIds[product.id] = true;
-                                  });
-
-                                  await Future.delayed(
-                                    const Duration(milliseconds: 450),
-                                  );
-
-                                  await _addToCart(product);
-
-                                  if (!mounted) return;
-
-                                  setState(() {
-                                    _fillAnimatingIds[product.id] = false;
-                                  });
-                                },
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: primary, width: 1.2),
-                        shape: const RoundedRectangleBorder(
-                          // borderRadius: BorderRadius.zero,
-                        ),
-                        padding: EdgeInsets.zero,
-                        backgroundColor: Colors.transparent,
-                        foregroundColor: isFilling ? Colors.white : primary,
-                        disabledForegroundColor:
-                            isFilling ? Colors.white : primary,
-                      ),
-                      child: Text(
-                        inCart ? 'GO TO CART' : 'SHOP NOW',
-                        style: TextStyle(
-                          fontFamily: _fBold,
-                          fontSize: r.sp(11),
-                          letterSpacing: 1.2,
-                          color: isFilling ? Colors.white : primary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
+          child: OutlinedButton(
+            onPressed: isBusy
+                ? null
+                : inCart
+                    ? _goToCart
+                    : () => _showSizeSelector(product),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: primary, width: 1.2),
+              shape: const RoundedRectangleBorder(),
+              padding: EdgeInsets.zero,
+              foregroundColor: primary,
+            ),
+            child: Text(
+              inCart ? 'GO TO CART' : 'SHOP NOW',
+              style: TextStyle(
+                fontFamily: _fBold,
+                fontSize: r.sp(11),
+                letterSpacing: 1.2,
+              ),
+            ),
           ),
         );
       },
@@ -1225,33 +1298,31 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _priceBlock(ShopifyProduct product, R r) {
-  if (!product.isOnSale) {
-    return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: r.sp(14), color: primary, amountFontFamily: _fNumber);
+    if (!product.isOnSale) {
+      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: r.sp(14), color: primary, amountFontFamily: _fNumber);
+    }
+    final saved = (product.compareAtPrice! - product.price).round();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('MRP ', style: TextStyle(fontFamily: _fBody, fontSize: r.sp(11), fontWeight: FontWeight.w500, color: const Color(0xFF9A9A9A))),
+            PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: r.sp(12), color: const Color(0xFF9A9A9A), amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
+          ],
+        ),
+        SizedBox(height: r.dp(2)),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: r.sp(15), color: primary, amountFontFamily: _fNumber),
+            SizedBox(width: r.dp(6)),
+            SavedAmountText(saved.toString(), currencyCode: product.currencyCode, fontSize: r.sp(11), color: const Color(0xFF2E7D32), fontFamily: _fNumber),
+          ],
+        ),
+      ],
+    );
   }
-
-  final saved = (product.compareAtPrice! - product.price).round();
-
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        children: [
-          Text('MRP ', style: TextStyle(fontFamily: _fBody, fontSize: r.sp(11), fontWeight: FontWeight.w500, color: const Color(0xFF9A9A9A))),
-          PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: r.sp(12), color: const Color(0xFF9A9A9A), amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
-        ],
-      ),
-      SizedBox(height: r.dp(2)),
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: r.sp(15), color: primary, amountFontFamily: _fNumber),
-          SizedBox(width: r.dp(6)),
-          SavedAmountText(saved.toString(), currencyCode: product.currencyCode, fontSize: r.sp(11), color: const Color(0xFF2E7D32), fontFamily: _fNumber),
-        ],
-      ),
-    ],
-  );
-}
 
   Widget _colorSwatches(List<String> hexCodes, R r) {
     final visible = hexCodes.take(5).toList();
@@ -1352,7 +1423,6 @@ class _PromoCollectionTile {
   final String handle;
   final String imageAsset;
   final String buttonText;
-
   const _PromoCollectionTile({
     required this.title,
     required this.subtitle,

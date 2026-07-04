@@ -54,13 +54,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   List<ShopifyProduct> _goesWellWith = [];
   List<ShopifyProduct> _youMayAlsoLike = [];
   bool _isLoadingRelated = false;
-
-  /// Which accordion tile is open. null = all collapsed.
-  /// 0 = Description, 1 = Shipping & Returns, 2 = Care Instructions.
   int? _expandedTileIndex;
 
-  /// Known labels in Shopify descriptions. Longest first is handled at
-  /// runtime, so order here doesn't matter — just add new labels as needed.
   static const List<String> _descLabels = [
     'STYLE NO & COLOR', 'STYLE NO', 'COLLAR/NECK', 'COLLAR / NECK',
     'STRETCH METER', 'WASH CARE', 'FABRIC', 'SLEEVES', 'DESIGN',
@@ -511,7 +506,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           const SizedBox(height: 20),
           _addToCartButton(),
           const SizedBox(height: 24),
-          const Divider(height: 1),
+          // const Divider(height: 1),
           if (p.description.isNotEmpty) ...[
             _descriptionTile(p.description, 0),
             const Divider(height: 1),
@@ -531,7 +526,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 : 'Machine wash cold. Do not bleach. Tumble dry low.',
             2,
           ),
-          const Divider(height: 1),
+          // const Divider(height: 1),
           const SizedBox(height: 16),
         ],
       ),
