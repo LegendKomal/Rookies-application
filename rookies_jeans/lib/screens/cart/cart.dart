@@ -42,15 +42,18 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _showToast(String message, {bool isError = false}) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: isError ? const Color(0xFFD32F2F) : primary,
-      textColor: Colors.white,
-      fontSize: 13,
-    );
-  }
+  Fluttertoast.showToast(
+    msg: message,
+    toastLength: Toast.LENGTH_SHORT,
+    gravity: ToastGravity.BOTTOM,
+    backgroundColor: isError ? const Color(0xFFD32F2F) : primary,
+    textColor: Colors.white,
+    fontSize: 13,
+    webBgColor: isError ? '#D32F2F' : '#1A1A1A', 
+    webPosition: 'center',
+    timeInSecForIosWeb: 2,
+  );
+}
 
   Future<void> _changeQuantity(ShopifyCartLine line, int newQuantity) async {
     setState(() => _pendingLineIds.add(line.lineId));

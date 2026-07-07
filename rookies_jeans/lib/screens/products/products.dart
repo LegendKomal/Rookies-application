@@ -316,20 +316,17 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
-  Future<void> _handleAddToCart(ShopifyProduct product) async {
-    if (_addingToCartProductIds.contains(product.id)) return;
-    if (product.variants.isEmpty) return;
+  Future<bool> _handleAddToCart(ShopifyProduct product, String variantId) async {
+    if (_addingToCartProductIds.contains(product.id)) return false;
 
     setState(() => _addingToCartProductIds.add(product.id));
 
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
 
-    final success = await CartService.instance.addLine(
-      variantId: product.variants.first.id,
-    );
+    final success = await CartService.instance.addLine(variantId: variantId);
 
-    if (!mounted) return;
+    if (!mounted) return success;
 
     setState(() => _addingToCartProductIds.remove(product.id));
 
@@ -343,6 +340,173 @@ class _ProductsPageState extends State<ProductsPage> {
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
+    );
+    return success;
+  }
+
+  void _showSizeSelector(ShopifyProduct product) {
+    if (product.variants.isEmpty) return;
+
+    String? selectedVariantId;
+    bool isAdding = false;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final selectedVariant = selectedVariantId == null
+                ? null
+                : product.variants
+                    .firstWhere((v) => v.id == selectedVariantId);
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                MediaQuery.of(sheetContext).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: _fHead,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: primary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _priceBlock(product),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'SELECT SIZE',
+                    style: TextStyle(
+                      fontFamily: _fBold,
+                      fontSize: 12,
+                      letterSpacing: 1.2,
+                      color: secondaryTxt,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: product.variants.map((variant) {
+                      final bool available = variant.availableForSale;
+                      final bool selected = variant.id == selectedVariantId;
+                      return GestureDetector(
+                        onTap: available
+                            ? () => setSheetState(
+                                () => selectedVariantId = variant.id)
+                            : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected ? primary : Colors.transparent,
+                            border: Border.all(
+                              color: available
+                                  ? primary
+                                  : const Color(0xFFCCCCCC),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Text(
+                            variant.title,
+                            style: TextStyle(
+                              fontFamily: _fBold,
+                              fontSize: 13,
+                              color: selected
+                                  ? Colors.white
+                                  : available
+                                      ? primary
+                                      : const Color(0xFFBBBBBB),
+                              decoration: available
+                                  ? TextDecoration.none
+                                  : TextDecoration.lineThrough,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 10),
+                  if (selectedVariant != null)
+                    Text(
+                      selectedVariant.availableForSale
+                          ? 'In stock'
+                          : 'Out of stock',
+                      style: TextStyle(
+                        fontFamily: _fBody,
+                        fontSize: 12,
+                        color: selectedVariant.availableForSale
+                            ? const Color(0xFF2E7D32)
+                            : Colors.red,
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton(
+                      onPressed: (selectedVariantId == null || isAdding)
+                          ? null
+                          : () async {
+                              setSheetState(() => isAdding = true);
+                              final success = await _handleAddToCart(
+                                  product, selectedVariantId!);
+                              if (!sheetContext.mounted) return;
+                              setSheetState(() => isAdding = false);
+                              if (success) {
+                                Navigator.pop(sheetContext);
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primary,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: primary.withOpacity(0.4),
+                        shape: const RoundedRectangleBorder(),
+                        elevation: 0,
+                      ),
+                      child: isAdding
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'ADD TO CART',
+                              style: TextStyle(
+                                fontFamily: _fBold,
+                                fontSize: 13,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -411,8 +575,6 @@ class _ProductsPageState extends State<ProductsPage> {
                     color: Colors.white,
                     fontFamily: _fBody,
                     fontSize: 10,
-                    // fontWeight: FontWeight.w800,
-                    // letterSpacing: 0.8,
                   ),
                 ),
               ],
@@ -439,9 +601,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 style: const TextStyle(
                   fontFamily: _fHead,
                   fontSize: 35,
-                  // fontWeight: FontWeight.w800,
                   color: primary,
-                  // letterSpacing: 1.8,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -474,7 +634,6 @@ class _ProductsPageState extends State<ProductsPage> {
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     color: primary,
-                    // letterSpacing: 0.8,
                   ),
                 ),
               ],
@@ -532,7 +691,6 @@ class _ProductsPageState extends State<ProductsPage> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
-                        // letterSpacing: 1.2,
                         color: primary,
                       ),
                     ),
@@ -642,7 +800,6 @@ class _ProductsPageState extends State<ProductsPage> {
                             style: TextStyle(
                               fontFamily: _fBody,
                               fontSize: 16,
-                              // fontWeight: FontWeight.w700,
                               color: primary,
                             ),
                           ),
@@ -1175,7 +1332,6 @@ class _ProductsPageState extends State<ProductsPage> {
       child: Container(
         decoration: BoxDecoration(
           color: cardColor,
-          // borderRadius: BorderRadius.circular(10),
           border: Border.all(color: borderColor, width: 0.8),
         ),
         child: Column(
@@ -1183,8 +1339,6 @@ class _ProductsPageState extends State<ProductsPage> {
           children: [
             Expanded(
               child: ClipRRect(
-                // borderRadius:
-                //     const BorderRadius.vertical(top: Radius.circular(10)),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -1231,7 +1385,6 @@ class _ProductsPageState extends State<ProductsPage> {
                           ),
                           decoration: BoxDecoration(
                             color: const Color.fromARGB(255, 194, 0, 0),
-                            // borderRadius: BorderRadius.circular(4),
                           ),
                          child: RichText(
                             text: TextSpan(
@@ -1274,7 +1427,6 @@ class _ProductsPageState extends State<ProductsPage> {
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
                       color: primary,
-                      // height: 1.3,
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -1386,14 +1538,11 @@ class _ProductsPageState extends State<ProductsPage> {
   }
 
   Widget _cartButtonForProduct(ShopifyProduct product) {
-    final variantId =
-        product.variants.isNotEmpty ? product.variants.first.id : null;
-
     return AnimatedBuilder(
       animation: CartService.instance,
       builder: (context, _) {
         final inCart =
-            variantId != null && CartService.instance.isInCart(variantId);
+            product.variants.any((v) => CartService.instance.isInCart(v.id));
         final isFilling = _fillAnimatingIds[product.id] ?? false;
         final isBusy = _addingToCartProductIds.contains(product.id);
 
@@ -1409,7 +1558,6 @@ class _ProductsPageState extends State<ProductsPage> {
                 children: [
                   Positioned.fill(
                     child: ClipRRect(
-                      // borderRadius: BorderRadius.circular(5),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: FractionallySizedBox(
@@ -1434,19 +1582,17 @@ class _ProductsPageState extends State<ProductsPage> {
                                     const Duration(milliseconds: 450),
                                   );
 
-                                  await _handleAddToCart(product);
-
                                   if (!mounted) return;
 
                                   setState(() {
                                     _fillAnimatingIds[product.id] = false;
                                   });
+
+                                  _showSizeSelector(product);
                                 },
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: primary, width: 1.2),
-                        shape: RoundedRectangleBorder(
-                          // borderRadius: BorderRadius.circular(5),
-                        ),
+                        shape: const RoundedRectangleBorder(),
                         padding: EdgeInsets.zero,
                         backgroundColor: Colors.transparent,
                         foregroundColor: isFilling ? Colors.white : primary,
@@ -1459,7 +1605,6 @@ class _ProductsPageState extends State<ProductsPage> {
                           fontFamily: _fBodyBold,
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
-                          // letterSpacing: 1.2,
                           color: isFilling ? Colors.white : primary,
                         ),
                       ),
@@ -1672,7 +1817,6 @@ class _ProductsPageState extends State<ProductsPage> {
         itemBuilder: (_, __) => Container(
           decoration: BoxDecoration(
             color: const Color(0xFFE0E0E0),
-            // borderRadius: BorderRadius.circular(10),
           ),
         ),
       );
@@ -2000,7 +2144,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
             constraints: BoxConstraints(maxHeight: screenHeight * 0.82),
             decoration: BoxDecoration(
               color: widget.cardColor,
-              // borderRadius: BorderRadius.circular(16),
               boxShadow: const [
                 BoxShadow(
                   color: Colors.black26,
@@ -2010,7 +2153,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
               ],
             ),
             child: ClipRRect(
-              // borderRadius: BorderRadius.circular(16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -2045,7 +2187,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFD32F2F),
-                                // borderRadius: BorderRadius.circular(4),
                               ),
                               child: RichText(
                                 text: TextSpan(
@@ -2067,7 +2208,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                                 horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: Colors.black.withOpacity(0.45),
-                              // borderRadius: BorderRadius.circular(20),
                             ),
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
@@ -2103,7 +2243,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                                     color: i == _currentPage
                                         ? widget.primary
                                         : Colors.white.withOpacity(0.65),
-                                    // borderRadius: BorderRadius.circular(3),
                                   ),
                                 ),
                               ),
@@ -2153,9 +2292,7 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                                         },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: widget.primary,
-                                shape: RoundedRectangleBorder(
-                                  // borderRadius: BorderRadius.circular(8),
-                                ),
+                                shape: RoundedRectangleBorder(),
                                 elevation: 0,
                               ),
                               child: _isAddingToCart
@@ -2173,7 +2310,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                                         color: Colors.white,
                                         fontWeight: FontWeight.w800,
                                         fontSize: 13,
-                                        // letterSpacing: 1.0,
                                       ),
                                     ),
                             ),
@@ -2238,7 +2374,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
             color: const Color(0xFFE8F5E9),
-            // borderRadius: BorderRadius.circular(4),
           ),
           child: RichText(
             text: TextSpan(
@@ -2277,7 +2412,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
             fontSize: 10,
             fontWeight: FontWeight.w700,
             color: widget.secondaryTxt,
-            // letterSpacing: 0.8,
           ),
         ),
         const SizedBox(height: 6),
@@ -2298,7 +2432,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                     color: isSelected ? widget.primary : widget.borderColor,
                     width: 1.2,
                   ),
-                  // borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   val,
