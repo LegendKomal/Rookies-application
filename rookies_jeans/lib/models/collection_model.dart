@@ -3,7 +3,7 @@ class ShopifyCollection {
   final String title;
   final String handle;
   final String? imageUrl;
-  final String label; // display label e.g. "CARGOS"
+  final String label;
 
   const ShopifyCollection({
     required this.id,

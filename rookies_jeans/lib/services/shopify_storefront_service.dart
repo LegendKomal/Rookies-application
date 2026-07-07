@@ -21,8 +21,6 @@ class PaginatedProductsResponse {
   });
 }
 
-/// Sort options exposed to the UI. [shopifyKey] maps 1:1 to Shopify's
-/// `ProductCollectionSortKeys` enum used in the Storefront API.
 enum ProductSortOption {
   featured('Featured', 'COLLECTION_DEFAULT', false),
   priceLowToHigh('Price: Low to High', 'PRICE', false),
@@ -105,16 +103,6 @@ class ShopifyStorefrontService {
     return response.products;
   }
 
-  /// Fetches a page of products for [handle], with optional sort and
-  /// filtering.
-  ///
-  /// [sortKey] / [reverse] map directly to Shopify's
-  /// `ProductCollectionSortKeys` enum (e.g. 'PRICE', 'BEST_SELLING',
-  /// 'CREATED', 'TITLE', 'COLLECTION_DEFAULT').
-  ///
-  /// [filters] is a list of raw filter `input` JSON strings as returned by
-  /// Shopify in [ShopifyFilterValue.input] — pass them back unmodified,
-  /// this method takes care of wrapping them for the query.
   Future<PaginatedProductsResponse> getProductsByCollectionPaginated(
     String handle, {
     int first = 24,
@@ -209,9 +197,6 @@ class ShopifyStorefrontService {
     ''';
 
     try {
-      // Each entry in `filters` is a raw JSON object string, e.g.
-      // '{"price":{"min":0,"max":50}}' or '{"available":true}'. Decode them
-      // back into maps so they slot correctly into the GraphQL variables.
       final decodedFilters = filters
           .map((f) {
             try {
@@ -655,7 +640,6 @@ query getProduct($handle: String!) {
     buffer.write('  c$i: collectionByHandle(handle: "${items[i]['handle']}") {\n');
     buffer.write('    id title handle\n');
     buffer.write('    image { url altText }\n');
-    // Fallback: grab first product image if collection has no image
     buffer.write('    products(first: 1) {\n');
     buffer.write('      edges { node { images(first: 1) { edges { node { url } } } } }\n');
     buffer.write('    }\n');
@@ -678,7 +662,6 @@ query getProduct($handle: String!) {
       final c = data['c$i'];
       if (c == null) continue;
 
-      // Use collection image, fall back to first product image
       String? imageUrl = c['image']?['url'] as String?;
       if (imageUrl == null) {
         final edges = c['products']?['edges'] as List?;

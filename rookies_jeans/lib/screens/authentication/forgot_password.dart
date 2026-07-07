@@ -97,9 +97,6 @@ class _ForgotPasswordState extends State<ForgotPassword> {
         debugPrint('UI FORGOT PASSWORD RESULT -> success: ${result.success}, message: ${result.message}');
       }
 
-      // Shopify never reveals whether an email is actually registered, so we
-      // always show the same neutral confirmation regardless of result.success
-      // (true network/server failures still surface their own message).
       if (result.success) {
         setState(() => emailSent = true);
       } else {

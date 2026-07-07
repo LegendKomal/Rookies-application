@@ -47,12 +47,10 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _checkLoginStatus() async {
   await Future.delayed(const Duration(seconds: 3));
 
-  // final loggedIn = await ShopifyAuthService.instance.isLoggedIn();
-
   if (!mounted) return;
 
   // context.go(loggedIn ? '/home' : '/login');
-  context.go('/home'); // Always go to home for now
+  context.go('/home');
 }
 
   @override

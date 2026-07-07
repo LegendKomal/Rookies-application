@@ -534,11 +534,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   String _preprocessDescription(String raw) {
-    // 1. Collapse ALL whitespace (incl. Shopify's raw newlines) to spaces.
     var text = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
 
-    // 2. Insert a line break ONLY before known labels (longest first so
-    //    "STYLE NO & COLOR" isn't matched as just "COLOR").
     final sorted = [..._descLabels]
       ..sort((a, b) => b.length.compareTo(a.length));
     final labelPattern = RegExp(
@@ -550,8 +547,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       (m) => '\n${m.group(1)!.toUpperCase()} : ',
     );
 
-    // 3. Keep pipes inline (like the website), just normalize spacing
-    //    and strip trailing pipe/quote junk.
     text = text.replaceAll(RegExp(r'\s*\|\s*'), ' | ');
     text = text.replaceAll(RegExp(r'(\s*\|\s*)?"?\s*$', multiLine: true), '');
     text = text.replaceAll(RegExp(r'\s+$', multiLine: true), '');
@@ -559,8 +554,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     return text.trim();
   }
 
-  /// Description accordion tile: intro paragraph as plain text, then each
-  /// "LABEL : value" line as a bullet with only the label bolded.
   Widget _descriptionTile(String raw, int index) {
     final cleaned = _preprocessDescription(raw);
     final lines =
@@ -657,7 +650,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     );
   }
 
-  /// Generic accordion tile for Shipping & Returns / Care Instructions.
   Widget _infoTile(String label, String content, int index) {
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -1192,9 +1184,6 @@ class _PairingConfig {
   });
 }
 
-/// Full-screen image gallery: swipe between images, pinch to zoom (up to 4x),
-/// double-tap to zoom in/out at the tap point. Pops with the last viewed
-/// index so the product carousel can sync back.
 class FullScreenImageViewer extends StatefulWidget {
   final List<String> imageUrls;
   final int initialIndex;

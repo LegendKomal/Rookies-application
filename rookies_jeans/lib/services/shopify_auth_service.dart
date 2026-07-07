@@ -158,13 +158,6 @@ class ShopifyAuthService {
     }
   }
 
-  /// Sends a password-reset email via Shopify's Storefront API.
-  ///
-  /// NOTE: Shopify's `customerRecover` mutation intentionally returns a
-  /// "success" (no customerUserErrors) regardless of whether an account
-  /// exists for the given email. This is a deliberate anti-enumeration
-  /// measure on Shopify's side, so don't use the response to tell the user
-  /// whether their email is registered — always show a neutral message.
   Future<ShopifyAuthResult> recoverPassword({
     required String email,
   }) async {
@@ -231,8 +224,6 @@ class ShopifyAuthService {
       final List errors = data['customerUserErrors'] ?? [];
       if (errors.isNotEmpty) {
         _log('AUTH RECOVER CUSTOMER USER ERRORS -> $errors');
-        // Most errors here are things like an invalid email *format*.
-        // Shopify will not tell us "no such account" for privacy reasons.
         return ShopifyAuthResult(
           success: false,
           message: errors.first['message'] ?? 'Could not process that request.',

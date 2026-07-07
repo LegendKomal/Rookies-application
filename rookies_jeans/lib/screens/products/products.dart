@@ -42,8 +42,6 @@ class _ProductsPageState extends State<ProductsPage> {
   static const String _fBody = ShopifyConstants.fontBody;
   static const String _fBold = ShopifyConstants.fontBodyBold;
   static const String _fBodyBold = ShopifyConstants.fontAlteBold;
-  // FIX: dedicated fonts for numerals and the rupee symbol, pulled from
-  // the constants file so prices render with distinct typography.
   static const String _fNumber = ShopifyConstants.fontNumber;
   static const String _fRupee = ShopifyConstants.fontRupee;
 
@@ -55,8 +53,6 @@ class _ProductsPageState extends State<ProductsPage> {
 
   final Map<String, PageController> _imagePageControllers = {};
 
-  // FIX: use ValueNotifier per product so only the dot indicator rebuilds,
-  // not the entire grid, when a page changes.
   final Map<String, ValueNotifier<int>> _currentImageIndex = {};
 
   Timer? _autoScrollTimer;
@@ -99,7 +95,6 @@ class _ProductsPageState extends State<ProductsPage> {
     for (final c in _imagePageControllers.values) {
       c.dispose();
     }
-    // FIX: dispose all ValueNotifiers
     for (final n in _currentImageIndex.values) {
       n.dispose();
     }
@@ -115,14 +110,12 @@ class _ProductsPageState extends State<ProductsPage> {
         .toList();
     for (final id in removed) {
       _imagePageControllers.remove(id)?.dispose();
-      // FIX: dispose and remove the ValueNotifier for removed products
       _currentImageIndex.remove(id)?.dispose();
     }
 
     for (final product in _products) {
       if (!_imagePageControllers.containsKey(product.id)) {
         _imagePageControllers[product.id] = PageController();
-        // FIX: create a ValueNotifier instead of storing a plain int
         _currentImageIndex[product.id] = ValueNotifier<int>(0);
       }
     }
@@ -200,7 +193,6 @@ class _ProductsPageState extends State<ProductsPage> {
       curve: Curves.easeInOut,
     );
 
-    // FIX: update the ValueNotifier directly — no setState, no grid rebuild
     _currentImageIndex[product.id]?.value = nextIndex;
   }
 
@@ -1038,8 +1030,6 @@ class _ProductsPageState extends State<ProductsPage> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  // FIX: split price-range labels so numerals/₹ render in
-                  // their dedicated fonts instead of plain Text.
                   child: RichText(
                     text: TextSpan(
                       children: _priceSpans(
@@ -1059,10 +1049,6 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
-  // FIX: formats a raw numeric amount with Indian-style comma grouping
-  // (e.g. 1499 -> "1,499", 199999 -> "1,99,999"), with NO currency symbol.
-  // The symbol is added separately in _amountSpans so it never depends on
-  // whatever string the model/API hands back.
   String _formatAmount(num amount) {
     final rounded = amount.round();
     final isNegative = rounded < 0;
@@ -1079,9 +1065,6 @@ class _ProductsPageState extends State<ProductsPage> {
     return '${isNegative ? '-' : ''}$restWithCommas,$lastThree';
   }
 
-  // FIX: builds the rupee symbol + amount as two spans, with the symbol
-  // hardcoded here (not taken from the model). Symbol uses _fRupee, the
-  // number uses _fNumber.
   List<InlineSpan> _amountSpans({
     required num amount,
     required String currencyCode,
@@ -1121,11 +1104,6 @@ class _ProductsPageState extends State<ProductsPage> {
     ];
   }
 
-  // FIX: splits a price-bearing string into TextSpans so the rupee symbol,
-  // digits/decimal separators, and any surrounding text each render with
-  // the fonts defined in ShopifyConstants (fontRupee / fontNumber / fBold).
-  // Still used for locally-authored strings (price filter labels) where
-  // the ₹ is hardcoded in this file already, not sourced from the model.
   List<InlineSpan> _priceSpans(
     String text, {
     required double fontSize,
@@ -1214,8 +1192,6 @@ class _ProductsPageState extends State<ProductsPage> {
                       PageView.builder(
                         controller: controller,
                         physics: const BouncingScrollPhysics(),
-                        // FIX: update ValueNotifier directly — no setState,
-                        // so the grid does NOT rebuild on every page swipe.
                         onPageChanged: (index) {
                           _currentImageIndex[product.id]?.value = index;
                         },
@@ -1257,9 +1233,7 @@ class _ProductsPageState extends State<ProductsPage> {
                             color: const Color.fromARGB(255, 194, 0, 0),
                             // borderRadius: BorderRadius.circular(4),
                           ),
-                          // FIX: discount badge ("20% OFF") now splits the
-                          // numeral through the dedicated number font.
-                          child: RichText(
+                         child: RichText(
                             text: TextSpan(
                               children: _priceSpans(
                                 _discountPercent(product),
@@ -1276,9 +1250,6 @@ class _ProductsPageState extends State<ProductsPage> {
                         bottom: 6,
                         left: 0,
                         right: 0,
-                        // FIX: dot indicator uses ValueListenableBuilder so
-                        // only THIS widget rebuilds when the page changes,
-                        // not the whole product grid.
                         child: _imageDotIndicator(
                           product: product,
                           count: images.length,
@@ -1382,8 +1353,6 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
-  // FIX: uses ValueListenableBuilder so only the dots rebuild on page change,
-  // not the entire grid.
   Widget _imageDotIndicator({
     required ShopifyProduct product,
     required int count,
@@ -1517,8 +1486,6 @@ class _ProductsPageState extends State<ProductsPage> {
 
   Widget _priceBlock(ShopifyProduct product) {
     if (!product.isOnSale) {
-      // FIX: ₹ symbol + number built locally from product.price via
-      // _amountSpans, instead of using product.formattedPrice from the model.
       return RichText(
         text: TextSpan(
           children: _amountSpans(
@@ -1541,7 +1508,6 @@ class _ProductsPageState extends State<ProductsPage> {
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            // FIX: struck-through compare-at price, built locally.
             RichText(
               text: TextSpan(
                 children: _amountSpans(
@@ -1556,7 +1522,6 @@ class _ProductsPageState extends State<ProductsPage> {
               ),
             ),
             const SizedBox(width: 6),
-            // FIX: active price, built locally.
             RichText(
               text: TextSpan(
                 children: _amountSpans(
@@ -1569,8 +1534,6 @@ class _ProductsPageState extends State<ProductsPage> {
               ),
             ),
             const SizedBox(width: 6),
-            // FIX: "Save ₹X" text — "Save " stays on the body font, the
-            // amount (symbol + number) is built locally via _amountSpans.
             RichText(
               text: TextSpan(
                 children: [
@@ -1715,10 +1678,6 @@ class _ProductsPageState extends State<ProductsPage> {
       );
 }
 
-// ---------------------------------------------------------------------------
-// Supporting classes
-// ---------------------------------------------------------------------------
-
 class _PriceOption {
   final String label;
   final double? min;
@@ -1833,8 +1792,6 @@ class _ProductPeekDialog extends StatefulWidget {
   final Color bgColor;
   final Color borderColor;
   final Color secondaryTxt;
-  // FIX: fonts passed in from the parent so the dialog uses the same
-  // number/rupee fonts defined in ShopifyConstants.
   final String numberFont;
   final String rupeeFont;
   final String bodyFont;
@@ -1920,7 +1877,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
     }
   }
 
-  // FIX: same Indian-comma formatter as the grid, scoped to this dialog.
   String _formatAmount(num amount) {
     final rounded = amount.round();
     final isNegative = rounded < 0;
@@ -1937,8 +1893,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
     return '${isNegative ? '-' : ''}$restWithCommas,$lastThree';
   }
 
-  // FIX: builds the rupee symbol + amount locally (not from the model),
-  // using the fonts passed in via widget.
   List<InlineSpan> _amountSpans({
     required num amount,
     required String currencyCode,
@@ -1978,9 +1932,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
     ];
   }
 
-  // FIX: same splitter as the grid, scoped to this dialog using the fonts
-  // passed in via the widget. Used for the discount badge ("20% OFF"),
-  // which has no currency symbol.
   List<InlineSpan> _priceSpans(
     String text, {
     required double fontSize,
@@ -2096,7 +2047,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                                 color: const Color(0xFFD32F2F),
                                 // borderRadius: BorderRadius.circular(4),
                               ),
-                              // FIX: discount badge split across fonts.
                               child: RichText(
                                 text: TextSpan(
                                   children: _priceSpans(
@@ -2243,7 +2193,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
 
   Widget _peekPriceRow(ShopifyProduct product) {
     if (!product.isOnSale) {
-      // FIX: ₹ symbol + number built locally from product.price.
       return RichText(
         text: TextSpan(
           children: _amountSpans(
@@ -2261,7 +2210,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: 8,
       children: [
-        // FIX: struck-through compare-at price, built locally.
         RichText(
           text: TextSpan(
             children: _amountSpans(
@@ -2275,7 +2223,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
             ),
           ),
         ),
-        // FIX: active price, built locally.
         RichText(
           text: TextSpan(
             children: _amountSpans(
@@ -2293,8 +2240,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
             color: const Color(0xFFE8F5E9),
             // borderRadius: BorderRadius.circular(4),
           ),
-          // FIX: "Save ₹X" text — "Save " on the body font, amount built
-          // locally via _amountSpans.
           child: RichText(
             text: TextSpan(
               children: [

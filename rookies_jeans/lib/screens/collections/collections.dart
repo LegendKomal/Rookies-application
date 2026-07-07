@@ -26,7 +26,6 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
 
   Future<void> _refresh() async {
     setState(() {
-      // Force a fresh network call instead of the cached one.
       ShopifyStorefrontService.instance.clearCache();
       _future = ShopifyStorefrontService.instance.getExploreCategories();
     });

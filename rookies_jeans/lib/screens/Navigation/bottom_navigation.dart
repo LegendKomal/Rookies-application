@@ -18,7 +18,6 @@ class RookiesBottomNavBar extends StatelessWidget {
   static const Color _border      = Color(ShopifyConstants.borderColorHex);
   static const Color _badgeBg     = Color(0xFFD32F2F);
 
-  // Index of the cart tab within _items / the nav row.
   static const int _cartIndex = 3;
 
   // static const List<_NavItem> _items = [
@@ -97,10 +96,6 @@ class RookiesBottomNavBar extends StatelessWidget {
   }
 }
 
-/// A single nav icon. When [showCartBadge] is true, this listens to
-/// [CartService] directly and overlays a small count badge that updates
-/// live whenever items are added to, removed from, or have their quantity
-/// changed in the cart — independent of which tab is currently selected.
 class _NavIcon extends StatelessWidget {
   const _NavIcon({
     required this.icon,

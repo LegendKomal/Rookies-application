@@ -101,8 +101,6 @@ class _LoginState extends State<Login> {
         return;
       }
 
-      // ── BRIDGE: tell AuthService the user is now logged in ──────────────
-      // This is the critical step that was missing before.
       if (result.customer != null) {
         AuthService.instance.signIn(
           firstName: result.customer!.firstName ?? '',
@@ -110,8 +108,6 @@ class _LoginState extends State<Login> {
           email:     result.customer!.email     ?? '',
         );
       }
-      // ────────────────────────────────────────────────────────────────────
-
       _showMessage(
         result.customer != null
             ? 'Welcome ${result.customer!.fullName}'

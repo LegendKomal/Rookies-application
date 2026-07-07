@@ -18,16 +18,13 @@ class ShopifyConstants {
   static const String storeUrl      = 'https://rookiesjeans.com';
   static const String shiprocketUrl  = 'https://rookiesjeans.shiprocket.co/';
 
-  // ─── Font families ────────────────────────────────────────────────────────
-  static const String fontHeading  = 'BebasNene';      // headings
-  static const String fontBody     = 'AlteHaasGroteskRegular'; // body text
-  static const String fontBodyBold = 'SplineSansMono';    // highlighted / emphasis
+  static const String fontHeading  = 'BebasNene';
+  static const String fontBody     = 'AlteHaasGroteskRegular';
+  static const String fontBodyBold = 'SplineSansMono';
   static const String fontAlteBold = 'AlteHaasGroteskBold';
   static const String fontNumber = 'Typist';
   static const String fontRupee = 'Serif4';
 
-  // ─── Base TextStyles ──────────────────────────────────────────────────────
-  // Use these as roots and extend with .copyWith() where needed.
   static const TextStyle tsHeading = TextStyle(
     fontFamily: fontHeading,
     color: Color(primaryColorHex),
@@ -43,7 +40,6 @@ class ShopifyConstants {
     color: Color(primaryColorHex),
   );
 
-  // ─── Collection handles ───────────────────────────────────────────────────
   static const String latestDropHandle       = 'new-arrivals';
   static const String cargosHandle           = 'CARGOS';
   static const String jeansHandle            = 'JEANS';
@@ -84,12 +80,10 @@ class ShopifyConstants {
     {'handle': trendingNowHandle, 'label': 'TRENDING NOW'},
   ];
 
-  // ─── Fetch limits ─────────────────────────────────────────────────────────
   static const int latestDropCount      = 6;
   static const int hotDealsCount        = 4;
   static const int oversizedShirtsCount = 10;
 
-  // ─── Colors ───────────────────────────────────────────────────────────────
   static const int primaryColorHex   = 0xFF111111;
   static const int accentOrangeHex   = 0xFFFF6B00;
   static const int bgColorHex        = 0xFFF5F5F5;

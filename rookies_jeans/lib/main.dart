@@ -16,11 +16,8 @@ import 'package:rookies_jeans/services/cart_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Restore cart state from Shopify
   CartService.instance.initialize();
 
-  // ── Restore auth session so the profile tab shows the correct state
-  //    immediately on app launch (even after a hot restart / cold start).
   await AuthService.instance.initialize();
 
   runApp(const MyApp());
@@ -42,7 +39,6 @@ final GoRouter _appRouter = GoRouter(
       builder: (context, state) => const Login(),
     ),
 
-    // ── Profile sub-page placeholders ─────────────────────────────────────
     GoRoute(
       path: '/register',
       builder: (context, state) =>
@@ -83,7 +79,6 @@ final GoRouter _appRouter = GoRouter(
           const Scaffold(body: Center(child: Text('Track Your Order'))),
     ),
 
-    // ── Main shell with bottom nav ────────────────────────────────────────
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return ScaffoldWithNavBar(navigationShell: navigationShell);

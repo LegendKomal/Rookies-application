@@ -9,7 +9,7 @@ class ShopifyProductDetail {
   final List<String> imageUrls;
   final List<ProductDetailVariant> variants;
   final List<ProductDetailOption> options;
-  final String? shippingInfo;      // ✅ NEW
+  final String? shippingInfo;
   final String? careInstructions;
 
   const ShopifyProductDetail({
@@ -23,7 +23,7 @@ class ShopifyProductDetail {
     required this.imageUrls,
     required this.variants,
     required this.options,
-    this.shippingInfo,             // ✅ NEW
+    this.shippingInfo,
     this.careInstructions,
   });
 

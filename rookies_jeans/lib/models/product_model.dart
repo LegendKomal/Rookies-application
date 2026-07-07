@@ -1,9 +1,7 @@
-/// A single filter facet returned by Shopify's Storefront API
-/// (e.g. "Size", "Color", "Availability", "Price").
 class ShopifyFilter {
   final String id;
   final String label;
-  final String type; // LIST, PRICE_RANGE, BOOLEAN
+  final String type;
   final List<ShopifyFilterValue> values;
 
   const ShopifyFilter({
@@ -26,11 +24,6 @@ class ShopifyFilter {
   }
 }
 
-/// A single selectable value within a [ShopifyFilter], e.g. "Blue" under
-/// the "Color" filter, or "$0 - $50" under "Price".
-///
-/// [input] is the raw JSON string Shopify expects you to pass back,
-/// unmodified, inside the `filters` argument of the products query.
 class ShopifyFilterValue {
   final String id;
   final String label;
@@ -98,7 +91,7 @@ String get formattedCompareAtPrice {
         return opt.optionValues
             .where((v) => v.swatchColor != null)
             .map((v) => v.swatchColor!)
-            .toSet()   // deduplicate
+            .toSet()
             .toList();
       }
     }

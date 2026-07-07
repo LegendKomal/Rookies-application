@@ -5,12 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/cart_model.dart';
 
-/// Owns the single Shopify cart for this app session and keeps it in sync
-/// with the Storefront API. Because this uses Shopify's real Cart object
-/// (cartCreate / cartLinesAdd / cartLinesUpdate / cartLinesRemove), the same
-/// cart can be resumed on shopify-hosted checkout and is visible to Shopify
-/// admin / other storefronts that load the same cart id — it is not a local
-/// app-only cart.
 class CartService extends ChangeNotifier {
   CartService._();
   static final CartService instance = CartService._();
@@ -30,7 +24,6 @@ class CartService extends ChangeNotifier {
     if (kDebugMode) debugPrint('[CartService] $msg');
   }
 
-  /// Returns true if [variantId] currently has at least one unit in the cart.
   bool isInCart(String variantId) =>
       _cart.lines.any((l) => l.variantId == variantId && l.quantity > 0);
 
@@ -40,9 +33,6 @@ class CartService extends ChangeNotifier {
     return matches.first.quantity;
   }
 
-  /// Loads any persisted cart id and fetches the latest cart from Shopify.
-  /// Safe to call multiple times; only does real work once per app session
-  /// unless [forceRefresh] is true.
   Future<void> initialize({bool forceRefresh = false}) async {
     if (_initialized && !forceRefresh) return;
 
@@ -109,8 +99,6 @@ class CartService extends ChangeNotifier {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  /// Re-fetches the current cart from Shopify. Call this after add/update/
-  /// remove operations, or on pull-to-refresh on the cart screen.
   Future<void> refresh() async {
     if (_cartId == null) {
       _cart = ShopifyCart.empty;
@@ -136,7 +124,6 @@ class CartService extends ChangeNotifier {
 
       final cartNode = decoded['data']?['cart'];
       if (decoded['errors'] != null || cartNode == null) {
-        // Cart may have expired/been completed on Shopify's side.
         await _clearPersistedCartId();
         _cart = ShopifyCart.empty;
       } else {
@@ -183,8 +170,6 @@ class CartService extends ChangeNotifier {
     }
   }
 
-  /// Adds [quantity] of [variantId] to the cart, creating a new Shopify cart
-  /// if one doesn't exist yet. Returns true on success.
   Future<bool> addLine({required String variantId, int quantity = 1}) async {
     _isLoading = true;
     notifyListeners();
@@ -220,8 +205,6 @@ class CartService extends ChangeNotifier {
 
       if (decoded['errors'] != null || userErrors.isNotEmpty || data?['cart'] == null) {
         _log('cartLinesAdd userErrors: $userErrors');
-        // The persisted cart may be stale/expired on Shopify's side — retry
-        // once by creating a fresh cart.
         await _clearPersistedCartId();
         final newCartId = await _createCart(variantId: variantId, quantity: quantity);
         if (newCartId == null) return false;
@@ -241,7 +224,6 @@ class CartService extends ChangeNotifier {
     }
   }
 
-  /// Sets the quantity of an existing cart line. Pass quantity 0 to remove it.
   Future<bool> updateLineQuantity({required String lineId, required int quantity}) async {
     if (_cartId == null) return false;
 
@@ -356,7 +338,6 @@ class CartService extends ChangeNotifier {
         return false;
       }
 
-      // Refresh so cart.checkoutUrl reflects the now-linked checkout.
       await refresh();
       return true;
     } catch (e) {
