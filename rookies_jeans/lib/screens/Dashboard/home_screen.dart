@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
-import 'package:rookies_jeans/models/banner_model.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/cart/cart.dart';
@@ -44,7 +43,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   static const Color primary      = Color(ShopifyConstants.primaryColorHex);
   static const Color bgColor      = Color(ShopifyConstants.bgColorHex);
-  static const Color cardColor    = Color(ShopifyConstants.cardColorHex);
   static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
   static const Color borderColor  = Color.fromARGB(255, 80, 57, 57);
   static const String _fHead = ShopifyConstants.fontHeading;
@@ -59,16 +57,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<_SectionAnchor> _sectionAnchors = [];
   bool _isSnapping = false;
   BuildContext? _scrollableContext;
-  List<ShopifyCollection> _latestDrop    = [];
   List<ShopifyCollection> _categories    = [];
-  List<ShopifyCollection> _ourCollection = [];
   List<ShopifyProduct>    _oversizedShirts = [];
-  List<ShopifyProduct>    _hotDeals       = [];
   BalloonBannerData?      _balloonBanner;
-  late final PageController _bannerCtrl;
-  int    _currentBanner = 0;
-  Timer? _bannerTimer;
-  final TextEditingController _searchCtrl = TextEditingController();
   final List<_PromoCollectionTile> _latestDropTiles = const [
     _PromoCollectionTile(
       title: 'NEW ARRIVALS',
@@ -141,7 +132,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _bannerCtrl = PageController(viewportFraction: 1);
     _videoCtrl  = VideoPlayerController.asset('assets/rookies_video.mp4')
       ..initialize().then((_) {
         if (!mounted) return;
@@ -156,10 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _bannerTimer?.cancel();
-    _bannerCtrl.dispose();
     _videoCtrl.dispose();
-    _searchCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
@@ -229,23 +216,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     final results = await Future.wait([
       ShopifyStorefrontService.instance.getLatestDropCollections(),
-      ShopifyStorefrontService.instance.getOurCollectionTiles(),
       ShopifyStorefrontService.instance.getOversizedShirts(
         first: ShopifyConstants.oversizedShirtsCount,
-      ),
-      ShopifyStorefrontService.instance.getHotDeals(
-        first: ShopifyConstants.hotDealsCount,
       ),
       ShopifyStorefrontService.instance.getBalloonBanner(),
     ]);
     if (!mounted) return;
     setState(() {
-      _latestDrop      = results[0] as List<ShopifyCollection>;
       _categories      = results[0] as List<ShopifyCollection>;
-      _ourCollection   = results[1] as List<ShopifyCollection>;
-      _oversizedShirts = results[2] as List<ShopifyProduct>;
-      _hotDeals        = results[3] as List<ShopifyProduct>;
-      _balloonBanner   = results[4] as BalloonBannerData?;
+      _oversizedShirts = results[1] as List<ShopifyProduct>;
+      _balloonBanner   = results[2] as BalloonBannerData?;
       _isLoading       = false;
     });
   }
