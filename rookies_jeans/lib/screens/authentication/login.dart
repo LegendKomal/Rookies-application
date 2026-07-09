@@ -28,6 +28,18 @@ class _LoginState extends State<Login> {
   static const Color borderColor  = Color(0xffdddddd);
   static const Color fieldFill    = Color(0xfffafafa);
 
+  // ---- Responsive helpers -------------------------------------------------
+  // Scales off screen width so the form fits from small phones to tablets.
+  // 400px logical width is the baseline (factor == 1.0).
+  double get _sf =>
+      (MediaQuery.of(context).size.width / 400).clamp(0.85, 1.3).toDouble();
+
+  /// Scale a size value responsively.
+  double _s(double base) => base * _sf;
+
+  /// Scale a fixed control height but keep it within comfortable touch bounds.
+  double _h(double base) => (base * _sf).clamp(48.0, 64.0);
+
   @override
   void dispose() {
     emailController.dispose();
@@ -42,32 +54,32 @@ class _LoginState extends State<Login> {
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: Color(0xff9a9a9a),
-        fontSize: 14.5,
+      hintStyle: TextStyle(
+        color: const Color(0xff9a9a9a),
+        fontSize: _s(14.5),
         fontWeight: FontWeight.w400,
       ),
-      prefixIcon: Icon(icon, color: const Color(0xff444444), size: 20),
+      prefixIcon: Icon(icon, color: const Color(0xff444444), size: _s(20)),
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: fieldFill,
       contentPadding:
-          const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-      border: OutlineInputBorder(
+          EdgeInsets.symmetric(vertical: _s(18), horizontal: _s(16)),
+      border: const OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: borderColor),
+        borderSide: BorderSide(color: borderColor),
       ),
-      enabledBorder: OutlineInputBorder(
+      enabledBorder: const OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: borderColor, width: 1),
+        borderSide: BorderSide(color: borderColor, width: 1),
       ),
-      focusedBorder: OutlineInputBorder(
+      focusedBorder: const OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: primary, width: 1.2),
+        borderSide: BorderSide(color: primary, width: 1.2),
       ),
-      errorBorder: OutlineInputBorder(
+      errorBorder: const OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.redAccent),
+        borderSide: BorderSide(color: Colors.redAccent),
       ),
     );
   }
@@ -151,16 +163,19 @@ class _LoginState extends State<Login> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final outerH = width < 360 ? 16.0 : _s(24);
+
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            padding: EdgeInsets.symmetric(horizontal: outerH, vertical: _s(24)),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
+              constraints: const BoxConstraints(maxWidth: 460),
               child: Container(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(_s(24)),
                 decoration: BoxDecoration(
                   color: cardColor,
                   // borderRadius: BorderRadius.circular(24),
@@ -176,25 +191,26 @@ class _LoginState extends State<Login> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 4),
+                    SizedBox(height: _s(4)),
                     Center(
                       child: Column(
-                        children: const [
+                        children: [
                           Text(
                             "Welcome Back",
+                            textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 30,
+                              fontSize: _s(30),
                               fontWeight: FontWeight.w700,
                               color: primary,
                               // letterSpacing: -0.5,
                             ),
                           ),
-                          SizedBox(height: 8),
+                          SizedBox(height: _s(8)),
                           Text(
                             "Sign in to continue to ROOKIES",
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 15,
+                              fontSize: _s(15),
                               color: secondaryText,
                               height: 1.5,
                             ),
@@ -202,31 +218,33 @@ class _LoginState extends State<Login> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 32),
-                    const Text("Email",
+                    SizedBox(height: _s(32)),
+                    Text("Email",
                         style: TextStyle(
-                            fontSize: 14,
+                            fontSize: _s(14),
                             fontWeight: FontWeight.w600,
                             color: primary)),
-                    const SizedBox(height: 8),
+                    SizedBox(height: _s(8)),
                     TextFormField(
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
+                      style: TextStyle(fontSize: _s(14.5)),
                       decoration: inputDecoration(
                         hintText: "Enter your email",
                         icon: Icons.mail_outline_rounded,
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    const Text("Password",
+                    SizedBox(height: _s(18)),
+                    Text("Password",
                         style: TextStyle(
-                            fontSize: 14,
+                            fontSize: _s(14),
                             fontWeight: FontWeight.w600,
                             color: primary)),
-                    const SizedBox(height: 8),
+                    SizedBox(height: _s(8)),
                     TextFormField(
                       controller: passwordController,
                       obscureText: isPasswordHidden,
+                      style: TextStyle(fontSize: _s(14.5)),
                       decoration: inputDecoration(
                         hintText: "Enter your password",
                         icon: Icons.lock_outline_rounded,
@@ -238,11 +256,12 @@ class _LoginState extends State<Login> {
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
                             color: const Color(0xff555555),
+                            size: _s(22),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    SizedBox(height: _s(14)),
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
@@ -251,15 +270,16 @@ class _LoginState extends State<Login> {
                           foregroundColor: primary,
                           padding: EdgeInsets.zero,
                         ),
-                        child: const Text("Forgot Password?",
+                        child: Text("Forgot Password?",
                             style: TextStyle(
-                                fontSize: 13.5, fontWeight: FontWeight.w600)),
+                                fontSize: _s(13.5),
+                                fontWeight: FontWeight.w600)),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    SizedBox(height: _s(18)),
                     SizedBox(
                       width: double.infinity,
-                      height: 56,
+                      height: _h(56),
                       child: ElevatedButton(
                         onPressed: isLoading ? null : _handleLogin,
                         style: ElevatedButton.styleFrom(
@@ -277,32 +297,33 @@ class _LoginState extends State<Login> {
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2.2, color: Colors.white),
                               )
-                            : const Text("Sign In",
+                            : Text("Sign In",
                                 style: TextStyle(
-                                    fontSize: 16,
+                                    fontSize: _s(16),
                                     fontWeight: FontWeight.w700,
                                     // letterSpacing: 0.2
                                     )),
                       ),
                     ),
-                    const SizedBox(height: 22),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    SizedBox(height: _s(22)),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        const Text("New to ROOKIES? ",
+                        Text("New to ROOKIES? ",
                             style: TextStyle(
-                                color: secondaryText, fontSize: 14)),
+                                color: secondaryText, fontSize: _s(14))),
                         GestureDetector(
                           onTap: () => context.push('/register'),
-                          child: const Text("Create Account",
+                          child: Text("Create Account",
                               style: TextStyle(
                                   color: primary,
-                                  fontSize: 14,
+                                  fontSize: _s(14),
                                   fontWeight: FontWeight.w700)),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: _s(6)),
                   ],
                 ),
               ),

@@ -38,6 +38,13 @@ class RookiesBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Scale off screen width so the bar and its icons stay proportional from
+    // small phones to tablets, while staying within touch-friendly bounds.
+    final width = MediaQuery.of(context).size.width;
+    final factor = (width / 400).clamp(0.9, 1.3).toDouble();
+    final barHeight = (60 * factor).clamp(56.0, 76.0);
+    final iconSize = (22 * factor).clamp(20.0, 30.0);
+
     return Container(
       decoration: BoxDecoration(
         color: _bg,
@@ -53,7 +60,7 @@ class RookiesBottomNavBar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 60,
+          height: barHeight,
           child: Row(
             children: List.generate(_items.length, (i) {
               final item    = _items[i];
@@ -68,22 +75,13 @@ class RookiesBottomNavBar extends StatelessWidget {
                       _NavIcon(
                         icon: active ? item.activeIcon : item.icon,
                         active: active,
+                        iconSize: iconSize,
                         showCartBadge: i == _cartIndex,
                         activeColor: _primary,
                         inactiveColor: _inactive,
                         badgeColor: _badgeBg,
                       ),
                       const SizedBox(height: 3),
-                      // AnimatedDefaultTextStyle(
-                      //   duration: const Duration(milliseconds: 200),
-                      //   style: TextStyle(
-                      //     fontSize: 10,
-                      //     fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-                      //     color: active ? _primary : _inactive,
-                      //     letterSpacing: active ? 0.4 : 0.2,
-                      //   ),
-                      //   child: Text(item.label),
-                      // ),
                     ],
                   ),
                 ),
@@ -100,6 +98,7 @@ class _NavIcon extends StatelessWidget {
   const _NavIcon({
     required this.icon,
     required this.active,
+    required this.iconSize,
     required this.showCartBadge,
     required this.activeColor,
     required this.inactiveColor,
@@ -108,6 +107,7 @@ class _NavIcon extends StatelessWidget {
 
   final IconData icon;
   final bool active;
+  final double iconSize;
   final bool showCartBadge;
   final Color activeColor;
   final Color inactiveColor;
@@ -120,7 +120,7 @@ class _NavIcon extends StatelessWidget {
       child: Icon(
         icon,
         key: ValueKey(active),
-        size: 22,
+        size: iconSize,
         color: active ? activeColor : inactiveColor,
       ),
     );

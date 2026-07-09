@@ -4,6 +4,20 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
+// ---------------------------------------------------------------------------
+// Shared responsive helpers.
+// Scale factor is derived from screen width (reference = 375) and clamped so
+// UI never gets too small on tiny phones or oversized on tablets/desktop.
+// ---------------------------------------------------------------------------
+const double _kBaseWidth   = 375;
+const double _kMaxContentW = 640; // cap content width on large screens.
+
+double _sf(BuildContext c) {
+  final w = MediaQuery.sizeOf(c).width;
+  return (w / _kBaseWidth).clamp(0.85, 1.35);
+}
+
+double _s(BuildContext c, double base) => base * _sf(c);
 
 class WebViewScreen extends StatefulWidget {
   const WebViewScreen({
@@ -56,17 +70,19 @@ class _WebViewScreenState extends State<WebViewScreen> {
         elevation: 0.5,
         shadowColor: const Color(0xFFEEEEEE),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              size: 18, color: Color(0xFF333333)),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              size: _s(context, 18).clamp(16.0, 26.0),
+              color: const Color(0xFF333333)),
           onPressed: () => context.pop(),
         ),
         title: Text(
           widget.title,
-          style: const TextStyle(
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
             fontFamily: ShopifyConstants.fontHeading,
-            fontSize: 17,
+            fontSize: _s(context, 17).clamp(15.0, 22.0),
             fontWeight: FontWeight.w500,
-            color: Color(0xFF111111),
+            color: const Color(0xFF111111),
           ),
         ),
         centerTitle: true,
@@ -75,39 +91,41 @@ class _WebViewScreenState extends State<WebViewScreen> {
         children: [
           if (_hasError)
             Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.wifi_off_rounded,
-                      size: 48, color: Color(0xFFBBBBBB)),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Failed to load page',
-                    style: TextStyle(
-                      fontFamily: ShopifyConstants.fontBody,
-                      fontSize: 14,
-                      color: Color(0xFF666666),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => _controller.reload(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(_s(context, 24)),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.wifi_off_rounded,
+                        size: _s(context, 48).clamp(40.0, 66.0),
+                        color: const Color(0xFFBBBBBB)),
+                    SizedBox(height: _s(context, 12)),
+                    Text(
+                      'Failed to load page',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: ShopifyConstants.fontBody,
+                        fontSize: _s(context, 14).clamp(13.0, 18.0),
+                        color: const Color(0xFF666666),
                       ),
                     ),
-                    child: const Text('Retry'),
-                  ),
-                ],
+                    SizedBox(height: _s(context, 16)),
+                    ElevatedButton(
+                      onPressed: () => _controller.reload(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: const RoundedRectangleBorder(),
+                      ),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
               ),
             )
-
           else
             WebViewWidget(controller: _controller),
-
           if (_isLoading && !_hasError)
             const LinearProgressIndicator(
               minHeight: 2,
@@ -119,7 +137,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
     );
   }
 }
-
 
 class AuthService extends ChangeNotifier {
   static final AuthService instance = AuthService._();
@@ -144,7 +161,6 @@ class AuthService extends ChangeNotifier {
   Future<void> initialize() async {
     final loggedIn = await ShopifyAuthService.instance.isLoggedIn();
     if (!loggedIn) return;
-
     final customer = await ShopifyAuthService.instance.getCurrentCustomer();
     if (customer != null) {
       _firstName  = customer.firstName ?? '';
@@ -177,7 +193,6 @@ class AuthService extends ChangeNotifier {
   }
 }
 
-
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -193,7 +208,6 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 }
-
 
 class _LoggedOutProfile extends StatelessWidget {
   const _LoggedOutProfile();
@@ -211,103 +225,112 @@ class _LoggedOutProfile extends StatelessWidget {
       backgroundColor: _bg,
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final screenH = MediaQuery.of(context).size.height;
-          final halfH   = screenH * 0.66;
+          final media   = MediaQuery.of(context);
+          final screenH = media.size.height;
+          final isWide  = constraints.maxWidth > _kMaxContentW;
+          // Hero image scales with height but is capped so it doesn't dominate
+          // very tall (tablet/landscape) screens.
+          final halfH = (screenH * (isWide ? 0.5 : 0.66)).clamp(220.0, 560.0);
 
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  height: halfH,
-                  child: Image.asset(
-                    'assets/welcome_model.png',
-                    fit: BoxFit.cover,
-                    alignment: Alignment.topCenter,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: const Color(0xFFE0E0E0),
-                      child: const Icon(Icons.person,
-                          size: 96, color: Color(0xFFBBBBBB)),
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: _kMaxContentW),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: halfH,
+                      child: Image.asset(
+                        'assets/welcome_model.png',
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFFE0E0E0),
+                          child: Icon(Icons.person,
+                              size: _s(context, 96).clamp(72.0, 140.0),
+                              color: const Color(0xFFBBBBBB)),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'WELCOME!',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: _fHead,
-                          color: _primary,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      SizedBox(
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: () => context.push('/login'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _primary,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                          ),
-                          child: Text(
-                            'Sign In',
+                    Container(
+                      color: Colors.white,
+                      padding: EdgeInsets.fromLTRB(
+                          _s(context, 24), _s(context, 28), _s(context, 24), _s(context, 28)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'WELCOME!',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontFamily: _fBold,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
+                              fontFamily: _fHead,
+                              color: _primary,
+                              fontSize: _s(context, 26).clamp(22.0, 34.0),
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      Center(
-                        child: RichText(
-                          text: TextSpan(
-                            style: TextStyle(
-                              fontFamily: _fBody,
-                              fontSize: 13,
-                              color: const Color(0xFF666666),
-                            ),
-                            children: [
-                              const TextSpan(text: "Don't have an account? "),
-                              WidgetSpan(
-                                child: GestureDetector(
-                                  onTap: () => context.push('/register'),
-                                  child: Text(
-                                    'Create Account',
-                                    style: TextStyle(
-                                      fontFamily: _fBold,
-                                      fontSize: 13,
-                                      color: _primary,
-                                      decoration: TextDecoration.underline,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
+                          SizedBox(height: _s(context, 20)),
+                          SizedBox(
+                            height: _s(context, 50).clamp(46.0, 62.0),
+                            child: ElevatedButton(
+                              onPressed: () => context.push('/login'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                              ),
+                              child: Text(
+                                'Sign In',
+                                style: TextStyle(
+                                  fontFamily: _fBold,
+                                  fontSize: _s(context, 16).clamp(14.0, 20.0),
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
+                          SizedBox(height: _s(context, 14)),
+                          Center(
+                            child: RichText(
+                              textAlign: TextAlign.center,
+                              text: TextSpan(
+                                style: TextStyle(
+                                  fontFamily: _fBody,
+                                  fontSize: _s(context, 13).clamp(12.0, 17.0),
+                                  color: const Color(0xFF666666),
+                                ),
+                                children: [
+                                  const TextSpan(text: "Don't have an account? "),
+                                  WidgetSpan(
+                                    alignment: PlaceholderAlignment.middle,
+                                    child: GestureDetector(
+                                      onTap: () => context.push('/register'),
+                                      child: Text(
+                                        'Create Account',
+                                        style: TextStyle(
+                                          fontFamily: _fBold,
+                                          fontSize: _s(context, 13).clamp(12.0, 17.0),
+                                          color: _primary,
+                                          decoration: TextDecoration.underline,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    SizedBox(height: _s(context, 12)),
+                    const _MoreSection(showSignOut: false),
+                  ],
                 ),
-
-                const SizedBox(height: 12),
-                const _MoreSection(showSignOut: false),
-              ],
+              ),
             ),
           );
         },
@@ -315,7 +338,6 @@ class _LoggedOutProfile extends StatelessWidget {
     );
   }
 }
-
 
 class _LoggedInProfile extends StatelessWidget {
   const _LoggedInProfile();
@@ -329,90 +351,104 @@ class _LoggedInProfile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = AuthService.instance;
-
     return Scaffold(
       backgroundColor: _bg,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(24, 40, 24, 32),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F0F0),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: const Color(0xFFE0E0E0), width: 1.5),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        auth.initials,
-                        style: const TextStyle(
-                          fontFamily: _fBold,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: _primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    Text(
-                      auth.firstName.isNotEmpty
-                          ? 'Hey, ${auth.firstName}!'
-                          : 'Hey!',
-                      style: const TextStyle(
-                        fontFamily: _fHead,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w500,
-                        color: _primary,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: _kMaxContentW),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    color: Colors.white,
+                    padding: EdgeInsets.fromLTRB(
+                        _s(context, 24), _s(context, 40), _s(context, 24), _s(context, 32)),
+                    child: Column(
                       children: [
-                        _QuickAction(
-                          icon: Icons.inventory_2_outlined,
-                          label: 'Order\nHistory',
-                          color: const Color(0xFFE8A020),
-                          onTap: () => context.push('/orders'),
+                        Container(
+                          width: _s(context, 72).clamp(64.0, 96.0),
+                          height: _s(context, 72).clamp(64.0, 96.0),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0F0F0),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: const Color(0xFFE0E0E0), width: 1.5),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            auth.initials,
+                            style: TextStyle(
+                              fontFamily: _fBold,
+                              fontSize: _s(context, 24).clamp(20.0, 32.0),
+                              fontWeight: FontWeight.w700,
+                              color: _primary,
+                            ),
+                          ),
                         ),
-                        _QuickAction(
-                          icon: Icons.menu_book_outlined,
-                          label: 'Address\nBook',
-                          color: const Color(0xFF4285F4),
-                          onTap: () => context.push('/addresses'),
+                        SizedBox(height: _s(context, 14)),
+                        Text(
+                          auth.firstName.isNotEmpty
+                              ? 'Hey, ${auth.firstName}!'
+                              : 'Hey!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: _fHead,
+                            fontSize: _s(context, 22).clamp(18.0, 30.0),
+                            fontWeight: FontWeight.w500,
+                            color: _primary,
+                          ),
                         ),
-                        _QuickAction(
-                          icon: Icons.chat_bubble_outline_rounded,
-                          label: 'Change\nPassword',
-                          color: const Color(0xFF888888),
-                          onTap: () => context.push('/change-password'),
-                        ),
-                        _QuickAction(
-                          icon: Icons.favorite_border_rounded,
-                          label: 'Your\nFavourites',
-                          color: const Color(0xFFD32F2F),
-                          onTap: () => context.go('/wishlist'),
+                        SizedBox(height: _s(context, 28)),
+                        // Each quick action takes an equal share of the row and
+                        // its label wraps/shrinks, so 4 items never overflow on
+                        // narrow phones.
+                        Row(
+                          children: const [
+                            Expanded(
+                              child: _QuickAction(
+                                icon: Icons.inventory_2_outlined,
+                                label: 'Order\nHistory',
+                                color: Color(0xFFE8A020),
+                                route: '/orders',
+                              ),
+                            ),
+                            Expanded(
+                              child: _QuickAction(
+                                icon: Icons.menu_book_outlined,
+                                label: 'Address\nBook',
+                                color: Color(0xFF4285F4),
+                                route: '/addresses',
+                              ),
+                            ),
+                            Expanded(
+                              child: _QuickAction(
+                                icon: Icons.chat_bubble_outline_rounded,
+                                label: 'Change\nPassword',
+                                color: Color(0xFF888888),
+                                route: '/change-password',
+                              ),
+                            ),
+                            Expanded(
+                              child: _QuickAction(
+                                icon: Icons.favorite_border_rounded,
+                                label: 'Your\nFavourites',
+                                color: Color(0xFFD32F2F),
+                                route: '/wishlist',
+                                useGo: true,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  SizedBox(height: _s(context, 12)),
+                  const _MoreSection(showSignOut: true),
+                ],
               ),
-
-              const SizedBox(height: 12),
-              const _MoreSection(showSignOut: true),
-            ],
+            ),
           ),
         ),
       ),
@@ -445,18 +481,18 @@ class _MoreSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
+            padding: EdgeInsets.fromLTRB(
+                _s(context, 20), _s(context, 20), _s(context, 20), _s(context, 6)),
             child: Text(
               'More',
               style: TextStyle(
                 fontFamily: _fHead,
-                fontSize: 22,
+                fontSize: _s(context, 22).clamp(18.0, 30.0),
                 fontWeight: FontWeight.w500,
                 color: const Color(0xFF111111),
               ),
             ),
           ),
-
           _MoreTile(
             label: 'Data & Privacy',
             onTap: () => _openWebView(
@@ -465,7 +501,6 @@ class _MoreSection extends StatelessWidget {
               url: 'https://rookiesjeans.com/policies/privacy-policy',
             ),
           ),
-
           _MoreTile(
             label: 'Return & Refund Policy',
             onTap: () => _openWebView(
@@ -474,7 +509,6 @@ class _MoreSection extends StatelessWidget {
               url: 'https://rookiesjeans.com/policies/refund-policy',
             ),
           ),
-
           _MoreTile(
             label: 'Shipping Policy',
             onTap: () => _openWebView(
@@ -483,7 +517,6 @@ class _MoreSection extends StatelessWidget {
               url: 'https://rookiesjeans.com/policies/shipping-policy',
             ),
           ),
-
           _MoreTile(
             label: 'Store Locator',
             onTap: () => _openWebView(
@@ -492,7 +525,6 @@ class _MoreSection extends StatelessWidget {
               url: 'https://rookiesjeans.com/pages/store-locator',
             ),
           ),
-
           _MoreTile(
             label: 'Track Your Order',
             onTap: () => _openWebView(
@@ -501,7 +533,6 @@ class _MoreSection extends StatelessWidget {
               url: 'https://rookiesjeans.shiprocket.co/',
             ),
           ),
-
           if (showSignOut)
             _MoreTile(
               label: 'Sign Out',
@@ -511,8 +542,7 @@ class _MoreSection extends StatelessWidget {
                 if (context.mounted) context.go('/home');
               },
             ),
-
-          const SizedBox(height: 8),
+          SizedBox(height: _s(context, 8)),
         ],
       ),
     );
@@ -521,7 +551,6 @@ class _MoreSection extends StatelessWidget {
 
 class _MoreTile extends StatelessWidget {
   const _MoreTile({required this.label, required this.onTap, this.icon});
-
   final String       label;
   final VoidCallback onTap;
   final IconData?    icon;
@@ -535,25 +564,30 @@ class _MoreTile extends StatelessWidget {
         InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            padding: EdgeInsets.symmetric(
+                horizontal: _s(context, 20), vertical: _s(context, 15)),
             child: Row(
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: 18, color: const Color(0xFF555555)),
-                  const SizedBox(width: 10),
+                  Icon(icon,
+                      size: _s(context, 18).clamp(16.0, 24.0),
+                      color: const Color(0xFF555555)),
+                  SizedBox(width: _s(context, 10)),
                 ],
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontFamily: _fBody,
-                    fontSize: 14,
-                    color: Color(0xFF333333),
-                    fontWeight: FontWeight.w400,
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: _fBody,
+                      fontSize: _s(context, 14).clamp(13.0, 18.0),
+                      color: const Color(0xFF333333),
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
                 ),
-                const Spacer(),
-                const Icon(Icons.chevron_right_rounded,
-                    size: 18, color: Color(0xFFBBBBBB)),
+                Icon(Icons.chevron_right_rounded,
+                    size: _s(context, 18).clamp(16.0, 24.0),
+                    color: const Color(0xFFBBBBBB)),
               ],
             ),
           ),
@@ -564,49 +598,58 @@ class _MoreTile extends StatelessWidget {
   }
 }
 
-
 class _QuickAction extends StatelessWidget {
   const _QuickAction({
     required this.icon,
     required this.label,
     required this.color,
-    required this.onTap,
+    required this.route,
+    this.useGo = false,
   });
 
-  final IconData     icon;
-  final String       label;
-  final Color        color;
-  final VoidCallback onTap;
+  final IconData icon;
+  final String   label;
+  final Color    color;
+  final String   route;
+  final bool     useGo;
 
   static const String _fBody = ShopifyConstants.fontBody;
 
   @override
   Widget build(BuildContext context) {
+    final circle = _s(context, 56).clamp(48.0, 72.0);
     return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
-              shape: BoxShape.circle,
+      onTap: () => useGo ? context.go(route) : context.push(route),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: _s(context, 2)),
+        child: Column(
+          children: [
+            Container(
+              width: circle,
+              height: circle,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon,
+                  color: color, size: _s(context, 24).clamp(20.0, 32.0)),
             ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: _fBody,
-              fontSize: 11,
-              color: Color(0xFF555555),
-              height: 1.35,
+            SizedBox(height: _s(context, 8)),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: _fBody,
+                fontSize: _s(context, 11).clamp(10.0, 14.0),
+                color: const Color(0xFF555555),
+                height: 1.35,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

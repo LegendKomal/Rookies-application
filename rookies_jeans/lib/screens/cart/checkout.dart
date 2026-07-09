@@ -19,6 +19,14 @@ class _CheckoutWebViewState extends State<CheckoutWebView> {
   static const String _fBold = ShopifyConstants.fontBodyBold;
   static const String _fBody = ShopifyConstants.fontBody;
 
+  // The WebView itself is inherently fluid (it fills whatever space it's
+  // given), so responsiveness here is mostly about the chrome around it.
+  // 400px logical width is the baseline (factor == 1.0).
+  double get _sf =>
+      (MediaQuery.of(context).size.width / 400).clamp(0.85, 1.3).toDouble();
+
+  double _s(double base) => base * _sf;
+
   late final WebViewController _controller;
   bool _isLoading      = true;
   bool _orderCompleted = false;
@@ -116,11 +124,11 @@ class _CheckoutWebViewState extends State<CheckoutWebView> {
               }
             },
           ),
-          title: const Text(
+          title: Text(
             'CHECKOUT',
             style: TextStyle(
               fontFamily: _fBold,
-              fontSize: 13,
+              fontSize: _s(13),
               fontWeight: FontWeight.w800,
               color: primary,
               // letterSpacing: 1.8,

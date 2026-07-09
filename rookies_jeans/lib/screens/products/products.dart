@@ -10,6 +10,38 @@ import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/screens/cart/cart.dart';
 
+/// Small, dependency-free responsive helper.
+///
+/// Everything scales off the current screen width so the same widgets look
+/// right on a 320px phone, a 430px large phone, a 768px tablet and a 1280px+
+/// desktop/foldable. Grid columns are derived from a target card width, so the
+/// layout adds/removes columns automatically instead of being locked to 2.
+class _Responsive {
+  _Responsive(BuildContext context)
+      : _size = MediaQuery.of(context).size,
+        _devicePadding = MediaQuery.of(context).padding;
+
+  final Size _size;
+  final EdgeInsets _devicePadding;
+
+  double get width => _size.width;
+  double get height => _size.height;
+
+  /// Usable width inside the horizontal safe-area insets.
+  double get safeWidth =>
+      (width - _devicePadding.left - _devicePadding.right).clamp(0.0, width);
+
+  bool get isTablet => width >= 600 && width < 1024;
+  bool get isDesktop => width >= 1024;
+
+  /// Linear text-scale factor. 400 logical px is treated as the baseline.
+  /// Clamped so tiny screens stay readable and huge screens don't explode.
+  double get _factor => (width / 400).clamp(0.85, 1.35);
+
+  /// Scale a font size responsively.
+  double sp(double base) => base * _factor;
+}
+
 class ProductsPage extends StatefulWidget {
   final ShopifyCollection collection;
 
@@ -25,6 +57,31 @@ class _ProductsPageState extends State<ProductsPage> {
   static const Color cardColor = Color(ShopifyConstants.cardColorHex);
   static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
   static const Color borderColor = Color(ShopifyConstants.borderColorHex);
+
+  // ---- Single source of truth for grid geometry (used by the grid AND the
+  // ---- auto-scroll visibility math so they can never drift apart). ----
+  static const double _kGridPadding = 12.0;
+  static const double _kCrossSpacing = 12.0;
+  static const double _kMainSpacing = 14.0;
+  static const double _kAspect = 0.52;
+
+  /// Target max width of a single card. Flutter's max-extent delegate fits as
+  /// many columns as possible without exceeding this, so columns adapt to the
+  /// screen automatically (2 on phones, 3–4 on tablets, 5+ on desktop).
+  double _maxCardExtent(_Responsive r) {
+    if (r.isDesktop) return 260;
+    if (r.isTablet) return 240;
+    return 230; // phones -> 2 columns across the usual 320–599px range
+  }
+
+  /// Mirror of SliverGridDelegateWithMaxCrossAxisExtent's column formula.
+  int _columnsFor(_Responsive r) {
+    final gridWidth = r.safeWidth - _kGridPadding * 2;
+    final extent = _maxCardExtent(r);
+    final count =
+        (gridWidth / (extent + _kCrossSpacing)).ceil();
+    return count < 1 ? 1 : count;
+  }
 
   final ScrollController _scrollController = ScrollController();
 
@@ -131,28 +188,25 @@ class _ProductsPageState extends State<ProductsPage> {
   List<int> _visibleProductIndices() {
     if (!_scrollController.hasClients || !mounted) return [];
 
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
+    final r = _Responsive(context);
+    final screenHeight = r.height;
 
-    const crossAxisCount = 2;
-    const mainAxisSpacing = 14.0;
-    const horizontalPadding = 12.0;
-    const crossAxisSpacing = 12.0;
-    const topPadding = 12.0;
-    const childAspectRatio = 0.52;
+    final crossAxisCount = _columnsFor(r);
+    final gridWidth = r.safeWidth - _kGridPadding * 2;
+    final cardWidth =
+        (gridWidth - _kCrossSpacing * (crossAxisCount - 1)) / crossAxisCount;
+    final cardHeight = cardWidth / _kAspect;
+    final rowHeight = cardHeight + _kMainSpacing;
 
-    final availableWidth =
-        screenWidth - (horizontalPadding * 2) - crossAxisSpacing * (crossAxisCount - 1);
-    final cardWidth = availableWidth / crossAxisCount;
-    final cardHeight = cardWidth / childAspectRatio;
-    final rowHeight = cardHeight + mainAxisSpacing;
-
+    const topPadding = _kGridPadding;
     final scrollOffset = _scrollController.offset;
 
     final firstVisibleRow =
         ((scrollOffset - topPadding) / rowHeight).floor().clamp(0, 999999);
-    final lastVisibleRow =
-        ((scrollOffset - topPadding + screenHeight) / rowHeight).ceil().clamp(0, 999999);
+    final lastVisibleRow = ((scrollOffset - topPadding + screenHeight) /
+            rowHeight)
+        .ceil()
+        .clamp(0, 999999);
 
     final indices = <int>[];
     for (int row = firstVisibleRow; row <= lastVisibleRow; row++) {
@@ -358,6 +412,7 @@ class _ProductsPageState extends State<ProductsPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (sheetContext) {
+        final r = _Responsive(sheetContext);
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
             final selectedVariant = selectedVariantId == null
@@ -365,143 +420,156 @@ class _ProductsPageState extends State<ProductsPage> {
                 : product.variants
                     .firstWhere((v) => v.id == selectedVariantId);
 
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                20,
-                20,
-                MediaQuery.of(sheetContext).viewInsets.bottom + 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: _fHead,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: primary,
-                    ),
+            return SafeArea(
+              top: false,
+              // Constrain height and make it scrollable so it never overflows
+              // on short screens / landscape / large system font settings.
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: r.height * 0.9,
+                  maxWidth: 640, // keep the sheet tidy on tablets/desktop
+                ),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    20,
+                    20,
+                    MediaQuery.of(sheetContext).viewInsets.bottom + 24,
                   ),
-                  const SizedBox(height: 4),
-                  _priceBlock(product),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'SELECT SIZE',
-                    style: TextStyle(
-                      fontFamily: _fBold,
-                      fontSize: 12,
-                      letterSpacing: 1.2,
-                      color: secondaryTxt,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: product.variants.map((variant) {
-                      final bool available = variant.availableForSale;
-                      final bool selected = variant.id == selectedVariantId;
-                      return GestureDetector(
-                        onTap: available
-                            ? () => setSheetState(
-                                () => selectedVariantId = variant.id)
-                            : null,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: selected ? primary : Colors.transparent,
-                            border: Border.all(
-                              color: available
-                                  ? primary
-                                  : const Color(0xFFCCCCCC),
-                              width: 1.2,
-                            ),
-                          ),
-                          child: Text(
-                            variant.title,
-                            style: TextStyle(
-                              fontFamily: _fBold,
-                              fontSize: 13,
-                              color: selected
-                                  ? Colors.white
-                                  : available
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: _fHead,
+                          fontSize: r.sp(20),
+                          fontWeight: FontWeight.w600,
+                          color: primary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      _priceBlock(product),
+                      const SizedBox(height: 16),
+                      Text(
+                        'SELECT SIZE',
+                        style: TextStyle(
+                          fontFamily: _fBold,
+                          fontSize: r.sp(12),
+                          letterSpacing: 1.2,
+                          color: secondaryTxt,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: product.variants.map((variant) {
+                          final bool available = variant.availableForSale;
+                          final bool selected =
+                              variant.id == selectedVariantId;
+                          return GestureDetector(
+                            onTap: available
+                                ? () => setSheetState(
+                                    () => selectedVariantId = variant.id)
+                                : null,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    selected ? primary : Colors.transparent,
+                                border: Border.all(
+                                  color: available
                                       ? primary
-                                      : const Color(0xFFBBBBBB),
-                              decoration: available
-                                  ? TextDecoration.none
-                                  : TextDecoration.lineThrough,
+                                      : const Color(0xFFCCCCCC),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Text(
+                                variant.title,
+                                style: TextStyle(
+                                  fontFamily: _fBold,
+                                  fontSize: r.sp(13),
+                                  color: selected
+                                      ? Colors.white
+                                      : available
+                                          ? primary
+                                          : const Color(0xFFBBBBBB),
+                                  decoration: available
+                                      ? TextDecoration.none
+                                      : TextDecoration.lineThrough,
+                                ),
+                              ),
                             ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 10),
+                      if (selectedVariant != null)
+                        Text(
+                          selectedVariant.availableForSale
+                              ? 'In stock'
+                              : 'Out of stock',
+                          style: TextStyle(
+                            fontFamily: _fBody,
+                            fontSize: r.sp(12),
+                            color: selectedVariant.availableForSale
+                                ? const Color(0xFF2E7D32)
+                                : Colors.red,
                           ),
                         ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 10),
-                  if (selectedVariant != null)
-                    Text(
-                      selectedVariant.availableForSale
-                          ? 'In stock'
-                          : 'Out of stock',
-                      style: TextStyle(
-                        fontFamily: _fBody,
-                        fontSize: 12,
-                        color: selectedVariant.availableForSale
-                            ? const Color(0xFF2E7D32)
-                            : Colors.red,
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 46,
+                        child: ElevatedButton(
+                          onPressed: (selectedVariantId == null || isAdding)
+                              ? null
+                              : () async {
+                                  setSheetState(() => isAdding = true);
+                                  final success = await _handleAddToCart(
+                                      product, selectedVariantId!);
+                                  if (!sheetContext.mounted) return;
+                                  setSheetState(() => isAdding = false);
+                                  if (success) {
+                                    Navigator.pop(sheetContext);
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primary,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: primary.withOpacity(0.4),
+                            shape: const RoundedRectangleBorder(),
+                            elevation: 0,
+                          ),
+                          child: isAdding
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text(
+                                  'ADD TO CART',
+                                  style: TextStyle(
+                                    fontFamily: _fBold,
+                                    fontSize: 13,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                        ),
                       ),
-                    ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 46,
-                    child: ElevatedButton(
-                      onPressed: (selectedVariantId == null || isAdding)
-                          ? null
-                          : () async {
-                              setSheetState(() => isAdding = true);
-                              final success = await _handleAddToCart(
-                                  product, selectedVariantId!);
-                              if (!sheetContext.mounted) return;
-                              setSheetState(() => isAdding = false);
-                              if (success) {
-                                Navigator.pop(sheetContext);
-                              }
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primary,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: primary.withOpacity(0.4),
-                        shape: const RoundedRectangleBorder(),
-                        elevation: 0,
-                      ),
-                      child: isAdding
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'ADD TO CART',
-                              style: TextStyle(
-                                fontFamily: _fBold,
-                                fontSize: 13,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             );
           },
@@ -585,34 +653,41 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
-  Widget _topBar(BuildContext context) => Container(
-        color: cardColor,
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-              color: primary,
-              onPressed: () => Navigator.pop(context),
-            ),
-            Expanded(
-              child: Text(
-                widget.collection.label.toUpperCase(),
-                style: const TextStyle(
-                  fontFamily: _fHead,
-                  fontSize: 35,
-                  color: primary,
-                ),
-                overflow: TextOverflow.ellipsis,
+  Widget _topBar(BuildContext context) {
+    final r = _Responsive(context);
+    // Collection heading was a fixed 35px which overflows on narrow phones and
+    // looks tiny on tablets. Scale it to the available width with sane bounds.
+    final titleSize = (r.width * 0.085).clamp(22.0, 40.0);
+    return Container(
+      color: cardColor,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+            color: primary,
+            onPressed: () => Navigator.pop(context),
+          ),
+          Expanded(
+            child: Text(
+              widget.collection.label.toUpperCase(),
+              style: TextStyle(
+                fontFamily: _fHead,
+                fontSize: titleSize,
+                color: primary,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: _sortButton(context),
-            ),
-          ],
-        ),
-      );
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: _sortButton(context),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _sortButton(BuildContext context) => Material(
         color: Colors.transparent,
@@ -642,28 +717,37 @@ class _ProductsPageState extends State<ProductsPage> {
         ),
       );
 
-  Widget _productGrid() => GridView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 90),
-        itemCount: _products.length + (_isLoadingMore ? 1 : 0),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 14,
-          crossAxisSpacing: 12,
-          childAspectRatio: 0.52,
-        ),
-        itemBuilder: (_, i) {
-          if (i >= _products.length) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(),
-              ),
-            );
-          }
-          return _productCard(_products[i]);
-        },
-      );
+  Widget _productGrid() {
+    final r = _Responsive(context);
+    return GridView.builder(
+      controller: _scrollController,
+      padding: EdgeInsets.fromLTRB(
+        _kGridPadding,
+        _kGridPadding,
+        _kGridPadding,
+        90,
+      ),
+      itemCount: _products.length + (_isLoadingMore ? 1 : 0),
+      // Max-extent delegate => columns adapt to screen width automatically.
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: _maxCardExtent(r),
+        mainAxisSpacing: _kMainSpacing,
+        crossAxisSpacing: _kCrossSpacing,
+        childAspectRatio: _kAspect,
+      ),
+      itemBuilder: (_, i) {
+        if (i >= _products.length) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        return _productCard(_products[i]);
+      },
+    );
+  }
 
   void _openSortSheet(BuildContext context) {
     showModalBottomSheet(
@@ -678,6 +762,7 @@ class _ProductsPageState extends State<ProductsPage> {
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(sheetContext).size.height * 0.7,
+              maxWidth: 640,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -748,6 +833,10 @@ class _ProductsPageState extends State<ProductsPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (sheetContext) {
+        final r = _Responsive(sheetContext);
+        // Left rail width scales with screen; capped so it never dominates a
+        // small phone nor looks lost on a wide tablet.
+        final railWidth = (r.width * 0.32).clamp(96.0, 200.0);
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
             final draftActiveCount =
@@ -787,345 +876,360 @@ class _ProductsPageState extends State<ProductsPage> {
                 : activeFilter.values;
 
             return SafeArea(
-              child: SizedBox(
-                height: MediaQuery.of(sheetContext).size.height * 0.82,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                      child: Row(
-                        children: [
-                          const Text(
-                            'Filters',
-                            style: TextStyle(
-                              fontFamily: _fBody,
-                              fontSize: 16,
-                              color: primary,
-                            ),
-                          ),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: draftActiveCount == 0
-                                ? null
-                                : () {
-                                    setSheetState(() {
-                                      draft.clear();
-                                    });
-                                  },
-                            child: const Text(
-                              'Clear All',
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: 900),
+                child: SizedBox(
+                  // Taller share of the screen on short devices so controls fit.
+                  height: r.height * (r.height < 600 ? 0.92 : 0.82),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                        child: Row(
+                          children: [
+                            const Text(
+                              'Filters',
                               style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
+                                fontFamily: _fBody,
+                                fontSize: 16,
                                 color: primary,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Divider(height: 1, color: borderColor),
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 120,
-                            decoration: BoxDecoration(
-                              color: bgColor,
-                              border: Border(
-                                right: BorderSide(
-                                  color: borderColor.withOpacity(0.8),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: draftActiveCount == 0
+                                  ? null
+                                  : () {
+                                      setSheetState(() {
+                                        draft.clear();
+                                      });
+                                    },
+                              child: const Text(
+                                'Clear All',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: primary,
                                 ),
                               ),
                             ),
-                            child: ListView.builder(
-                              itemCount: _visibleFilters.length,
-                              itemBuilder: (context, index) {
-                                final filter = _visibleFilters[index];
-                                final isActive = index == localActiveIndex;
-                                final count = draft[filter.id]?.length ?? 0;
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1, color: borderColor),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              width: railWidth,
+                              decoration: BoxDecoration(
+                                color: bgColor,
+                                border: Border(
+                                  right: BorderSide(
+                                    color: borderColor.withOpacity(0.8),
+                                  ),
+                                ),
+                              ),
+                              child: ListView.builder(
+                                itemCount: _visibleFilters.length,
+                                itemBuilder: (context, index) {
+                                  final filter = _visibleFilters[index];
+                                  final isActive = index == localActiveIndex;
+                                  final count = draft[filter.id]?.length ?? 0;
 
-                                return InkWell(
-                                  onTap: () {
-                                    setSheetState(() {
-                                      localActiveIndex = index;
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 14,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isActive
-                                          ? cardColor
-                                          : Colors.transparent,
-                                      border: Border(
-                                        left: BorderSide(
-                                          color: isActive
-                                              ? primary
-                                              : Colors.transparent,
-                                          width: 3,
-                                        ),
+                                  return InkWell(
+                                    onTap: () {
+                                      setSheetState(() {
+                                        localActiveIndex = index;
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 14,
                                       ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            filter.label,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: isActive
-                                                  ? FontWeight.w700
-                                                  : FontWeight.w500,
-                                              color: primary,
-                                            ),
+                                      decoration: BoxDecoration(
+                                        color: isActive
+                                            ? cardColor
+                                            : Colors.transparent,
+                                        border: Border(
+                                          left: BorderSide(
+                                            color: isActive
+                                                ? primary
+                                                : Colors.transparent,
+                                            width: 3,
                                           ),
                                         ),
-                                        if (count > 0)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 6,
-                                              vertical: 2,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: primary,
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
                                             child: Text(
-                                              '$count',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w700,
+                                              filter.label,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: isActive
+                                                    ? FontWeight.w700
+                                                    : FontWeight.w500,
+                                                color: primary,
                                               ),
                                             ),
                                           ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          Expanded(
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    activeFilter.label,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: primary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Expanded(
-                                    child: isPriceFilter
-                                        ? _priceOptionsSection(
-                                            activeFilter: activeFilter,
-                                            draft: draft,
-                                            setSheetState: setSheetState,
-                                          )
-                                        : ListView.separated(
-                                            itemCount: visibleValues.length +
-                                                (canShowMore ? 1 : 0),
-                                            separatorBuilder: (_, __) =>
-                                                const Divider(
-                                              height: 1,
-                                              color: Color(0xFFF1F1F1),
+                                          if (count > 0)
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: primary,
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                              child: Text(
+                                                '$count',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
                                             ),
-                                            itemBuilder: (context, index) {
-                                              if (canShowMore &&
-                                                  index == visibleValues.length) {
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      activeFilter.label,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: primary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Expanded(
+                                      child: isPriceFilter
+                                          ? _priceOptionsSection(
+                                              activeFilter: activeFilter,
+                                              draft: draft,
+                                              setSheetState: setSheetState,
+                                            )
+                                          : ListView.separated(
+                                              itemCount: visibleValues.length +
+                                                  (canShowMore ? 1 : 0),
+                                              separatorBuilder: (_, __) =>
+                                                  const Divider(
+                                                height: 1,
+                                                color: Color(0xFFF1F1F1),
+                                              ),
+                                              itemBuilder: (context, index) {
+                                                if (canShowMore &&
+                                                    index ==
+                                                        visibleValues.length) {
+                                                  return InkWell(
+                                                    onTap: () {
+                                                      setSheetState(() {
+                                                        _expandedFilters[
+                                                                activeFilter
+                                                                    .id] =
+                                                            !isExpanded;
+                                                      });
+                                                    },
+                                                    child: Padding(
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                        vertical: 14,
+                                                      ),
+                                                      child: Text(
+                                                        isExpanded
+                                                            ? 'Show less'
+                                                            : 'Show more',
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          color: primary,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+
+                                                final value =
+                                                    visibleValues[index];
+                                                final isSelected = selected
+                                                    .contains(value.input);
+
                                                 return InkWell(
                                                   onTap: () {
                                                     setSheetState(() {
-                                                      _expandedFilters[
-                                                              activeFilter.id] =
-                                                          !isExpanded;
+                                                      final set =
+                                                          draft.putIfAbsent(
+                                                        activeFilter.id,
+                                                        () => <String>{},
+                                                      );
+                                                      if (isSelected) {
+                                                        set.remove(
+                                                            value.input);
+                                                        if (set.isEmpty) {
+                                                          draft.remove(
+                                                              activeFilter.id);
+                                                        }
+                                                      } else {
+                                                        set.add(value.input);
+                                                      }
                                                     });
                                                   },
                                                   child: Padding(
                                                     padding: const EdgeInsets
                                                         .symmetric(
-                                                      vertical: 14,
+                                                      vertical: 12,
                                                     ),
-                                                    child: Text(
-                                                      isExpanded
-                                                          ? 'Show less'
-                                                          : 'Show more',
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                        color: primary,
-                                                      ),
+                                                    child: Row(
+                                                      children: [
+                                                        Container(
+                                                          width: 18,
+                                                          height: 18,
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            border: Border.all(
+                                                              color: isSelected
+                                                                  ? primary
+                                                                  : borderColor,
+                                                            ),
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        4),
+                                                            color: isSelected
+                                                                ? primary
+                                                                : Colors.white,
+                                                          ),
+                                                          child: isSelected
+                                                              ? const Icon(
+                                                                  Icons.check,
+                                                                  size: 13,
+                                                                  color: Colors
+                                                                      .white,
+                                                                )
+                                                              : null,
+                                                        ),
+                                                        const SizedBox(
+                                                            width: 10),
+                                                        Expanded(
+                                                          child: Text(
+                                                            value.label,
+                                                            style:
+                                                                const TextStyle(
+                                                              fontSize: 12,
+                                                              color: primary,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w500,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        if (value.count > 0)
+                                                          Text(
+                                                            '${value.count}',
+                                                            style:
+                                                                const TextStyle(
+                                                              fontSize: 11,
+                                                              color:
+                                                                  secondaryTxt,
+                                                            ),
+                                                          ),
+                                                      ],
                                                     ),
                                                   ),
                                                 );
-                                              }
-
-                                              final value = visibleValues[index];
-                                              final isSelected = selected
-                                                  .contains(value.input);
-
-                                              return InkWell(
-                                                onTap: () {
-                                                  setSheetState(() {
-                                                    final set = draft.putIfAbsent(
-                                                      activeFilter.id,
-                                                      () => <String>{},
-                                                    );
-                                                    if (isSelected) {
-                                                      set.remove(value.input);
-                                                      if (set.isEmpty) {
-                                                        draft.remove(
-                                                            activeFilter.id);
-                                                      }
-                                                    } else {
-                                                      set.add(value.input);
-                                                    }
-                                                  });
-                                                },
-                                                child: Padding(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                    vertical: 12,
-                                                  ),
-                                                  child: Row(
-                                                    children: [
-                                                      Container(
-                                                        width: 18,
-                                                        height: 18,
-                                                        decoration: BoxDecoration(
-                                                          border: Border.all(
-                                                            color: isSelected
-                                                                ? primary
-                                                                : borderColor,
-                                                          ),
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(4),
-                                                          color: isSelected
-                                                              ? primary
-                                                              : Colors.white,
-                                                        ),
-                                                        child: isSelected
-                                                            ? const Icon(
-                                                                Icons.check,
-                                                                size: 13,
-                                                                color:
-                                                                    Colors.white,
-                                                              )
-                                                            : null,
-                                                      ),
-                                                      const SizedBox(width: 10),
-                                                      Expanded(
-                                                        child: Text(
-                                                          value.label,
-                                                          style:
-                                                              const TextStyle(
-                                                            fontSize: 12,
-                                                            color: primary,
-                                                            fontWeight:
-                                                                FontWeight.w500,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      if (value.count > 0)
-                                                        Text(
-                                                          '${value.count}',
-                                                          style:
-                                                              const TextStyle(
-                                                            fontSize: 11,
-                                                            color:
-                                                                secondaryTxt,
-                                                          ),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                  ),
-                                ],
+                                              },
+                                            ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                      decoration: const BoxDecoration(
-                        color: cardColor,
-                        border: Border(
-                          top: BorderSide(color: borderColor),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                setSheetState(() {
-                                  draft.clear();
-                                });
-                              },
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: primary),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(6),
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                        decoration: const BoxDecoration(
+                          color: cardColor,
+                          border: Border(
+                            top: BorderSide(color: borderColor),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  setSheetState(() {
+                                    draft.clear();
+                                  });
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: primary),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  minimumSize: const Size.fromHeight(46),
                                 ),
-                                minimumSize: const Size.fromHeight(46),
-                              ),
-                              child: const Text(
-                                'Clear',
-                                style: TextStyle(
-                                  color: primary,
-                                  fontWeight: FontWeight.w700,
+                                child: const Text(
+                                  'Clear',
+                                  style: TextStyle(
+                                    color: primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                _activeFilterSectionIndex = localActiveIndex;
-                                Navigator.pop(sheetContext);
-                                _applyFilters(draft);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primary,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(6),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  _activeFilterSectionIndex = localActiveIndex;
+                                  Navigator.pop(sheetContext);
+                                  _applyFilters(draft);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  minimumSize: const Size.fromHeight(46),
                                 ),
-                                minimumSize: const Size.fromHeight(46),
-                              ),
-                              child: Text(
-                                draftActiveCount > 0
-                                    ? 'Apply ($draftActiveCount)'
-                                    : 'Apply',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
+                                child: Text(
+                                  draftActiveCount > 0
+                                      ? 'Apply ($draftActiveCount)'
+                                      : 'Apply',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );
@@ -1386,7 +1490,7 @@ class _ProductsPageState extends State<ProductsPage> {
                           decoration: BoxDecoration(
                             color: const Color.fromARGB(255, 194, 0, 0),
                           ),
-                         child: RichText(
+                          child: RichText(
                             text: TextSpan(
                               children: _priceSpans(
                                 _discountPercent(product),
@@ -1599,13 +1703,16 @@ class _ProductsPageState extends State<ProductsPage> {
                         disabledForegroundColor:
                             isFilling ? Colors.white : primary,
                       ),
-                      child: Text(
-                        inCart ? 'GO TO CART' : 'SHOP NOW',
-                        style: TextStyle(
-                          fontFamily: _fBodyBold,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: isFilling ? Colors.white : primary,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          inCart ? 'GO TO CART' : 'SHOP NOW',
+                          style: TextStyle(
+                            fontFamily: _fBodyBold,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: isFilling ? Colors.white : primary,
+                          ),
                         ),
                       ),
                     ),
@@ -1646,62 +1753,59 @@ class _ProductsPageState extends State<ProductsPage> {
 
     final saved = product.compareAtPrice! - product.price;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    // Wrap (instead of a single Row) so the strikethrough price, current
+    // price and the "Save ₹X" chip flow onto the next line on narrow cards
+    // instead of overflowing.
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 6,
+      runSpacing: 2,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            RichText(
-              text: TextSpan(
-                children: _amountSpans(
-                  amount: product.compareAtPrice!,
-                  currencyCode: product.currencyCode,
-                  fontSize: 10,
-                  fontWeight: FontWeight.normal,
-                  color: const Color(0xFF9A9A9A),
-                  decoration: TextDecoration.lineThrough,
-                  decorationColor: const Color(0xFF9A9A9A),
+        RichText(
+          text: TextSpan(
+            children: _amountSpans(
+              amount: product.compareAtPrice!,
+              currencyCode: product.currencyCode,
+              fontSize: 10,
+              fontWeight: FontWeight.normal,
+              color: const Color(0xFF9A9A9A),
+              decoration: TextDecoration.lineThrough,
+              decorationColor: const Color(0xFF9A9A9A),
+            ),
+          ),
+        ),
+        RichText(
+          text: TextSpan(
+            children: _amountSpans(
+              amount: product.price,
+              currencyCode: product.currencyCode,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: primary,
+            ),
+          ),
+        ),
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: 'Save ',
+                style: TextStyle(
+                  fontFamily: _fBold,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: const Color.fromARGB(255, 53, 168, 59),
                 ),
               ),
-            ),
-            const SizedBox(width: 6),
-            RichText(
-              text: TextSpan(
-                children: _amountSpans(
-                  amount: product.price,
-                  currencyCode: product.currencyCode,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: primary,
-                ),
+              ..._amountSpans(
+                amount: saved,
+                currencyCode: product.currencyCode,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: const Color.fromARGB(255, 53, 168, 59),
               ),
-            ),
-            const SizedBox(width: 6),
-            RichText(
-              text: TextSpan(
-                children: [
-                  TextSpan(
-                    text: 'Save ',
-                    style: TextStyle(
-                      fontFamily: _fBold,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: const Color.fromARGB(255, 53, 168, 59),
-                    ),
-                  ),
-                  ..._amountSpans(
-                    amount: saved,
-                    currencyCode: product.currencyCode,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: const Color.fromARGB(255, 53, 168, 59),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
@@ -1795,7 +1899,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: primary,
                   side: const BorderSide(color: primary),
-                   shape: RoundedRectangleBorder(
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(6),
                   ),
                 ),
@@ -1805,21 +1909,24 @@ class _ProductsPageState extends State<ProductsPage> {
         ),
       );
 
-  Widget _shimmerGrid() => GridView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: 6,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 14,
-          crossAxisSpacing: 12,
-          childAspectRatio: 0.52,
+  Widget _shimmerGrid() {
+    final r = _Responsive(context);
+    return GridView.builder(
+      padding: const EdgeInsets.all(_kGridPadding),
+      itemCount: _columnsFor(r) * 3,
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: _maxCardExtent(r),
+        mainAxisSpacing: _kMainSpacing,
+        crossAxisSpacing: _kCrossSpacing,
+        childAspectRatio: _kAspect,
+      ),
+      itemBuilder: (_, __) => Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFE0E0E0),
         ),
-        itemBuilder: (_, __) => Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFE0E0E0),
-          ),
-        ),
-      );
+      ),
+    );
+  }
 }
 
 class _PriceOption {
@@ -2130,9 +2237,17 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
   Widget build(BuildContext context) {
     final product = widget.product;
     final images = product.imageUrls;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final dialogWidth = screenWidth * 0.88;
+    final media = MediaQuery.of(context);
+    final screenWidth = media.size.width;
+    final screenHeight = media.size.height;
+
+    // Cap the dialog width so it looks like a focused peek on tablets/desktop
+    // instead of stretching edge to edge.
+    final dialogWidth = (screenWidth * 0.88).clamp(0.0, 460.0);
+    // Image is square-ish; cap it against the available height too so the
+    // dialog never exceeds the screen in landscape / short devices.
+    final imageHeight =
+        (dialogWidth * 1.1).clamp(0.0, screenHeight * 0.5);
 
     return Center(
       child: GestureDetector(
@@ -2141,7 +2256,7 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
           color: Colors.transparent,
           child: Container(
             width: dialogWidth,
-            constraints: BoxConstraints(maxHeight: screenHeight * 0.82),
+            constraints: BoxConstraints(maxHeight: screenHeight * 0.85),
             decoration: BoxDecoration(
               color: widget.cardColor,
               boxShadow: const [
@@ -2157,7 +2272,7 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   SizedBox(
-                    height: dialogWidth * 1.1,
+                    height: imageHeight,
                     child: Stack(
                       children: [
                         PageView.builder(
@@ -2251,70 +2366,77 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                       ],
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () {},
-                    child: Container(
-                      color: widget.cardColor,
-                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            product.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: widget.primary,
-                              height: 1.3,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          _peekPriceRow(product),
-                          const SizedBox(height: 12),
-                          ..._peekOptions.map((opt) => Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: _peekOptionRow(opt),
-                              )),
-                          const SizedBox(height: 4),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 42,
-                            child: ElevatedButton(
-                              onPressed:
-                                  _isAddingToCart || _selectedVariantId == null
+                  // The details block can be taller than the remaining space on
+                  // short screens (many options / large fonts), so let it scroll.
+                  Flexible(
+                    child: GestureDetector(
+                      onTap: () {},
+                      child: Container(
+                        color: widget.cardColor,
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                product.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: widget.primary,
+                                  height: 1.3,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              _peekPriceRow(product),
+                              const SizedBox(height: 12),
+                              ..._peekOptions.map((opt) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: _peekOptionRow(opt),
+                                  )),
+                              const SizedBox(height: 4),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 42,
+                                child: ElevatedButton(
+                                  onPressed: _isAddingToCart ||
+                                          _selectedVariantId == null
                                       ? null
                                       : () async {
-                                          setState(() => _isAddingToCart = true);
+                                          setState(
+                                              () => _isAddingToCart = true);
                                           await widget.onAddToCart(
                                               _selectedVariantId!);
                                         },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: widget.primary,
-                                shape: RoundedRectangleBorder(),
-                                elevation: 0,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: widget.primary,
+                                    shape: const RoundedRectangleBorder(),
+                                    elevation: 0,
+                                  ),
+                                  child: _isAddingToCart
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'ADD TO CART',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                ),
                               ),
-                              child: _isAddingToCart
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'ADD TO CART',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -2345,6 +2467,7 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: 8,
+      runSpacing: 4,
       children: [
         RichText(
           text: TextSpan(

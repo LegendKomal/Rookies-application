@@ -26,8 +26,23 @@ class _WishlistPageState extends State<WishlistPage> {
   static const String _fBody = ShopifyConstants.fontBody;
   static const String _fBold = ShopifyConstants.fontBodyBold;
 
+  // ---- Responsive helpers -------------------------------------------------
+  double get _sf =>
+      (MediaQuery.of(context).size.width / 400).clamp(0.85, 1.25).toDouble();
+  double _s(double base) => base * _sf;
+
+  double _maxTileExtent(double width) {
+    if (width >= 1024) return 240;
+    if (width >= 600) return 220;
+    return 200;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    // Big heading scales to the width instead of a hardcoded 34.
+    final titleSize = (width * 0.09).clamp(22.0, 40.0);
+
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
@@ -52,14 +67,18 @@ class _WishlistPageState extends State<WishlistPage> {
                 }
               },
             ),
-            const Text(
-              'MY WISHLIST',
-              style: TextStyle(
-                fontSize: 34,
-            height: 1,
-            fontFamily: _fHead,
-            color: Color(ShopifyConstants.primaryColorHex),
-                // letterSpacing: 1.4,
+            Expanded(
+              child: Text(
+                'MY WISHLIST',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: titleSize,
+                  height: 1,
+                  fontFamily: _fHead,
+                  color: primary,
+                  // letterSpacing: 1.4,
+                ),
               ),
             ),
           ],
@@ -74,19 +93,24 @@ class _WishlistPageState extends State<WishlistPage> {
             return _emptyWishlistState();
           }
 
-          return GridView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: products.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.62,
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 900),
+              child: GridView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: products.length,
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: _maxTileExtent(width),
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.62,
+                ),
+                itemBuilder: (context, index) {
+                  final product = products[index];
+                  return _wishlistCard(product);
+                },
+              ),
             ),
-            itemBuilder: (context, index) {
-              final product = products[index];
-              return _wishlistCard(product);
-            },
           );
         },
       ),
@@ -100,52 +124,53 @@ class _WishlistPageState extends State<WishlistPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.favorite_border_rounded,
-              size: 70,
-              color: Color(0xFFBDBDBD),
+              size: _s(70),
+              color: const Color(0xFFBDBDBD),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'No wishlist items yet',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: _fHead,
-                fontSize: 22,
+                fontSize: _s(22),
                 fontWeight: FontWeight.w500,
                 color: primary,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Products you like will appear here.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: _fBody,
-                fontSize: 13,
+                fontSize: _s(13),
                 color: secondaryTxt,
                 height: 1.5,
               ),
             ),
             const SizedBox(height: 20),
             SizedBox(
-              width: 170,
-              height: 42,
+              width: _s(170).clamp(150.0, 220.0),
+              height: _s(42).clamp(40.0, 52.0),
               child: OutlinedButton(
                 onPressed: _openExploreProducts,
                 style: OutlinedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   foregroundColor: primary,
                   side: const BorderSide(color: primary, width: 1.1),
-                  shape: RoundedRectangleBorder(
-                    // borderRadius: BorderRadius.circular(6),
-                  ),
+                  shape: const RoundedRectangleBorder(
+                      // borderRadius: BorderRadius.circular(6),
+                      ),
                   elevation: 0,
                 ),
-                child: const Text(
+                child: Text(
                   'EXPLORE PRODUCT',
                   style: TextStyle(
                     fontFamily: _fBold,
-                    fontSize: 11,
+                    fontSize: _s(11),
                     fontWeight: FontWeight.w800,
                     // letterSpacing: 1.1,
                     color: primary,
@@ -197,12 +222,8 @@ class _WishlistPageState extends State<WishlistPage> {
             Expanded(
               child: Stack(
                 children: [
-                  ClipRRect(
-                    // borderRadius: const BorderRadius.vertical(
-                    //   top: Radius.circular(10),
-                    // ),
-                    child: SizedBox(
-                      width: double.infinity,
+                  Positioned.fill(
+                    child: ClipRRect(
                       child: imageUrl != null
                           ? CachedNetworkImage(
                               imageUrl: imageUrl,
@@ -237,16 +258,16 @@ class _WishlistPageState extends State<WishlistPage> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFD32F2F),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFD32F2F),
                           // borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           _discountPercent(product),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: _fBold,
                             color: Colors.white,
-                            fontSize: 9,
+                            fontSize: _s(9),
                             fontWeight: FontWeight.w800,
                             // letterSpacing: 0.5,
                           ),
@@ -288,9 +309,9 @@ class _WishlistPageState extends State<WishlistPage> {
                     product.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: _fBold,
-                      fontSize: 12,
+                      fontSize: _s(12),
                       fontWeight: FontWeight.w700,
                       color: primary,
                       height: 1.35,
@@ -308,29 +329,30 @@ class _WishlistPageState extends State<WishlistPage> {
   }
 
   Widget _priceBlock(ShopifyProduct product) {
-  if (!_isOnSale(product)) {
-    return PriceText(_formattedPrice(product), currencyCode: product.currencyCode, fontSize: 14, fontWeight: FontWeight.w800, amountFontFamily: _fBold, color: primary);
+    if (!_isOnSale(product)) {
+      return PriceText(_formattedPrice(product), currencyCode: product.currencyCode, fontSize: _s(14), fontWeight: FontWeight.w800, amountFontFamily: _fBold, color: primary);
+    }
+
+    final saved = ((product.compareAtPrice ?? 0) - product.price).round();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Wrap so struck-through + current price flow to a new line on narrow
+        // cards instead of overflowing.
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 6,
+          children: [
+            PriceText(_formattedCompareAtPrice(product), currencyCode: product.currencyCode, fontSize: _s(10), color: const Color(0xFF9A9A9A), amountFontFamily: _fBody, decoration: TextDecoration.lineThrough),
+            PriceText(_formattedPrice(product), currencyCode: product.currencyCode, fontSize: _s(12), fontWeight: FontWeight.w800, amountFontFamily: _fBold, color: primary),
+          ],
+        ),
+        const SizedBox(height: 4),
+        SavedAmountText(saved.toString(), currencyCode: product.currencyCode, fontSize: _s(9), fontWeight: FontWeight.w600, color: const Color(0xFF2E7D32), fontFamily: _fBold),
+      ],
+    );
   }
-
-  final saved = ((product.compareAtPrice ?? 0) - product.price).round();
-
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          PriceText(_formattedCompareAtPrice(product), currencyCode: product.currencyCode, fontSize: 10, color: const Color(0xFF9A9A9A), amountFontFamily: _fBody, decoration: TextDecoration.lineThrough),
-          const SizedBox(width: 6),
-          PriceText(_formattedPrice(product), currencyCode: product.currencyCode, fontSize: 12, fontWeight: FontWeight.w800, amountFontFamily: _fBold, color: primary),
-        ],
-      ),
-      const SizedBox(height: 4),
-      SavedAmountText(saved.toString(), currencyCode: product.currencyCode, fontSize: 9, fontWeight: FontWeight.w600, color: const Color(0xFF2E7D32), fontFamily: _fBold),
-    ],
-  );
-}
 
   bool _isOnSale(ShopifyProduct product) {
     return product.compareAtPrice != null &&
@@ -338,18 +360,18 @@ class _WishlistPageState extends State<WishlistPage> {
   }
 
   String _formattedPrice(ShopifyProduct product) {
-  return product.currencyCode == 'INR'
-      ? product.price.toStringAsFixed(0)
-      : '${product.currencyCode} ${product.price.toStringAsFixed(2)}';
-}
+    return product.currencyCode == 'INR'
+        ? product.price.toStringAsFixed(0)
+        : '${product.currencyCode} ${product.price.toStringAsFixed(2)}';
+  }
 
-String _formattedCompareAtPrice(ShopifyProduct product) {
-  final compareAtPrice = product.compareAtPrice;
-  if (compareAtPrice == null) return '';
-  return product.currencyCode == 'INR'
-      ? compareAtPrice.toStringAsFixed(0)
-      : '${product.currencyCode} ${compareAtPrice.toStringAsFixed(2)}';
-}
+  String _formattedCompareAtPrice(ShopifyProduct product) {
+    final compareAtPrice = product.compareAtPrice;
+    if (compareAtPrice == null) return '';
+    return product.currencyCode == 'INR'
+        ? compareAtPrice.toStringAsFixed(0)
+        : '${product.currencyCode} ${compareAtPrice.toStringAsFixed(2)}';
+  }
 
   String _discountPercent(ShopifyProduct product) {
     final compareAtPrice = product.compareAtPrice;

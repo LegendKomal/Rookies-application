@@ -30,6 +30,27 @@ class _CartScreenState extends State<CartScreen> {
   static const String _fBody = ShopifyConstants.fontBody;
   static const String _fBold = ShopifyConstants.fontBodyBold;
 
+  // ---- Responsive helpers -------------------------------------------------
+  // Scales off screen width so the cart looks right on small phones, large
+  // phones, tablets and beyond. 400px logical width is the baseline.
+  double get _sf =>
+      (MediaQuery.of(context).size.width / 400).clamp(0.85, 1.3).toDouble();
+
+  /// Scale a size value responsively.
+  double _s(double base) => base * _sf;
+
+  /// Cap the content column so lists/bars don't stretch edge-to-edge on wide
+  /// screens (tablets, foldables, desktop/web).
+  static const double _maxContentWidth = 720;
+
+  /// Center a widget within the max content width.
+  Widget _centered(Widget child) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _maxContentWidth),
+          child: child,
+        ),
+      );
+
   final Set<String> _pendingLineIds = {};
   bool _isCheckingOut = false;
 
@@ -42,18 +63,18 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _showToast(String message, {bool isError = false}) {
-  Fluttertoast.showToast(
-    msg: message,
-    toastLength: Toast.LENGTH_SHORT,
-    gravity: ToastGravity.BOTTOM,
-    backgroundColor: isError ? const Color(0xFFD32F2F) : primary,
-    textColor: Colors.white,
-    fontSize: 13,
-    webBgColor: isError ? '#D32F2F' : '#1A1A1A', 
-    webPosition: 'center',
-    timeInSecForIosWeb: 2,
-  );
-}
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: isError ? const Color(0xFFD32F2F) : primary,
+      textColor: Colors.white,
+      fontSize: 13,
+      webBgColor: isError ? '#D32F2F' : '#1A1A1A',
+      webPosition: 'center',
+      timeInSecForIosWeb: 2,
+    );
+  }
 
   Future<void> _changeQuantity(ShopifyCartLine line, int newQuantity) async {
     setState(() => _pendingLineIds.add(line.lineId));
@@ -83,10 +104,10 @@ class _CartScreenState extends State<CartScreen> {
   Future<void> _checkout() async {
     if (_isCheckingOut) return;
     setState(() => _isCheckingOut = true);
- 
+
     try {
       final isLoggedIn = await ShopifyAuthService.instance.isLoggedIn();
- 
+
       if (!isLoggedIn) {
         final loggedInNow = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
@@ -96,12 +117,12 @@ class _CartScreenState extends State<CartScreen> {
         if (!mounted) return;
         if (loggedInNow != true) return;
       }
- 
+
       await AddressService.instance.fetchAddresses();
       if (!mounted) return;
- 
+
       ShopifyAddress? selectedAddress;
- 
+
       if (AddressService.instance.addresses.isNotEmpty) {
         selectedAddress = await Navigator.of(context).push<ShopifyAddress>(
           MaterialPageRoute(
@@ -110,9 +131,9 @@ class _CartScreenState extends State<CartScreen> {
           ),
         );
         if (!mounted) return;
- 
+
         if (selectedAddress == null) return;
- 
+
         if (!selectedAddress.isDefault) {
           await AddressService.instance.setDefaultAddress(selectedAddress.id);
           if (!mounted) return;
@@ -131,14 +152,14 @@ class _CartScreenState extends State<CartScreen> {
           );
         }
       }
- 
+
       final url = CartService.instance.cart.checkoutUrl;
       if (url == null) {
         if (!mounted) return;
         _showToast('Checkout is not available right now.', isError: true);
         return;
       }
- 
+
       final result = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
           builder: (_) => CheckoutWebView(checkoutUrl: url),
@@ -146,7 +167,7 @@ class _CartScreenState extends State<CartScreen> {
         ),
       );
       if (!mounted) return;
- 
+
       if (result == true) {
         await CartService.instance.refresh();
         if (!mounted) return;
@@ -156,7 +177,6 @@ class _CartScreenState extends State<CartScreen> {
       if (mounted) setState(() => _isCheckingOut = false);
     }
   }
- 
 
   void _openImageViewer(String imageUrl, String heroTag) {
     Navigator.of(context).push(
@@ -207,10 +227,16 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _topBar(ShopifyCart cart) => Container(
-        color: cardColor,
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        child: Row(
+  Widget _topBar(ShopifyCart cart) {
+    // Big heading was a hardcoded 34 which overflows on narrow phones and
+    // looks small on tablets; scale it to the available width with bounds.
+    final titleSize =
+        (MediaQuery.of(context).size.width * 0.09).clamp(22.0, 40.0);
+    return Container(
+      color: cardColor,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      child: _centered(
+        Row(
           children: [
             IconButton(
               icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
@@ -228,20 +254,23 @@ class _CartScreenState extends State<CartScreen> {
                 cart.totalQuantity > 0
                     ? 'MY CART (${cart.totalQuantity})'
                     : 'MY CART',
-                style: const TextStyle(
-                  fontSize: 34,
-            height: 1,
-            fontFamily: _fHead,
-            color: Color(ShopifyConstants.primaryColorHex),
+                style: TextStyle(
+                  fontSize: titleSize,
+                  height: 1,
+                  fontFamily: _fHead,
+                  color: primary,
                   // letterSpacing: 1.8,
                 ),
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(width: 48),
           ],
         ),
-      );
+      ),
+    );
+  }
 
   Widget _loadingState() => const Center(
         child: CircularProgressIndicator(color: primary),
@@ -253,46 +282,53 @@ class _CartScreenState extends State<CartScreen> {
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
             child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.shopping_bag_outlined,
-                    size: 52,
-                    color: Colors.grey.shade300,
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Your cart is empty',
-                    style: TextStyle(
-                      fontFamily: _fHead,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w500,
-                      color: primary,
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.shopping_bag_outlined,
+                      size: _s(52),
+                      color: Colors.grey.shade300,
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Items you add will show up here.',
-                    style: TextStyle(
-                      fontFamily: _fBody,
-                      fontSize: 12,
-                      color: secondaryTxt,
+                    SizedBox(height: _s(14)),
+                    Text(
+                      'Your cart is empty',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: _fHead,
+                        fontSize: _s(22),
+                        fontWeight: FontWeight.w500,
+                        color: primary,
+                      ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: _s(6)),
+                    Text(
+                      'Items you add will show up here.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: _fBody,
+                        fontSize: _s(12),
+                        color: secondaryTxt,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       );
 
-  Widget _cartList(ShopifyCart cart) => ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        itemCount: cart.lines.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, i) => _cartLineCard(cart.lines[i]),
+  Widget _cartList(ShopifyCart cart) => _centered(
+        ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          itemCount: cart.lines.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (_, i) => _cartLineCard(cart.lines[i]),
+        ),
       );
 
   Widget _cartLineCard(ShopifyCartLine line) {
@@ -318,8 +354,8 @@ class _CartScreenState extends State<CartScreen> {
               child: ClipRRect(
                 // borderRadius: BorderRadius.circular(8),
                 child: SizedBox(
-                  width: 80,
-                  height: 100,
+                  width: _s(80).clamp(72.0, 120.0),
+                  height: _s(100).clamp(90.0, 150.0),
                   child: line.imageUrl != null
                       ? CachedNetworkImage(
                           imageUrl: line.imageUrl!,
@@ -350,9 +386,9 @@ class _CartScreenState extends State<CartScreen> {
                   line.productTitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: _fBold,
-                    fontSize: 12,
+                    fontSize: _s(12),
                     fontWeight: FontWeight.w700,
                     color: primary,
                     height: 1.3,
@@ -363,9 +399,9 @@ class _CartScreenState extends State<CartScreen> {
                   const SizedBox(height: 3),
                   Text(
                     line.variantTitle!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: _fBody,
-                      fontSize: 11,
+                      fontSize: _s(11),
                       color: secondaryTxt,
                     ),
                   ),
@@ -373,22 +409,22 @@ class _CartScreenState extends State<CartScreen> {
                 const SizedBox(height: 6),
                 Text(
                   line.formattedPrice,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: _fBold,
-                    fontSize: 13,
+                    fontSize: _s(13),
                     fontWeight: FontWeight.w800,
                     color: primary,
                   ),
                 ),
                 if (!line.availableForSale) ...[
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'Out of stock',
                     style: TextStyle(
                       fontFamily: _fBold,
-                      fontSize: 11,
+                      fontSize: _s(11),
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFFD32F2F),
+                      color: const Color(0xFFD32F2F),
                     ),
                   ),
                 ],
@@ -405,9 +441,9 @@ class _CartScreenState extends State<CartScreen> {
                           )
                         : GestureDetector(
                             onTap: () => _removeLine(line),
-                            child: const Icon(
+                            child: Icon(
                               Icons.delete_outline_rounded,
-                              size: 20,
+                              size: _s(20),
                               color: secondaryTxt,
                             ),
                           ),
@@ -436,13 +472,13 @@ class _CartScreenState extends State<CartScreen> {
                   : () => _changeQuantity(line, line.quantity - 1),
             ),
             SizedBox(
-              width: 28,
+              width: _s(28),
               child: Text(
                 '${line.quantity}',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: _fBold,
-                  fontSize: 12,
+                  fontSize: _s(12),
                   fontWeight: FontWeight.w700,
                   color: primary,
                 ),
@@ -462,86 +498,94 @@ class _CartScreenState extends State<CartScreen> {
       InkWell(
         onTap: onTap,
         child: SizedBox(
-          width: 26,
-          height: 26,
-          child: Icon(icon, size: 14, color: primary),
+          width: _s(26).clamp(26.0, 40.0),
+          height: _s(26).clamp(26.0, 40.0),
+          child: Icon(icon, size: _s(14), color: primary),
         ),
       );
 
   Widget _checkoutBar(ShopifyCart cart) => Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         decoration: const BoxDecoration(
           color: cardColor,
           border: Border(top: BorderSide(color: borderColor)),
         ),
         child: SafeArea(
           top: false,
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'SUBTOTAL',
-                      style: TextStyle(
-                        fontFamily: _fBold,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: secondaryTxt,
-                        // letterSpacing: 1.0,
+          child: _centered(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'SUBTOTAL',
+                          style: TextStyle(
+                            fontFamily: _fBold,
+                            fontSize: _s(10),
+                            fontWeight: FontWeight.w700,
+                            color: secondaryTxt,
+                            // letterSpacing: 1.0,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            cart.formattedSubtotal,
+                            style: TextStyle(
+                              fontFamily: _fBold,
+                              fontSize: _s(17),
+                              fontWeight: FontWeight.w800,
+                              color: primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: (cart.checkoutUrl == null || _isCheckingOut)
+                        ? null
+                        : _checkout,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primary,
+                      shape: const RoundedRectangleBorder(
+                          // borderRadius: BorderRadius.circular(8),
+                          ),
+                      elevation: 0,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: _s(28).clamp(20.0, 40.0),
+                        vertical: _s(16).clamp(14.0, 20.0),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      cart.formattedSubtotal,
-                      style: const TextStyle(
-                        fontFamily: _fBold,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton(
-                onPressed: (cart.checkoutUrl == null || _isCheckingOut)
-                    ? null
-                    : _checkout,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primary,
-                  shape: RoundedRectangleBorder(
-                    // borderRadius: BorderRadius.circular(8),
+                    child: _isCheckingOut
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            'CHECKOUT',
+                            style: TextStyle(
+                              fontFamily: _fBold,
+                              fontSize: _s(13),
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              // letterSpacing: 1.5,
+                            ),
+                          ),
                   ),
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 28,
-                    vertical: 16,
-                  ),
-                ),
-                child: _isCheckingOut
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'CHECKOUT',
-                        style: TextStyle(
-                          fontFamily: _fBold,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          // letterSpacing: 1.5,
-                        ),
-                      ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       );

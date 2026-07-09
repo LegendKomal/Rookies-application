@@ -24,6 +24,10 @@ class _SearchPageState extends State<SearchPage>
   static const String _fBody = ShopifyConstants.fontBody;
   static const String _fBold = ShopifyConstants.fontBodyBold;
 
+  // Layout tuning.
+  static const double _kBaseWidth   = 375; // reference design width.
+  static const double _kMaxContentW = 720; // cap list width on tablets/desktop.
+
   final TextEditingController _searchCtrl = TextEditingController();
   final FocusNode _focusNode = FocusNode();
 
@@ -35,6 +39,14 @@ class _SearchPageState extends State<SearchPage>
   Timer? _debounce;
   late AnimationController _fadeCtrl;
   late Animation<double> _fadeAnim;
+
+  /// Width-based scale factor, clamped so text/controls stay sensible.
+  double _sf() {
+    final w = MediaQuery.sizeOf(context).width;
+    return (w / _kBaseWidth).clamp(0.85, 1.35);
+  }
+
+  double _s(double base) => base * _sf();
 
   @override
   void initState() {
@@ -143,11 +155,16 @@ class _SearchPageState extends State<SearchPage>
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildSearchBar(),
-            Expanded(child: _buildBody()),
-          ],
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: _kMaxContentW),
+            child: Column(
+              children: [
+                _buildSearchBar(),
+                Expanded(child: _buildBody()),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -155,7 +172,7 @@ class _SearchPageState extends State<SearchPage>
 
   Widget _buildSearchBar() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 12, 8, 10),
+      padding: EdgeInsets.fromLTRB(_s(8), _s(12), _s(8), _s(10)),
       decoration: BoxDecoration(
         color: bgColor,
         border: Border(
@@ -168,20 +185,19 @@ class _SearchPageState extends State<SearchPage>
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+            icon: Icon(Icons.arrow_back_ios_new_rounded,
+                size: _s(20).clamp(18.0, 26.0)),
             color: primary,
             onPressed: () => Navigator.pop(context),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           ),
-          const SizedBox(width: 4),
-
+          SizedBox(width: _s(4)),
           Expanded(
             child: Container(
-              height: 44,
+              height: _s(44).clamp(42.0, 56.0),
               decoration: BoxDecoration(
                 color: cardColor,
-                // borderRadius: BorderRadius.circular(6),
                 border: Border.all(
                   color: primary.withOpacity(0.15),
                   width: 0.8,
@@ -191,9 +207,9 @@ class _SearchPageState extends State<SearchPage>
                 controller: _searchCtrl,
                 focusNode: _focusNode,
                 textAlignVertical: TextAlignVertical.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: _fBody,
-                  fontSize: 14,
+                  fontSize: _s(14).clamp(13.0, 18.0),
                   color: primary,
                   fontWeight: FontWeight.w500,
                 ),
@@ -201,21 +217,21 @@ class _SearchPageState extends State<SearchPage>
                   hintText: 'Search products...',
                   hintStyle: TextStyle(
                     fontFamily: _fBody,
-                    fontSize: 14,
+                    fontSize: _s(14).clamp(13.0, 18.0),
                     color: secondaryTxt.withOpacity(0.6),
                     fontWeight: FontWeight.w400,
                   ),
                   prefixIcon: Icon(
                     Icons.search_rounded,
                     color: secondaryTxt,
-                    size: 20,
+                    size: _s(20).clamp(18.0, 26.0),
                   ),
                   suffixIcon: _searchCtrl.text.isNotEmpty
                       ? IconButton(
                           icon: Icon(
                             Icons.close_rounded,
                             color: secondaryTxt,
-                            size: 18,
+                            size: _s(18).clamp(16.0, 24.0),
                           ),
                           onPressed: _clearSearch,
                         )
@@ -246,35 +262,39 @@ class _SearchPageState extends State<SearchPage>
 
   Widget _buildIdleState() {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.search_rounded,
-            size: 56,
-            color: primary.withOpacity(0.15),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'SEARCH PRODUCTS',
-            style: TextStyle(
-              fontFamily: _fBold,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: primary.withOpacity(0.35),
-              // letterSpacing: 2.0,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(_s(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.search_rounded,
+              size: _s(56).clamp(48.0, 76.0),
+              color: primary.withOpacity(0.15),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Start typing to find what you\'re looking for',
-            style: TextStyle(
-              fontFamily: _fBody,
-              fontSize: 12,
-              color: secondaryTxt.withOpacity(0.55),
+            SizedBox(height: _s(16)),
+            Text(
+              'SEARCH PRODUCTS',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: _fBold,
+                fontSize: _s(12).clamp(11.0, 16.0),
+                fontWeight: FontWeight.w800,
+                color: primary.withOpacity(0.35),
+              ),
             ),
-          ),
-        ],
+            SizedBox(height: _s(8)),
+            Text(
+              'Start typing to find what you\'re looking for',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: _fBody,
+                fontSize: _s(12).clamp(11.0, 16.0),
+                color: secondaryTxt.withOpacity(0.55),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -282,37 +302,42 @@ class _SearchPageState extends State<SearchPage>
   Widget _buildTypeMoreHint(int currentLength) {
     final remaining = 3 - currentLength;
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Type $remaining more ${remaining == 1 ? 'character' : 'characters'}',
-            style: TextStyle(
-              fontFamily: _fBody,
-              fontSize: 13,
-              color: secondaryTxt.withOpacity(0.55),
-              fontWeight: FontWeight.w500,
+      child: Padding(
+        padding: EdgeInsets.all(_s(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Type $remaining more ${remaining == 1 ? 'character' : 'characters'}',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: _fBody,
+                fontSize: _s(13).clamp(12.0, 17.0),
+                color: secondaryTxt.withOpacity(0.55),
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'to see suggestions',
-            style: TextStyle(
-              fontFamily: _fBody,
-              fontSize: 12,
-              color: secondaryTxt.withOpacity(0.35),
+            SizedBox(height: _s(6)),
+            Text(
+              'to see suggestions',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: _fBody,
+                fontSize: _s(12).clamp(11.0, 16.0),
+                color: secondaryTxt.withOpacity(0.35),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildLoadingState() {
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      padding: EdgeInsets.fromLTRB(_s(16), _s(16), _s(16), _s(24)),
       itemCount: 6,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, __) => SizedBox(height: _s(12)),
       itemBuilder: (_, __) => _shimmerTile(),
     );
   }
@@ -321,33 +346,30 @@ class _SearchPageState extends State<SearchPage>
     return Row(
       children: [
         Container(
-          width: 72,
-          height: 88,
+          width: _s(72).clamp(60.0, 96.0),
+          height: _s(88).clamp(74.0, 116.0),
           decoration: BoxDecoration(
             color: primary.withOpacity(0.07),
-            // borderRadius: BorderRadius.circular(6),
           ),
         ),
-        const SizedBox(width: 14),
+        SizedBox(width: _s(14)),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                height: 13,
+                height: _s(13).clamp(12.0, 18.0),
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: primary.withOpacity(0.07),
-                  // borderRadius: BorderRadius.circular(4),
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: _s(8)),
               Container(
-                height: 11,
-                width: 100,
+                height: _s(11).clamp(10.0, 15.0),
+                width: _s(100).clamp(80.0, 160.0),
                 decoration: BoxDecoration(
                   color: primary.withOpacity(0.05),
-                  // borderRadius: BorderRadius.circular(4),
                 ),
               ),
             ],
@@ -359,43 +381,49 @@ class _SearchPageState extends State<SearchPage>
 
   Widget _buildEmptyState(String query) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.search_off_rounded,
-            size: 48,
-            color: primary.withOpacity(0.18),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No results for',
-            style: TextStyle(
-              fontFamily: _fBody,
-              fontSize: 13,
-              color: secondaryTxt.withOpacity(0.55),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(_s(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              size: _s(48).clamp(40.0, 66.0),
+              color: primary.withOpacity(0.18),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '"$query"',
-            style: TextStyle(
-              fontFamily: _fBold,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: primary.withOpacity(0.75),
+            SizedBox(height: _s(16)),
+            Text(
+              'No results for',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: _fBody,
+                fontSize: _s(13).clamp(12.0, 17.0),
+                color: secondaryTxt.withOpacity(0.55),
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Try a different search term',
-            style: TextStyle(
-              fontFamily: _fBody,
-              fontSize: 12,
-              color: secondaryTxt.withOpacity(0.4),
+            SizedBox(height: _s(4)),
+            Text(
+              '"$query"',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: _fBold,
+                fontSize: _s(15).clamp(14.0, 20.0),
+                fontWeight: FontWeight.w700,
+                color: primary.withOpacity(0.75),
+              ),
             ),
-          ),
-        ],
+            SizedBox(height: _s(10)),
+            Text(
+              'Try a different search term',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: _fBody,
+                fontSize: _s(12).clamp(11.0, 16.0),
+                color: secondaryTxt.withOpacity(0.4),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -407,21 +435,20 @@ class _SearchPageState extends State<SearchPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            padding: EdgeInsets.fromLTRB(_s(16), _s(14), _s(16), _s(8)),
             child: Text(
               '${_suggestions.length} RESULT${_suggestions.length == 1 ? '' : 'S'}',
               style: TextStyle(
                 fontFamily: _fBold,
-                fontSize: 10,
+                fontSize: _s(10).clamp(9.0, 14.0),
                 fontWeight: FontWeight.w800,
                 color: primary.withOpacity(0.45),
-                // letterSpacing: 1.6,
               ),
             ),
           ),
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              padding: EdgeInsets.fromLTRB(_s(16), 0, _s(16), _s(32)),
               itemCount: _suggestions.length,
               separatorBuilder: (_, __) => Divider(
                 height: 1,
@@ -441,14 +468,13 @@ class _SearchPageState extends State<SearchPage>
       splashColor: primary.withOpacity(0.05),
       highlightColor: primary.withOpacity(0.03),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: EdgeInsets.symmetric(vertical: _s(12)),
         child: Row(
           children: [
             ClipRRect(
-              // borderRadius: BorderRadius.circular(6),
               child: SizedBox(
-                width: 72,
-                height: 88,
+                width: _s(72).clamp(60.0, 100.0),
+                height: _s(88).clamp(74.0, 122.0),
                 child: product.primaryImageUrl != null
                     ? CachedNetworkImage(
                         imageUrl: product.primaryImageUrl!,
@@ -461,15 +487,14 @@ class _SearchPageState extends State<SearchPage>
                           child: Icon(
                             Icons.image_not_supported_outlined,
                             color: secondaryTxt.withOpacity(0.3),
-                            size: 20,
+                            size: _s(20).clamp(18.0, 26.0),
                           ),
                         ),
                       )
                     : Container(color: primary.withOpacity(0.07)),
               ),
             ),
-            const SizedBox(width: 14),
-
+            SizedBox(width: _s(14)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -478,29 +503,28 @@ class _SearchPageState extends State<SearchPage>
                     product.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: _fBold,
-                      fontSize: 13,
+                      fontSize: _s(13).clamp(12.0, 18.0),
                       fontWeight: FontWeight.w600,
                       color: primary,
                       height: 1.35,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: _s(6)),
                   _priceRow(product),
                   if (product.colorHexCodes.isNotEmpty) ...[
-                    const SizedBox(height: 7),
+                    SizedBox(height: _s(7)),
                     _colorSwatches(product.colorHexCodes),
                   ],
                 ],
               ),
             ),
-
             Padding(
-              padding: const EdgeInsets.only(left: 8),
+              padding: EdgeInsets.only(left: _s(8)),
               child: Icon(
                 Icons.arrow_forward_ios_rounded,
-                size: 13,
+                size: _s(13).clamp(12.0, 18.0),
                 color: primary.withOpacity(0.3),
               ),
             ),
@@ -514,35 +538,38 @@ class _SearchPageState extends State<SearchPage>
     if (!product.isOnSale) {
       return Text(
         product.formattedPrice,
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: _fBold,
-          fontSize: 13,
+          fontSize: _s(13).clamp(12.0, 18.0),
           fontWeight: FontWeight.w700,
           color: primary,
         ),
       );
     }
 
-    return Row(
+    // Wrap so a long price + strikethrough compare-at price never overflows
+    // on narrow screens.
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: _s(6),
       children: [
         Text(
           product.formattedPrice,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: _fBold,
-            fontSize: 13,
+            fontSize: _s(13).clamp(12.0, 18.0),
             fontWeight: FontWeight.w700,
             color: primary,
           ),
         ),
-        const SizedBox(width: 6),
         Text(
           product.formattedCompareAtPrice,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: _fBody,
-            fontSize: 11,
-            color: Color(0xFF9A9A9A),
+            fontSize: _s(11).clamp(10.0, 15.0),
+            color: const Color(0xFF9A9A9A),
             decoration: TextDecoration.lineThrough,
-            decorationColor: Color(0xFF9A9A9A),
+            decorationColor: const Color(0xFF9A9A9A),
           ),
         ),
       ],
@@ -561,9 +588,9 @@ class _SearchPageState extends State<SearchPage>
           color = const Color(0xFFCCCCCC);
         }
         return Container(
-          margin: const EdgeInsets.only(right: 5),
-          width: 14,
-          height: 14,
+          margin: EdgeInsets.only(right: _s(5)),
+          width: _s(14).clamp(12.0, 20.0),
+          height: _s(14).clamp(12.0, 20.0),
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,

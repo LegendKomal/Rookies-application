@@ -18,10 +18,23 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   static const String _fBody = ShopifyConstants.fontBody;
   static const String _fBold = ShopifyConstants.fontBodyBold;
 
+  // Layout tuning.
+  static const double _kBaseWidth   = 375; // reference design width.
+  static const double _kMaxContentW = 480; // cap form width on tablets/desktop.
+
   final _emailController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   bool _loading = false;
+
+  /// Width-based scale factor, clamped so text never gets too tiny or huge.
+  double _sf(BuildContext c) {
+    final w = MediaQuery.sizeOf(c).width;
+    return (w / _kBaseWidth).clamp(0.85, 1.35);
+  }
+
+  /// Scaled size helper.
+  double _s(BuildContext c, double base) => base * _sf(c);
 
   Future<void> _sendResetLink() async {
     if (!_formKey.currentState!.validate()) return;
@@ -63,6 +76,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final toolbarHeight =
+        (_s(context, 64)).clamp(56.0, 96.0) * media.textScaler.scale(1).clamp(1.0, 1.3);
+
     return Scaffold(
       backgroundColor: Colors.white,
 
@@ -71,12 +88,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         centerTitle: false,
         automaticallyImplyLeading: false,
         titleSpacing: 0,
+        toolbarHeight: toolbarHeight,
         title: Row(
           children: [
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.arrow_back_ios_new_rounded,
-                size: 18,
+                size: _s(context, 18).clamp(16.0, 26.0),
                 color: primary,
               ),
               onPressed: () {
@@ -87,116 +105,144 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 }
               },
             ),
-            const Text(
-              'RESET PASSWORD',
-              style: TextStyle(
-                fontSize: 34,
-            height: 1,
-            fontFamily: _fHead,
-            color: Color(ShopifyConstants.primaryColorHex),
-                // letterSpacing: 1.4,
+            // Flexible + FittedBox lets the big display title shrink to fit
+            // on very narrow screens instead of overflowing.
+            Flexible(
+              child: Padding(
+                padding: EdgeInsets.only(right: _s(context, 12)),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'RESET PASSWORD',
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: _s(context, 34).clamp(24.0, 46.0),
+                      height: 1,
+                      fontFamily: _fHead,
+                      color: const Color(ShopifyConstants.primaryColorHex),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
         ),
       ),
 
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 10),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.all(_s(context, 20)),
+              child: ConstrainedBox(
+                // Fill height so the form can center vertically on big screens
+                // while still scrolling when the keyboard shrinks the viewport.
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: _kMaxContentW),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(height: _s(context, 10)),
 
-              const Text(
-                "Enter your registered email address and we'll send you a password reset link.",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: _fBody,
-                  fontSize: 13,
-                  color: secondaryText,
-                  height: 1.5,
-                ),
-              ),
+                          Text(
+                            "Enter your registered email address and we'll send you a password reset link.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: _fBody,
+                              fontSize: _s(context, 13).clamp(12.0, 17.0),
+                              color: secondaryText,
+                              height: 1.5,
+                            ),
+                          ),
 
-              const SizedBox(height: 30),
+                          SizedBox(height: _s(context, 30)),
 
-              TextFormField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                style: const TextStyle(
-                  fontFamily: _fBody,
-                  fontSize: 14,
-                  color: Colors.black,
-                ),
-                decoration: const InputDecoration(
-                  labelText: "Email",
-                  labelStyle: TextStyle(
-                    fontFamily: _fBody,
-                    fontSize: 13,
-                  ),
-                  border: OutlineInputBorder(),
-                  enabledBorder: OutlineInputBorder(),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: primary,
-                      width: 1.5,
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            style: TextStyle(
+                              fontFamily: _fBody,
+                              fontSize: _s(context, 14).clamp(13.0, 18.0),
+                              color: Colors.black,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: "Email",
+                              labelStyle: TextStyle(
+                                fontFamily: _fBody,
+                                fontSize: _s(context, 13).clamp(12.0, 17.0),
+                              ),
+                              border: const OutlineInputBorder(),
+                              enabledBorder: const OutlineInputBorder(),
+                              focusedBorder: const OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: primary,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return "Please enter your email";
+                              }
+
+                              final emailRegex = RegExp(
+                                r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$',
+                              );
+
+                              if (!emailRegex.hasMatch(value.trim())) {
+                                return "Enter a valid email";
+                              }
+
+                              return null;
+                            },
+                          ),
+
+                          SizedBox(height: _s(context, 30)),
+
+                          SizedBox(
+                            width: double.infinity,
+                            height: _s(context, 52).clamp(48.0, 64.0),
+                            child: ElevatedButton(
+                              onPressed: _loading ? null : _sendResetLink,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                              ),
+                              child: _loading
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Text(
+                                      "SEND RESET LINK",
+                                      style: TextStyle(
+                                        fontFamily: _fBold,
+                                        fontSize: _s(context, 13).clamp(12.0, 17.0),
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return "Please enter your email";
-                  }
-
-                  final emailRegex = RegExp(
-                    r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$',
-                  );
-
-                  if (!emailRegex.hasMatch(value.trim())) {
-                    return "Enter a valid email";
-                  }
-
-                  return null;
-                },
               ),
-
-              const SizedBox(height: 30),
-
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _loading ? null : _sendResetLink,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                  ),
-                  child: _loading
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          "SEND RESET LINK",
-                          style: TextStyle(
-                            fontFamily: _fBold,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

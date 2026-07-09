@@ -22,6 +22,18 @@ class _ForgotPasswordState extends State<ForgotPassword> {
   static const Color borderColor = Color(0xffdddddd);
   static const Color fieldFill = Color(0xfffafafa);
 
+  // ---- Responsive helpers -------------------------------------------------
+  // Everything scales off screen width so the form looks right on a 320px
+  // phone, a 430px large phone, a 768px tablet and wider. 400px is baseline.
+  double get _sf =>
+      (MediaQuery.of(context).size.width / 400).clamp(0.85, 1.3).toDouble();
+
+  /// Scale a size value responsively.
+  double _s(double base) => base * _sf;
+
+  /// Scale a fixed control height but keep it within comfortable touch bounds.
+  double _h(double base) => (base * _sf).clamp(48.0, 64.0);
+
   @override
   void dispose() {
     emailController.dispose();
@@ -34,34 +46,35 @@ class _ForgotPasswordState extends State<ForgotPassword> {
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: Color(0xff9a9a9a),
-        fontSize: 14.5,
+      hintStyle: TextStyle(
+        color: const Color(0xff9a9a9a),
+        fontSize: _s(14.5),
         fontWeight: FontWeight.w400,
       ),
       prefixIcon: Icon(
         icon,
         color: const Color(0xff444444),
-        size: 20,
+        size: _s(20),
       ),
       filled: true,
       fillColor: fieldFill,
-      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-      border: OutlineInputBorder(
+      contentPadding:
+          EdgeInsets.symmetric(vertical: _s(18), horizontal: _s(16)),
+      border: const OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: borderColor),
+        borderSide: BorderSide(color: borderColor),
       ),
-      enabledBorder: OutlineInputBorder(
+      enabledBorder: const OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: borderColor, width: 1),
+        borderSide: BorderSide(color: borderColor, width: 1),
       ),
-      focusedBorder: OutlineInputBorder(
+      focusedBorder: const OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: primary, width: 1.2),
+        borderSide: BorderSide(color: primary, width: 1.2),
       ),
-      errorBorder: OutlineInputBorder(
+      errorBorder: const OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.redAccent),
+        borderSide: BorderSide(color: Colors.redAccent),
       ),
     );
   }
@@ -94,13 +107,15 @@ class _ForgotPasswordState extends State<ForgotPassword> {
       if (!mounted) return;
 
       if (kDebugMode) {
-        debugPrint('UI FORGOT PASSWORD RESULT -> success: ${result.success}, message: ${result.message}');
+        debugPrint(
+            'UI FORGOT PASSWORD RESULT -> success: ${result.success}, message: ${result.message}');
       }
 
       if (result.success) {
         setState(() => emailSent = true);
       } else {
-        _showMessage(result.message ?? 'Something went wrong. Please try again.');
+        _showMessage(
+            result.message ?? 'Something went wrong. Please try again.');
       }
     } catch (e) {
       if (!mounted) return;
@@ -130,16 +145,21 @@ class _ForgotPasswordState extends State<ForgotPassword> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    // Tighter side gutters on very small phones; a little more air elsewhere.
+    final outerH = width < 360 ? 16.0 : _s(24);
+
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            padding: EdgeInsets.symmetric(horizontal: outerH, vertical: _s(24)),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
+              // Cap width so the form stays a focused card on tablets/desktop.
+              constraints: const BoxConstraints(maxWidth: 460),
               child: Container(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(_s(24)),
                 decoration: BoxDecoration(
                   color: cardColor,
                   // borderRadius: BorderRadius.circular(24),
@@ -161,19 +181,20 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                           onPressed: () => Navigator.of(context).maybePop(),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.arrow_back_rounded,
                             color: primary,
+                            size: _s(24),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: _s(12)),
                     Center(
                       child: Column(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: EdgeInsets.all(_s(16)),
                             decoration: BoxDecoration(
                               color: fieldFill,
                               shape: BoxShape.circle,
@@ -184,27 +205,28 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                                   ? Icons.mark_email_read_outlined
                                   : Icons.lock_reset_rounded,
                               color: primary,
-                              size: 28,
+                              size: _s(28),
                             ),
                           ),
-                          const SizedBox(height: 18),
+                          SizedBox(height: _s(18)),
                           Text(
                             emailSent ? "Check Your Email" : "Forgot Password?",
-                            style: const TextStyle(
-                              fontSize: 26,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: _s(26),
                               fontWeight: FontWeight.w700,
                               color: primary,
                               // letterSpacing: -0.5,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: _s(8)),
                           Text(
                             emailSent
                                 ? "If an account exists for ${emailController.text.trim()}, we've sent a link to reset your password."
                                 : "Enter the email linked to your account and we'll send you a link to reset your password.",
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 14.5,
+                            style: TextStyle(
+                              fontSize: _s(14.5),
                               color: secondaryText,
                               height: 1.5,
                             ),
@@ -212,31 +234,32 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 28),
+                    SizedBox(height: _s(28)),
                     if (!emailSent) ...[
-                      const Text(
+                      Text(
                         "Email",
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: _s(14),
                           fontWeight: FontWeight.w600,
                           color: primary,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: _s(8)),
                       TextFormField(
                         controller: emailController,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.done,
+                        style: TextStyle(fontSize: _s(14.5)),
                         onFieldSubmitted: (_) => _handleSendResetLink(),
                         decoration: inputDecoration(
                           hintText: "Enter your email",
                           icon: Icons.mail_outline_rounded,
                         ),
                       ),
-                      const SizedBox(height: 22),
+                      SizedBox(height: _s(22)),
                       SizedBox(
                         width: double.infinity,
-                        height: 56,
+                        height: _h(56),
                         child: ElevatedButton(
                           onPressed: isLoading ? null : _handleSendResetLink,
                           style: ElevatedButton.styleFrom(
@@ -244,9 +267,9 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                             foregroundColor: Colors.white,
                             disabledBackgroundColor: const Color(0xff2d2d2d),
                             elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              // borderRadius: BorderRadius.circular(14),
-                            ),
+                            shape: const RoundedRectangleBorder(
+                                // borderRadius: BorderRadius.circular(14),
+                                ),
                           ),
                           child: isLoading
                               ? const SizedBox(
@@ -257,10 +280,10 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text(
+                              : Text(
                                   "Send Reset Link",
                                   style: TextStyle(
-                                    fontSize: 16,
+                                    fontSize: _s(16),
                                     fontWeight: FontWeight.w700,
                                     // letterSpacing: 0.2,
                                   ),
@@ -270,7 +293,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                     ] else ...[
                       SizedBox(
                         width: double.infinity,
-                        height: 56,
+                        height: _h(56),
                         child: OutlinedButton(
                           onPressed: () {
                             setState(() => emailSent = false);
@@ -278,37 +301,37 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                           style: OutlinedButton.styleFrom(
                             foregroundColor: primary,
                             side: const BorderSide(color: borderColor),
-                            shape: RoundedRectangleBorder(
-                              // borderRadius: BorderRadius.circular(14),
-                            ),
+                            shape: const RoundedRectangleBorder(
+                                // borderRadius: BorderRadius.circular(14),
+                                ),
                           ),
-                          child: const Text(
+                          child: Text(
                             "Use a Different Email",
                             style: TextStyle(
-                              fontSize: 15,
+                              fontSize: _s(15),
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: _s(12)),
                       SizedBox(
                         width: double.infinity,
-                        height: 56,
+                        height: _h(56),
                         child: ElevatedButton(
                           onPressed: () => Navigator.of(context).maybePop(),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primary,
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              // borderRadius: BorderRadius.circular(14),
-                            ),
+                            shape: const RoundedRectangleBorder(
+                                // borderRadius: BorderRadius.circular(14),
+                                ),
                           ),
-                          child: const Text(
+                          child: Text(
                             "Back to Sign In",
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: _s(16),
                               fontWeight: FontWeight.w700,
                               // letterSpacing: 0.2,
                             ),
@@ -316,7 +339,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 6),
+                    SizedBox(height: _s(6)),
                   ],
                 ),
               ),

@@ -6,7 +6,6 @@ import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 
 class ExploreCategoriesPage extends StatefulWidget {
   const ExploreCategoriesPage({super.key});
-
   @override
   State<ExploreCategoriesPage> createState() => _ExploreCategoriesPageState();
 }
@@ -31,6 +30,20 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    // Big heading scales to the screen instead of a hardcoded 34, and stays
+    // on one line via ellipsis on very narrow phones.
+    final titleSize = (width * 0.09).clamp(20.0, 40.0);
+    // Toolbar height scales a little so the large title always fits.
+    final toolbarHeight = (titleSize + 50).clamp(72.0, 104.0);
+    // Target tile width -> columns adapt automatically (2 on phones, more on
+    // tablets/foldables/desktop).
+    final maxTileExtent = width >= 1024
+        ? 260.0
+        : width >= 600
+            ? 240.0
+            : 220.0;
+
     return Scaffold(
       backgroundColor: const Color(ShopifyConstants.bgColorHex),
       appBar: AppBar(
@@ -38,7 +51,7 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
-        toolbarHeight: 84,
+        toolbarHeight: toolbarHeight,
         titleSpacing: 0,
         title: Padding(
           padding: const EdgeInsets.only(left: 12, right: 16),
@@ -53,13 +66,17 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
-                'EXPLORE CATEGORIES',
-                style: TextStyle(
-                  fontSize: 34,
-                  height: 1,
-                  fontFamily: _fHead,
-                  color: Color(ShopifyConstants.primaryColorHex),
+              Expanded(
+                child: Text(
+                  'EXPLORE CATEGORIES',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: titleSize,
+                    height: 1,
+                    fontFamily: _fHead,
+                    color: const Color(ShopifyConstants.primaryColorHex),
+                  ),
                 ),
               ),
             ],
@@ -75,13 +92,10 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
-
               if (snapshot.hasError) {
                 return _ErrorState(onRetry: _refresh);
               }
-
               final categories = snapshot.data ?? [];
-
               return CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
@@ -95,8 +109,8 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       sliver: SliverGrid(
                         gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
+                            SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: maxTileExtent,
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
                           childAspectRatio: 0.78,
@@ -123,88 +137,99 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
 
 class _CategoryTile extends StatelessWidget {
   const _CategoryTile({required this.category});
-
   final ShopifyCollection category;
-
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProductsPage(collection: category),
+    // Scale the label and overlay to the tile's own width so it looks right
+    // regardless of how many columns the grid decided to show.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tileWidth = constraints.maxWidth;
+        final labelSize = (tileWidth * 0.09).clamp(14.0, 22.0);
+        final gradientHeight = (tileWidth * 0.42).clamp(56.0, 90.0);
+        final inset = (tileWidth * 0.08).clamp(10.0, 18.0);
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProductsPage(collection: category),
+              ),
+            );
+          },
+          child: ClipRRect(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Container(
+                  color: const Color(0xFFD9D9D9),
+                  child: category.imageUrl != null
+                      ? Image.network(
+                          category.imageUrl!,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stack) =>
+                              const SizedBox.shrink(),
+                        )
+                      : null,
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: gradientHeight,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.45),
+                          Colors.black.withOpacity(0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: inset,
+                  right: inset,
+                  bottom: inset,
+                  child: Text(
+                    category.label.toUpperCase(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: labelSize,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
-      child: ClipRRect(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Container(
-              color: const Color(0xFFD9D9D9),
-              child: category.imageUrl != null
-                  ? Image.network(
-                      category.imageUrl!,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
-                        return const Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stack) =>
-                          const SizedBox.shrink(),
-                    )
-                  : null,
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 70,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.45),
-                      Colors.black.withOpacity(0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: 14,
-              bottom: 14,
-              child: Text(
-                category.label.toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
 
 class _ErrorState extends StatelessWidget {
   const _ErrorState({required this.onRetry});
-
   final Future<void> Function() onRetry;
-
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -215,7 +240,10 @@ class _ErrorState extends StatelessWidget {
           children: [
             const Icon(Icons.error_outline, size: 40, color: Colors.grey),
             const SizedBox(height: 12),
-            const Text('Something went wrong loading categories.'),
+            const Text(
+              'Something went wrong loading categories.',
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: onRetry,

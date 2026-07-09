@@ -38,6 +38,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   static const String _fBodyBold = ShopifyConstants.fontAlteBold;
   static const String _fNumber = ShopifyConstants.fontNumber;
 
+  // ---- Responsive helpers -------------------------------------------------
+  // Scales off screen width (400px baseline). Content is capped so on tablets
+  // and desktop the page reads as a centered column instead of stretching.
+  double get _sf =>
+      (MediaQuery.of(context).size.width / 400).clamp(0.85, 1.25).toDouble();
+  double _s(double base) => base * _sf;
+  static const double _maxContentWidth = 720;
+
   ShopifyProductDetail? _product;
   bool _isLoading = true;
   String? _error;
@@ -342,21 +350,27 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _imageCarousel(p),
-              _infoSection(p),
-              if (_goesWellWith.isNotEmpty) ...[
-                const Divider(height: 1),
-                _goesWellWithSection(),
-              ],
-              if (_youMayAlsoLike.isNotEmpty) ...[
-                const Divider(height: 1),
-                _youMayAlsoLikeSection(),
-              ],
-              const SizedBox(height: 40),
-            ],
+          // Cap and center the content column on wide screens.
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: _maxContentWidth),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _imageCarousel(p),
+                  _infoSection(p),
+                  if (_goesWellWith.isNotEmpty) ...[
+                    const Divider(height: 1),
+                    _goesWellWithSection(),
+                  ],
+                  if (_youMayAlsoLike.isNotEmpty) ...[
+                    const Divider(height: 1),
+                    _youMayAlsoLikeSection(),
+                  ],
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
           ),
         ),
       ],
@@ -490,9 +504,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         children: [
           Text(
             p.title,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: _fBold,
-              fontSize: 22,
+              fontSize: _s(22),
               color: primary,
               height: 1.3,
             ),
@@ -580,9 +594,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               Expanded(
                 child: RichText(
                   text: TextSpan(
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: _fBody,
-                      fontSize: 13,
+                      fontSize: _s(13),
                       color: secondaryTxt,
                       height: 1.5,
                     ),
@@ -607,9 +621,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
             trimmed,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: _fBody,
-              fontSize: 13,
+              fontSize: _s(13),
               color: secondaryTxt,
               height: 1.6,
             ),
@@ -629,11 +643,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         tilePadding: EdgeInsets.zero,
         iconColor: primary,
         collapsedIconColor: secondaryTxt,
-        title: const Text(
+        title: Text(
           'Description',
           style: TextStyle(
             fontFamily: _fBold,
-            fontSize: 14,
+            fontSize: _s(14),
             color: primary,
           ),
         ),
@@ -664,9 +678,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         collapsedIconColor: secondaryTxt,
         title: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: _fBold,
-            fontSize: 14,
+            fontSize: _s(14),
             color: primary,
           ),
         ),
@@ -677,9 +691,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(
                 content,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: _fBody,
-                  fontSize: 13,
+                  fontSize: _s(13),
                   color: secondaryTxt,
                   height: 1.6,
                 ),
@@ -692,30 +706,35 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _goesWellWithSection() {
+    final cardWidth = _s(140).clamp(120.0, 180.0);
+    final imgHeight = _s(150).clamp(130.0, 200.0);
+    // List height = image + gaps + 2 title lines + price, scaled.
+    final listHeight = imgHeight + _s(70).clamp(60.0, 90.0);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 0, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(right: 16, bottom: 14),
+          Padding(
+            padding: const EdgeInsets.only(right: 16, bottom: 14),
             child: Text(
               'GOES WELL WITH',
               style: TextStyle(
                 fontFamily: _fBold,
-                fontSize: 25,
+                fontSize: _s(22).clamp(20.0, 28.0),
                 color: primary,
               ),
             ),
           ),
           SizedBox(
-            height: 220,
+            height: listHeight,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.only(right: 16),
               itemCount: _goesWellWith.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (_, i) => _pairingCard(_goesWellWith[i]),
+              itemBuilder: (_, i) =>
+                  _pairingCard(_goesWellWith[i], cardWidth, imgHeight),
             ),
           ),
           const SizedBox(height: 16),
@@ -724,18 +743,18 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     );
   }
 
-  Widget _pairingCard(ShopifyProduct product) {
+  Widget _pairingCard(ShopifyProduct product, double cardWidth, double imgHeight) {
     return GestureDetector(
       onTap: () => _openProductDetail(product),
       child: SizedBox(
-        width: 140,
+        width: cardWidth,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               child: SizedBox(
-                width: 140,
-                height: 150,
+                width: cardWidth,
+                height: imgHeight,
                 child: product.primaryImageUrl != null
                     ? CachedNetworkImage(
                         imageUrl: product.primaryImageUrl!,
@@ -753,9 +772,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               product.title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: _fBold,
-                fontSize: 11,
+                fontSize: _s(11),
                 color: primary,
                 height: 1.3,
               ),
@@ -770,28 +789,35 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   Widget _pairingPriceText(ShopifyProduct product) {
     if (!product.isOnSale) {
-      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 12, color: primary, amountFontFamily: _fBold);
+      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(12), color: primary, amountFontFamily: _fBold);
     }
     return Row(
       children: [
-        PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 15, color: primary),
+        Flexible(
+          child: PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(15), color: primary),
+        ),
         const SizedBox(width: 5),
-        PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: 15, color: const Color(0xFF9A9A9A), decoration: TextDecoration.lineThrough),
+        Flexible(
+          child: PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: _s(15), color: const Color(0xFF9A9A9A), decoration: TextDecoration.lineThrough),
+        ),
       ],
     );
   }
 
   Widget _youMayAlsoLikeSection() {
+    // Adaptive columns: keep 2 on phones, more on tablets/desktop.
+    final width = MediaQuery.of(context).size.width;
+    final maxTileExtent = width >= 900 ? 240.0 : width >= 600 ? 220.0 : 200.0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'YOU MAY ALSO LIKE',
             style: TextStyle(
               fontFamily: _fBold,
-              fontSize: 25,
+              fontSize: _s(22).clamp(20.0, 28.0),
               color: primary,
             ),
           ),
@@ -800,8 +826,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             physics: const NeverScrollableScrollPhysics(),
             shrinkWrap: true,
             itemCount: _youMayAlsoLike.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: maxTileExtent,
               mainAxisSpacing: 16,
               crossAxisSpacing: 12,
               childAspectRatio: 0.58,
@@ -865,9 +891,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             product.title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: _fBodyBold,
-              fontSize: 12,
+              fontSize: _s(12),
               color: primary,
               height: 1.3,
             ),
@@ -881,40 +907,43 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   Widget _alsoLikePriceRow(ShopifyProduct product) {
     if (!product.isOnSale) {
-      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 15, color: primary);
+      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(15), color: primary);
     }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: 15, color: primary),
+        Flexible(
+          child: PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(15), color: primary),
+        ),
         const SizedBox(width: 5),
-        PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: 11, color: const Color(0xFF9A9A9A), amountFontFamily: _fBold, decoration: TextDecoration.lineThrough),
+        Flexible(
+          child: PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: _s(11), color: const Color(0xFF9A9A9A), amountFontFamily: _fBold, decoration: TextDecoration.lineThrough),
+        ),
       ],
     );
   }
 
   Widget _priceBlock(ShopifyProductDetail p) {
     if (!p.isOnSale) {
-      return PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: 20, color: primary, amountFontFamily: _fNumber);
+      return PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: _s(20), color: primary, amountFontFamily: _fNumber);
     }
     final saved = (p.compareAtPrice! - p.price).round();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 10,
           children: [
-            PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: 20, color: primary, amountFontFamily: _fNumber),
-            const SizedBox(width: 10),
-            PriceText(p.formattedCompareAtPrice, currencyCode: p.currencyCode, fontSize: 14, color: const Color(0xFF9A9A9A), amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
+            PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: _s(20), color: primary, amountFontFamily: _fNumber),
+            PriceText(p.formattedCompareAtPrice, currencyCode: p.currencyCode, fontSize: _s(14), color: const Color(0xFF9A9A9A), amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
           ],
         ),
         const SizedBox(height: 4),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(color: const Color(0xFF2E7D32).withOpacity(0.1)),
-          child: SavedAmountText(saved.toString(), currencyCode: p.currencyCode, fontSize: 11, color: const Color(0xFF2E7D32), fontFamily: _fNumber),
+          child: SavedAmountText(saved.toString(), currencyCode: p.currencyCode, fontSize: _s(11), color: const Color(0xFF2E7D32), fontFamily: _fNumber),
         ),
       ],
     );
@@ -926,9 +955,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       children: [
         RichText(
           text: TextSpan(
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: _fBold,
-              fontSize: 11,
+              fontSize: _s(11),
               color: primary,
             ),
             children: [
@@ -969,7 +998,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   val,
                   style: TextStyle(
                     fontFamily: _fBody,
-                    fontSize: 12,
+                    fontSize: _s(12),
                     color: isSelected ? Colors.white : primary,
                   ),
                 ),
@@ -1000,7 +1029,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           inStock ? 'In Stock' : 'Out of Stock',
           style: TextStyle(
             fontFamily: _fBody,
-            fontSize: 12,
+            fontSize: _s(12),
             color: inStock
                 ? const Color(0xFF2E7D32)
                 : const Color(0xFFD32F2F),
@@ -1020,7 +1049,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             variant != null && CartService.instance.isInCart(variant.id);
         return SizedBox(
           width: double.infinity,
-          height: 50,
+          height: _s(50).clamp(46.0, 60.0),
           child: ElevatedButton(
             onPressed: !inStock || _isAddingToCart
                 ? null
@@ -1045,9 +1074,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         : alreadyInCart
                             ? 'GO TO CART'
                             : 'ADD TO CART',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: _fBold,
-                      fontSize: 13,
+                      fontSize: _s(13),
                       color: Colors.white,
                     ),
                   ),
@@ -1077,9 +1106,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     Expanded(
                       child: Text(
                         widget.title.toUpperCase(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: _fBold,
-                          fontSize: 12,
+                          fontSize: _s(12),
                           color: primary,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -1127,9 +1156,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           ),
           title: Text(
             widget.title.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: _fBold,
-              fontSize: 12,
+              fontSize: _s(12),
               color: primary,
             ),
           ),
@@ -1146,9 +1175,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 Text(
                   _error ?? 'Something went wrong.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: _fBody,
-                    fontSize: 13,
+                    fontSize: _s(13),
                     color: secondaryTxt,
                   ),
                 ),

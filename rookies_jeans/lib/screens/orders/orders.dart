@@ -4,6 +4,26 @@ import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/screens/profile/profile.dart';
 import 'package:rookies_jeans/services/order_service.dart';
 
+/// Shared responsive helpers for the order screens.
+/// Scales off screen width (400px baseline) and caps content width so the
+/// layout stays comfortable from small phones to tablets/desktop.
+class _R {
+  _R(BuildContext context) : width = MediaQuery.of(context).size.width;
+  final double width;
+
+  double get factor => (width / 400).clamp(0.85, 1.3).toDouble();
+  double s(double base) => base * factor;
+
+  static const double maxContentWidth = 720;
+
+  Widget center(Widget child) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: maxContentWidth),
+          child: child,
+        ),
+      );
+}
+
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
 
@@ -41,6 +61,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final r = _R(context);
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
@@ -51,13 +72,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Color(0xFF333333)),
           onPressed: () => context.pop(),
         ),
-        title: const Text(
+        title: Text(
           'Order History',
           style: TextStyle(
             fontFamily: ShopifyConstants.fontHeading,
-            fontSize: 17,
+            fontSize: r.s(17),
             fontWeight: FontWeight.w500,
-            color: Color(0xFF111111),
+            color: const Color(0xFF111111),
           ),
         ),
         centerTitle: true,
@@ -71,16 +92,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   : RefreshIndicator(
                       color: _primary,
                       onRefresh: _load,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _orders.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, i) => _OrderTile(
-                          order: _orders[i],
-                          svc: _svc,
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => OrderDetailScreen(order: _orders[i]),
+                      child: r.center(
+                        ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _orders.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (context, i) => _OrderTile(
+                            order: _orders[i],
+                            svc: _svc,
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => OrderDetailScreen(order: _orders[i]),
+                              ),
                             ),
                           ),
                         ),
@@ -99,6 +122,7 @@ class _OrderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = _R(context);
     final lineItems  = (order['lineItems']?['edges'] as List?) ?? [];
     final firstItem  = lineItems.isNotEmpty ? lineItems.first['node'] : null;
     final imageUrl   = firstItem?['variant']?['image']?['url'] as String?;
@@ -106,6 +130,9 @@ class _OrderTile extends StatelessWidget {
     final totalPrice = order['currentTotalPrice'] ?? {'amount': '0', 'currencyCode': 'INR'};
     final state      = svc.resolveOrderState(order);
     final isCod      = svc.isCod(order);
+
+    final imgW = r.s(100).clamp(84.0, 140.0);
+    final imgH = r.s(120).clamp(100.0, 168.0);
 
     return GestureDetector(
       onTap: onTap,
@@ -118,9 +145,9 @@ class _OrderTile extends StatelessWidget {
             ClipRRect(
               // borderRadius: BorderRadius.circular(8),
               child: imageUrl != null
-                  ? Image.network(imageUrl, width: 100, height: 120, fit: BoxFit.fill,
-                      errorBuilder: (_, __, ___) => _imgPlaceholder(70))
-                  : _imgPlaceholder(70),
+                  ? Image.network(imageUrl, width: imgW, height: imgH, fit: BoxFit.fill,
+                      errorBuilder: (_, __, ___) => _imgPlaceholder(imgW))
+                  : _imgPlaceholder(imgW),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -129,29 +156,29 @@ class _OrderTile extends StatelessWidget {
                 children: [
                   Text(
                     'Order #${order['orderNumber']}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: ShopifyConstants.fontBodyBold,
-                      fontSize: 14,
+                      fontSize: r.s(14),
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF111111),
+                      color: const Color(0xFF111111),
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     svc.formatDate(order['processedAt'] ?? ''),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: ShopifyConstants.fontBody,
-                      fontSize: 12,
-                      color: Color(0xFF888888),
+                      fontSize: r.s(12),
+                      color: const Color(0xFF888888),
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     '$itemCount item${itemCount != 1 ? 's' : ''}  •  ${svc.formatPrice(totalPrice)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: ShopifyConstants.fontBody,
-                      fontSize: 13,
-                      color: Color(0xFF333333),
+                      fontSize: r.s(13),
+                      color: const Color(0xFF333333),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -187,10 +214,13 @@ class _OrderStateBadge extends StatelessWidget {
       case OrderState.delivered:
         return const _Badge(label: 'Delivered', color: Color(0xFF2E7D32));
       case OrderState.active:
-        return Row(
+        // Wrap so the two badges flow to a second line on narrow cards
+        // instead of overflowing.
+        return Wrap(
+          spacing: 6,
+          runSpacing: 6,
           children: [
             const _Badge(label: 'Processing', color: Color(0xFFE65100)),
-            const SizedBox(width: 6),
             _Badge(
               label: isCod ? 'Cash on Delivery' : 'Paid',
               color: isCod ? const Color(0xFF1565C0) : const Color(0xFF2E7D32),
@@ -209,6 +239,7 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = _R(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -219,7 +250,7 @@ class _Badge extends StatelessWidget {
         label,
         style: TextStyle(
           fontFamily: ShopifyConstants.fontBody,
-          fontSize: 11,
+          fontSize: r.s(11),
           fontWeight: FontWeight.w600,
           color: color,
         ),
@@ -324,12 +355,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final r          = _R(context);
     final order      = widget.order;
     final lineItems  = (order['lineItems']?['edges'] as List?) ?? [];
     final totalPrice = order['currentTotalPrice'] ?? {'amount': '0', 'currencyCode': 'INR'};
     final state      = _svc.resolveOrderState(order);
     final isCod      = _svc.isCod(order);
     final canCancel  = _svc.canCancelOrder(order);
+    final btnHeight  = r.s(50).clamp(46.0, 60.0);
+    final itemImg    = r.s(64).clamp(56.0, 88.0);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F3),
@@ -343,205 +377,207 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
         title: Text(
           'Order #${order['orderNumber']}',
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: ShopifyConstants.fontHeading,
-            fontSize: 17,
+            fontSize: r.s(17),
             fontWeight: FontWeight.w500,
-            color: Color(0xFF111111),
+            color: const Color(0xFF111111),
           ),
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _SectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Order Details',
-                    style: TextStyle(
-                      fontFamily: ShopifyConstants.fontHeading,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF111111),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _DetailRow(label: 'Order Number', value: '#${order['orderNumber']}'),
-                  _DetailRow(label: 'Placed On',    value: _svc.formatDate(order['processedAt'] ?? '')),
-                  _DetailRow(label: 'Total',        value: _svc.formatPrice(totalPrice)),
-                  const SizedBox(height: 10),
-                  _OrderStateBadge(state: state, isCod: isCod),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            _SectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Items',
-                    style: TextStyle(
-                      fontFamily: ShopifyConstants.fontHeading,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF111111),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  ...lineItems.asMap().entries.map((entry) {
-                    final item     = entry.value['node'] as Map<String, dynamic>;
-                    final variant  = item['variant'];
-                    final imageUrl = variant?['image']?['url'] as String?;
-                    final options  = (variant?['selectedOptions'] as List?) ?? [];
-                    final optText  = options.map((o) => '${o['name']}: ${o['value']}').join(' · ');
-                    final price    = variant?['price'];
-
-                    return Column(
-                      children: [
-                        if (entry.key > 0)
-                          const Divider(height: 20, thickness: 1, color: Color(0xFFEEEEEE)),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: imageUrl != null
-                                  ? Image.network(imageUrl, width: 64, height: 64, fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => _imgPlaceholder(64))
-                                  : _imgPlaceholder(64),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item['title'] ?? '',
-                                    style: const TextStyle(
-                                      fontFamily: ShopifyConstants.fontBodyBold,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF222222),
-                                    ),
-                                  ),
-                                  if (optText.isNotEmpty) ...[
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      optText,
-                                      style: const TextStyle(
-                                        fontFamily: ShopifyConstants.fontBody,
-                                        fontSize: 12,
-                                        color: Color(0xFF888888),
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 5),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Qty: ${item['quantity'] ?? 1}',
-                                        style: const TextStyle(
-                                          fontFamily: ShopifyConstants.fontBody,
-                                          fontSize: 12,
-                                          color: Color(0xFF666666),
-                                        ),
-                                      ),
-                                      if (price != null)
-                                        Text(
-                                          _svc.formatPrice(price),
-                                          style: const TextStyle(
-                                            fontFamily: ShopifyConstants.fontBodyBold,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: _primary,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  }),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            if (state == OrderState.cancelled)
-              _StatusBanner(
-                icon: Icons.cancel_outlined,
-                label: 'Order Cancelled',
-                color: const Color(0xFFD32F2F),
-              )
-            else if (state == OrderState.delivered)
-              _StatusBanner(
-                icon: Icons.check_circle_outline_rounded,
-                label: 'Order Delivered',
-                color: const Color(0xFF2E7D32),
-              )
-            else ...[
-              SizedBox(
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: _openTrackOrder,
-                  icon: const Icon(Icons.local_shipping_outlined, size: 18),
-                  label: const Text(
-                    'Track My Order',
-                    style: TextStyle(
-                      fontFamily: ShopifyConstants.fontBodyBold,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ),
-              if (canCancel) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 50,
-                  child: OutlinedButton.icon(
-                    onPressed: _openCancelPage,
-                    icon: const Icon(Icons.cancel_outlined, size: 18, color: Color(0xFFD32F2F)),
-                    label: const Text(
-                      'Cancel Order',
+      body: r.center(
+        SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Order Details',
                       style: TextStyle(
-                        fontFamily: ShopifyConstants.fontBodyBold,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFD32F2F),
+                        fontFamily: ShopifyConstants.fontHeading,
+                        fontSize: r.s(15),
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF111111),
                       ),
                     ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFD32F2F), width: 1.5),
+                    const SizedBox(height: 14),
+                    _DetailRow(label: 'Order Number', value: '#${order['orderNumber']}'),
+                    _DetailRow(label: 'Placed On',    value: _svc.formatDate(order['processedAt'] ?? '')),
+                    _DetailRow(label: 'Total',        value: _svc.formatPrice(totalPrice)),
+                    const SizedBox(height: 10),
+                    _OrderStateBadge(state: state, isCod: isCod),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              _SectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Items',
+                      style: TextStyle(
+                        fontFamily: ShopifyConstants.fontHeading,
+                        fontSize: r.s(15),
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF111111),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    ...lineItems.asMap().entries.map((entry) {
+                      final item     = entry.value['node'] as Map<String, dynamic>;
+                      final variant  = item['variant'];
+                      final imageUrl = variant?['image']?['url'] as String?;
+                      final options  = (variant?['selectedOptions'] as List?) ?? [];
+                      final optText  = options.map((o) => '${o['name']}: ${o['value']}').join(' · ');
+                      final price    = variant?['price'];
+
+                      return Column(
+                        children: [
+                          if (entry.key > 0)
+                            const Divider(height: 20, thickness: 1, color: Color(0xFFEEEEEE)),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: imageUrl != null
+                                    ? Image.network(imageUrl, width: itemImg, height: itemImg, fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => _imgPlaceholder(itemImg))
+                                    : _imgPlaceholder(itemImg),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item['title'] ?? '',
+                                      style: TextStyle(
+                                        fontFamily: ShopifyConstants.fontBodyBold,
+                                        fontSize: r.s(13),
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF222222),
+                                      ),
+                                    ),
+                                    if (optText.isNotEmpty) ...[
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        optText,
+                                        style: TextStyle(
+                                          fontFamily: ShopifyConstants.fontBody,
+                                          fontSize: r.s(12),
+                                          color: const Color(0xFF888888),
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 5),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Qty: ${item['quantity'] ?? 1}',
+                                          style: TextStyle(
+                                            fontFamily: ShopifyConstants.fontBody,
+                                            fontSize: r.s(12),
+                                            color: const Color(0xFF666666),
+                                          ),
+                                        ),
+                                        if (price != null)
+                                          Text(
+                                            _svc.formatPrice(price),
+                                            style: TextStyle(
+                                              fontFamily: ShopifyConstants.fontBodyBold,
+                                              fontSize: r.s(13),
+                                              fontWeight: FontWeight.w600,
+                                              color: _primary,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              if (state == OrderState.cancelled)
+                _StatusBanner(
+                  icon: Icons.cancel_outlined,
+                  label: 'Order Cancelled',
+                  color: const Color(0xFFD32F2F),
+                )
+              else if (state == OrderState.delivered)
+                _StatusBanner(
+                  icon: Icons.check_circle_outline_rounded,
+                  label: 'Order Delivered',
+                  color: const Color(0xFF2E7D32),
+                )
+              else ...[
+                SizedBox(
+                  height: btnHeight,
+                  child: ElevatedButton.icon(
+                    onPressed: _openTrackOrder,
+                    icon: const Icon(Icons.local_shipping_outlined, size: 18),
+                    label: Text(
+                      'Track My Order',
+                      style: TextStyle(
+                        fontFamily: ShopifyConstants.fontBodyBold,
+                        fontSize: r.s(15),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
                 ),
+                if (canCancel) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: btnHeight,
+                    child: OutlinedButton.icon(
+                      onPressed: _openCancelPage,
+                      icon: const Icon(Icons.cancel_outlined, size: 18, color: Color(0xFFD32F2F)),
+                      label: Text(
+                        'Cancel Order',
+                        style: TextStyle(
+                          fontFamily: ShopifyConstants.fontBodyBold,
+                          fontSize: r.s(15),
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFFD32F2F),
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFD32F2F), width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ],
               ],
-            ],
 
-            const SizedBox(height: 24),
-          ],
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );
@@ -557,8 +593,9 @@ class _StatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = _R(context);
     return Container(
-      height: 50,
+      height: r.s(50).clamp(46.0, 60.0),
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(10),
@@ -569,13 +606,16 @@ class _StatusBanner extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: color),
           const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: ShopifyConstants.fontBodyBold,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: color,
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: ShopifyConstants.fontBodyBold,
+                fontSize: r.s(15),
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
             ),
           ),
         ],
@@ -608,25 +648,29 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = _R(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '$label: ',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: ShopifyConstants.fontBody,
-              fontSize: 13,
-              color: Color(0xFF888888),
+              fontSize: r.s(13),
+              color: const Color(0xFF888888),
             ),
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontFamily: ShopifyConstants.fontBodyBold,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF222222),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontFamily: ShopifyConstants.fontBodyBold,
+                fontSize: r.s(13),
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF222222),
+              ),
             ),
           ),
         ],

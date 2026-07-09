@@ -25,8 +25,21 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   static const _fBody = ShopifyConstants.fontBody;
   static const _fBold = ShopifyConstants.fontBodyBold;
 
+  // Layout tuning.
+  static const double _kBaseWidth   = 375; // reference design width.
+  static const double _kMaxContentW = 640; // cap content on tablets/desktop.
+
   String? _selectedId;
   bool _isSettingDefault = false;
+
+  /// Width-based scale factor, clamped so text never gets too tiny or huge.
+  double _sf(BuildContext c) {
+    final w = MediaQuery.sizeOf(c).width;
+    return (w / _kBaseWidth).clamp(0.85, 1.35);
+  }
+
+  /// Scaled size helper.
+  double _s(BuildContext c, double base) => base * _sf(c);
 
   @override
   void initState() {
@@ -151,6 +164,10 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   @override
   Widget build(BuildContext context) {
     final isPickMode = widget.pickMode;
+    final media = MediaQuery.of(context);
+    // Responsive app bar height (also grows a bit with the user's text scale).
+    final toolbarHeight =
+        (_s(context, 72)).clamp(64.0, 104.0) * media.textScaler.scale(1).clamp(1.0, 1.3);
 
     return Scaffold(
       backgroundColor: _bg,
@@ -159,28 +176,37 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
-        toolbarHeight: 84,
+        toolbarHeight: toolbarHeight,
         titleSpacing: 0,
         title: Padding(
-          padding: const EdgeInsets.only(left: 12, right: 16),
+          padding: EdgeInsets.only(left: _s(context, 12), right: _s(context, 16)),
           child: Row(
             children: [
               GestureDetector(
                 onTap: () => Navigator.of(context).maybePop(),
-                child: const Icon(
+                child: Icon(
                   Icons.arrow_back_ios_new,
-                  size: 22,
-                  color: Color(ShopifyConstants.primaryColorHex),
+                  size: _s(context, 22).clamp(20.0, 30.0),
+                  color: const Color(ShopifyConstants.primaryColorHex),
                 ),
               ),
-              const SizedBox(width: 10),
-              const Text(
-                'ADDRESS BOOK',
-                style: TextStyle(
-                  fontSize: 34,
-                  height: 1,
-                  fontFamily: _fHead,
-                  color: Color(ShopifyConstants.primaryColorHex),
+              SizedBox(width: _s(context, 10)),
+              // Flexible + FittedBox lets the big display title shrink to fit
+              // on very narrow screens instead of overflowing.
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'ADDRESS BOOK',
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: _s(context, 34).clamp(26.0, 46.0),
+                      height: 1,
+                      fontFamily: _fHead,
+                      color: const Color(ShopifyConstants.primaryColorHex),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -194,7 +220,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 'Add',
                 style: TextStyle(
                   fontFamily: _fBold,
-                  fontSize: 14,
+                  fontSize: _s(context, 14).clamp(13.0, 18.0),
                   color: _primary,
                   fontWeight: FontWeight.w600,
                 ),
@@ -222,21 +248,29 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
             return _emptyState();
           }
 
+          final pad = _s(context, 16);
           return Stack(
             children: [
-              ListView.separated(
-                padding: EdgeInsets.fromLTRB(
-                  16, 16, 16,
-                  isPickMode ? 100 : 16,
+              // Center + max width keeps lines readable on tablets/desktop.
+              Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: _kMaxContentW),
+                  child: ListView.separated(
+                    padding: EdgeInsets.fromLTRB(
+                      pad, pad, pad,
+                      isPickMode ? _s(context, 100) : pad,
+                    ),
+                    itemCount: addresses.length + (isPickMode ? 1 : 0),
+                    separatorBuilder: (_, __) => SizedBox(height: _s(context, 10)),
+                    itemBuilder: (_, i) {
+                      if (isPickMode && i == addresses.length) {
+                        return _addNewTile();
+                      }
+                      return _addressCard(addresses[i], isPickMode: isPickMode);
+                    },
+                  ),
                 ),
-                itemCount: addresses.length + (isPickMode ? 1 : 0),
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) {
-                  if (isPickMode && i == addresses.length) {
-                    return _addNewTile();
-                  }
-                  return _addressCard(addresses[i], isPickMode: isPickMode);
-                },
               ),
               if (_isSettingDefault)
                 const Positioned.fill(
@@ -258,30 +292,37 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 final canConfirm = _selectedId != null &&
                     AddressService.instance.addresses.isNotEmpty;
                 return Container(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  padding: EdgeInsets.fromLTRB(
+                      _s(context, 16), _s(context, 12), _s(context, 16), _s(context, 16)),
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     border: Border(top: BorderSide(color: _border)),
                   ),
                   child: SafeArea(
                     top: false,
-                    child: SizedBox(
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: canConfirm ? _confirmPick : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _primary,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: const Color(0xFFCCCCCC),
-                          elevation: 0,
-                          shape: const RoundedRectangleBorder(),
-                        ),
-                        child: const Text(
-                          'DELIVER HERE',
-                          style: TextStyle(
-                            fontFamily: _fBold,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: _kMaxContentW),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: _s(context, 50).clamp(46.0, 64.0),
+                          child: ElevatedButton(
+                            onPressed: canConfirm ? _confirmPick : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _primary,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: const Color(0xFFCCCCCC),
+                              elevation: 0,
+                              shape: const RoundedRectangleBorder(),
+                            ),
+                            child: Text(
+                              'DELIVER HERE',
+                              style: TextStyle(
+                                fontFamily: _fBold,
+                                fontSize: _s(context, 14).clamp(13.0, 18.0),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -311,29 +352,29 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
             ? () => setState(() => _selectedId = address.id)
             : null,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: EdgeInsets.all(_s(context, 14)),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (isPickMode)
                 Padding(
-                  padding: const EdgeInsets.only(top: 1, right: 10),
+                  padding: EdgeInsets.only(top: 1, right: _s(context, 10)),
                   child: Icon(
                     isSelected
                         ? Icons.radio_button_checked_rounded
                         : Icons.radio_button_unchecked_rounded,
-                    size: 20,
+                    size: _s(context, 20).clamp(18.0, 26.0),
                     color: isSelected ? _primary : const Color(0xFFBBBBBB),
                   ),
                 )
               else
                 Padding(
-                  padding: const EdgeInsets.only(top: 1, right: 10),
+                  padding: EdgeInsets.only(top: 1, right: _s(context, 10)),
                   child: Icon(
                     address.isDefault
                         ? Icons.home_rounded
                         : Icons.location_on_outlined,
-                    size: 20,
+                    size: _s(context, 20).clamp(18.0, 26.0),
                     color: address.isDefault ? _primary : _secondaryTx,
                   ),
                 ),
@@ -342,29 +383,30 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: Text(
                             address.fullName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: _fBold,
-                              fontSize: 13,
+                              fontSize: _s(context, 13).clamp(12.0, 18.0),
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF111111),
+                              color: const Color(0xFF111111),
                             ),
                           ),
                         ),
                         if (address.isDefault)
                           Container(
-                            margin: const EdgeInsets.only(left: 8),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 2),
+                            margin: EdgeInsets.only(left: _s(context, 8)),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: _s(context, 7), vertical: _s(context, 2)),
                             color: _primary.withOpacity(0.1),
                             child: Text(
                               'DEFAULT',
                               style: TextStyle(
                                 fontFamily: _fBold,
-                                fontSize: 9,
+                                fontSize: _s(context, 9).clamp(8.0, 12.0),
                                 fontWeight: FontWeight.w700,
                                 color: _primary,
                                 letterSpacing: 0.5,
@@ -373,30 +415,34 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: _s(context, 4)),
                     Text(
                       address.formattedAddress,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: _fBody,
-                        fontSize: 12,
+                        fontSize: _s(context, 12).clamp(11.0, 16.0),
                         color: _secondaryTx,
                         height: 1.5,
                       ),
                     ),
                     if (address.phone.isNotEmpty) ...[
-                      const SizedBox(height: 3),
+                      SizedBox(height: _s(context, 3)),
                       Text(
                         address.phone,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: _fBody,
-                          fontSize: 12,
+                          fontSize: _s(context, 12).clamp(11.0, 16.0),
                           color: _secondaryTx,
                         ),
                       ),
                     ],
                     if (!isPickMode) ...[
-                      const SizedBox(height: 10),
-                      Row(
+                      SizedBox(height: _s(context, 10)),
+                      // Wrap prevents the action buttons from overflowing on
+                      // narrow screens; they flow to the next line instead.
+                      Wrap(
+                        spacing: _s(context, 14),
+                        runSpacing: _s(context, 8),
                         children: [
                           if (!address.isDefault)
                             _actionButton(
@@ -405,14 +451,12 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                               color: _primary,
                               onTap: () => _setDefault(address),
                             ),
-                          if (!address.isDefault) const SizedBox(width: 14),
                           _actionButton(
                             label: 'Edit',
                             icon: Icons.edit_outlined,
                             color: const Color(0xFF555555),
                             onTap: () => _openEditAddress(address),
                           ),
-                          const SizedBox(width: 14),
                           _actionButton(
                             label: 'Delete',
                             icon: Icons.delete_outline_rounded,
@@ -443,13 +487,13 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 3),
+            Icon(icon, size: _s(context, 14).clamp(13.0, 18.0), color: color),
+            SizedBox(width: _s(context, 3)),
             Text(
               label,
               style: TextStyle(
                 fontFamily: _fBold,
-                fontSize: 11,
+                fontSize: _s(context, 11).clamp(10.0, 15.0),
                 fontWeight: FontWeight.w600,
                 color: color,
               ),
@@ -461,108 +505,124 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   Widget _addNewTile() => InkWell(
         onTap: _openAddAddress,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+          padding: EdgeInsets.symmetric(
+              horizontal: _s(context, 14), vertical: _s(context, 16)),
           color: Colors.white,
           child: Row(
             children: [
-              Icon(Icons.add_location_alt_outlined, size: 20, color: _primary),
-              const SizedBox(width: 10),
-              Text(
-                'Add New Address',
-                style: TextStyle(
-                  fontFamily: _fBold,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _primary,
+              Icon(Icons.add_location_alt_outlined,
+                  size: _s(context, 20).clamp(18.0, 26.0), color: _primary),
+              SizedBox(width: _s(context, 10)),
+              Flexible(
+                child: Text(
+                  'Add New Address',
+                  style: TextStyle(
+                    fontFamily: _fBold,
+                    fontSize: _s(context, 13).clamp(12.0, 18.0),
+                    fontWeight: FontWeight.w600,
+                    color: _primary,
+                  ),
                 ),
               ),
               const Spacer(),
-              const Icon(Icons.chevron_right_rounded,
-                  size: 18, color: Color(0xFFBBBBBB)),
+              Icon(Icons.chevron_right_rounded,
+                  size: _s(context, 18).clamp(16.0, 24.0),
+                  color: const Color(0xFFBBBBBB)),
             ],
           ),
         ),
       );
 
   Widget _emptyState() => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.location_off_outlined,
-                size: 52, color: Colors.grey.shade300),
-            const SizedBox(height: 14),
-            const Text(
-              'No saved addresses',
-              style: TextStyle(
-                fontFamily: _fHead,
-                fontSize: 20,
-                fontWeight: FontWeight.w500,
-                color: _primary,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(_s(context, 24)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.location_off_outlined,
+                  size: _s(context, 52).clamp(44.0, 72.0),
+                  color: Colors.grey.shade300),
+              SizedBox(height: _s(context, 14)),
+              Text(
+                'No saved addresses',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: _fHead,
+                  fontSize: _s(context, 20).clamp(18.0, 28.0),
+                  fontWeight: FontWeight.w500,
+                  color: _primary,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Add an address for faster checkout',
-              style: TextStyle(
-                fontFamily: _fBody,
-                fontSize: 12,
-                color: _secondaryTx,
+              SizedBox(height: _s(context, 6)),
+              Text(
+                'Add an address for faster checkout',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: _fBody,
+                  fontSize: _s(context, 12).clamp(11.0, 16.0),
+                  color: _secondaryTx,
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 46,
-              child: ElevatedButton.icon(
-                onPressed: _openAddAddress,
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text(
-                  'Add Address',
-                  style: TextStyle(
-                    fontFamily: _fBold,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+              SizedBox(height: _s(context, 24)),
+              SizedBox(
+                height: _s(context, 46).clamp(44.0, 60.0),
+                child: ElevatedButton.icon(
+                  onPressed: _openAddAddress,
+                  icon: Icon(Icons.add_rounded, size: _s(context, 18).clamp(16.0, 24.0)),
+                  label: Text(
+                    'Add Address',
+                    style: TextStyle(
+                      fontFamily: _fBold,
+                      fontSize: _s(context, 14).clamp(13.0, 18.0),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: const RoundedRectangleBorder(),
+                    padding: EdgeInsets.symmetric(horizontal: _s(context, 24)),
                   ),
                 ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _errorState(String error) => Center(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(_s(context, 24)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.wifi_off_rounded,
+                  size: _s(context, 48).clamp(40.0, 66.0),
+                  color: const Color(0xFFBBBBBB)),
+              SizedBox(height: _s(context, 12)),
+              Text(
+                error,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: _fBody,
+                  fontSize: _s(context, 13).clamp(12.0, 17.0),
+                  color: _secondaryTx,
+                ),
+              ),
+              SizedBox(height: _s(context, 16)),
+              ElevatedButton(
+                onPressed: () => AddressService.instance.fetchAddresses(),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: const RoundedRectangleBorder(),
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
                 ),
+                child: const Text('Retry'),
               ),
-            ),
-          ],
-        ),
-      );
-
-  Widget _errorState(String error) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.wifi_off_rounded,
-                size: 48, color: Color(0xFFBBBBBB)),
-            const SizedBox(height: 12),
-            Text(
-              error,
-              style: const TextStyle(
-                fontFamily: _fBody,
-                fontSize: 13,
-                color: _secondaryTx,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => AddressService.instance.fetchAddresses(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: const RoundedRectangleBorder(),
-              ),
-              child: const Text('Retry'),
-            ),
-          ],
+            ],
+          ),
         ),
       );
 }
