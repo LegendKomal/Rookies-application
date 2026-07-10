@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
@@ -15,18 +15,16 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage>
     with SingleTickerProviderStateMixin {
-  static const Color primary      = Color(ShopifyConstants.primaryColorHex);
-  static const Color bgColor      = Color(ShopifyConstants.bgColorHex);
-  static const Color cardColor    = Color(ShopifyConstants.cardColorHex);
-  static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
+  static const Color primary      = AppColors.primary;
+  static const Color bgColor      = AppColors.bg;
+  static const Color cardColor    = AppColors.card;
+  static const Color secondaryTxt = AppColors.secondaryText;
 
-  static const String _fHead = ShopifyConstants.fontHeading;
-  static const String _fBody = ShopifyConstants.fontBody;
-  static const String _fBold = ShopifyConstants.fontBodyBold;
+  static const String _fHead = AppFonts.heading;
+  static const String _fBody = AppFonts.body;
+  static const String _fBold = AppFonts.bold;
 
-  // Layout tuning.
-  static const double _kBaseWidth   = 375; // reference design width.
-  static const double _kMaxContentW = 720; // cap list width on tablets/desktop.
+  static const double _kMaxContentW = 720;
 
   final TextEditingController _searchCtrl = TextEditingController();
   final FocusNode _focusNode = FocusNode();
@@ -40,13 +38,7 @@ class _SearchPageState extends State<SearchPage>
   late AnimationController _fadeCtrl;
   late Animation<double> _fadeAnim;
 
-  /// Width-based scale factor, clamped so text/controls stay sensible.
-  double _sf() {
-    final w = MediaQuery.sizeOf(context).width;
-    return (w / _kBaseWidth).clamp(0.85, 1.35);
-  }
-
-  double _s(double base) => base * _sf();
+  double _s(double base) => Responsive.of(context, baseW: 375).s(base);
 
   @override
   void initState() {
@@ -547,8 +539,6 @@ class _SearchPageState extends State<SearchPage>
       );
     }
 
-    // Wrap so a long price + strikethrough compare-at price never overflows
-    // on narrow screens.
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: _s(6),

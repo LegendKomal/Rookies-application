@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/product_detail_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
@@ -26,25 +26,21 @@ class ProductDetailPage extends StatefulWidget {
 }
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
-  static const Color primary      = Color(ShopifyConstants.primaryColorHex);
-  static const Color bgColor      = Color(ShopifyConstants.bgColorHex);
-  static const Color cardColor    = Color(ShopifyConstants.cardColorHex);
-  static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
-  static const Color borderColor  = Color(ShopifyConstants.borderColorHex);
+  static const Color primary      = AppColors.primary;
+  static const Color bgColor      = AppColors.bg;
+  static const Color cardColor    = AppColors.card;
+  static const Color secondaryTxt = AppColors.secondaryText;
+  static const Color borderColor  = AppColors.border;
 
-  static const String _fHead = ShopifyConstants.fontHeading;
-  static const String _fBody = ShopifyConstants.fontBody;
-  static const String _fBold = ShopifyConstants.fontBodyBold;
-  static const String _fBodyBold = ShopifyConstants.fontAlteBold;
-  static const String _fNumber = ShopifyConstants.fontNumber;
+  static const String _fHead = AppFonts.heading;
+  static const String _fBody = AppFonts.body;
+  static const String _fBold = AppFonts.bold;
+  static const String _fBodyBold = AppFonts.alteBold;
+  static const String _fNumber = AppFonts.number;
 
-  // ---- Responsive helpers -------------------------------------------------
-  // Scales off screen width (400px baseline). Content is capped so on tablets
-  // and desktop the page reads as a centered column instead of stretching.
-  double get _sf =>
-      (MediaQuery.of(context).size.width / 400).clamp(0.85, 1.25).toDouble();
-  double _s(double base) => base * _sf;
-  static const double _maxContentWidth = 720;
+  double _s(double base) =>
+      Responsive.of(context, baseW: 400, maxScale: 1.25).s(base);
+  static const double _maxContentWidth = AppLayout.maxContentMedium;
 
   ShopifyProductDetail? _product;
   bool _isLoading = true;
@@ -350,7 +346,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
-          // Cap and center the content column on wide screens.
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: _maxContentWidth),
@@ -708,7 +703,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   Widget _goesWellWithSection() {
     final cardWidth = _s(140).clamp(120.0, 180.0);
     final imgHeight = _s(150).clamp(130.0, 200.0);
-    // List height = image + gaps + 2 title lines + price, scaled.
     final listHeight = imgHeight + _s(70).clamp(60.0, 90.0);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 0, 8),
@@ -805,7 +799,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _youMayAlsoLikeSection() {
-    // Adaptive columns: keep 2 on phones, more on tablets/desktop.
     final width = MediaQuery.of(context).size.width;
     final maxTileExtent = width >= 900 ? 240.0 : width >= 600 ? 220.0 : 200.0;
     return Padding(

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/screens/authentication/forgot_password.dart';
 import 'package:rookies_jeans/screens/profile/profile.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
@@ -23,22 +24,15 @@ class _LoginState extends State<Login> {
 
   static const Color bgColor      = Color(0xfff5f5f3);
   static const Color cardColor    = Colors.white;
-  static const Color primary      = Color(0xff111111);
-  static const Color secondaryText = Color(0xff6b6b6b);
-  static const Color borderColor  = Color(0xffdddddd);
+  static const Color primary      = AppColors.primary;
+  static const Color secondaryText = AppColors.secondaryText;
+  static const Color borderColor  = AppColors.border;
   static const Color fieldFill    = Color(0xfffafafa);
 
-  // ---- Responsive helpers -------------------------------------------------
-  // Scales off screen width so the form fits from small phones to tablets.
-  // 400px logical width is the baseline (factor == 1.0).
-  double get _sf =>
-      (MediaQuery.of(context).size.width / 400).clamp(0.85, 1.3).toDouble();
+  double _s(double base) =>
+      Responsive.of(context, baseW: 400, maxScale: 1.3).s(base);
 
-  /// Scale a size value responsively.
-  double _s(double base) => base * _sf;
-
-  /// Scale a fixed control height but keep it within comfortable touch bounds.
-  double _h(double base) => (base * _sf).clamp(48.0, 64.0);
+  double _h(double base) => _s(base).clamp(48.0, 64.0);
 
   @override
   void dispose() {

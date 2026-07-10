@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
 class ForgotPassword extends StatefulWidget {
@@ -17,22 +18,15 @@ class _ForgotPasswordState extends State<ForgotPassword> {
 
   static const Color bgColor = Color(0xfff5f5f3);
   static const Color cardColor = Colors.white;
-  static const Color primary = Color(0xff111111);
-  static const Color secondaryText = Color(0xff6b6b6b);
-  static const Color borderColor = Color(0xffdddddd);
+  static const Color primary = AppColors.primary;
+  static const Color secondaryText = AppColors.secondaryText;
+  static const Color borderColor = AppColors.border;
   static const Color fieldFill = Color(0xfffafafa);
 
-  // ---- Responsive helpers -------------------------------------------------
-  // Everything scales off screen width so the form looks right on a 320px
-  // phone, a 430px large phone, a 768px tablet and wider. 400px is baseline.
-  double get _sf =>
-      (MediaQuery.of(context).size.width / 400).clamp(0.85, 1.3).toDouble();
+  double _s(double base) =>
+      Responsive.of(context, baseW: 400, maxScale: 1.3).s(base);
 
-  /// Scale a size value responsively.
-  double _s(double base) => base * _sf;
-
-  /// Scale a fixed control height but keep it within comfortable touch bounds.
-  double _h(double base) => (base * _sf).clamp(48.0, 64.0);
+  double _h(double base) => _s(base).clamp(48.0, 64.0);
 
   @override
   void dispose() {
@@ -146,7 +140,6 @@ class _ForgotPasswordState extends State<ForgotPassword> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    // Tighter side gutters on very small phones; a little more air elsewhere.
     final outerH = width < 360 ? 16.0 : _s(24);
 
     return Scaffold(
@@ -156,7 +149,6 @@ class _ForgotPasswordState extends State<ForgotPassword> {
           child: SingleChildScrollView(
             padding: EdgeInsets.symmetric(horizontal: outerH, vertical: _s(24)),
             child: ConstrainedBox(
-              // Cap width so the form stays a focused card on tablets/desktop.
               constraints: const BoxConstraints(maxWidth: 460),
               child: Container(
                 padding: EdgeInsets.all(_s(24)),

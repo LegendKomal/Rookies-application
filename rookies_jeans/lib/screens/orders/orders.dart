@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/screens/profile/profile.dart';
 import 'package:rookies_jeans/services/order_service.dart';
 
-/// Shared responsive helpers for the order screens.
-/// Scales off screen width (400px baseline) and caps content width so the
-/// layout stays comfortable from small phones to tablets/desktop.
 class _R {
-  _R(BuildContext context) : width = MediaQuery.of(context).size.width;
-  final double width;
+  _R(BuildContext context)
+      : _r = Responsive.of(context, baseW: 400, maxScale: 1.3);
+  final Responsive _r;
 
-  double get factor => (width / 400).clamp(0.85, 1.3).toDouble();
-  double s(double base) => base * factor;
+  double s(double base) => _r.s(base);
 
   static const double maxContentWidth = 720;
 
@@ -32,7 +30,7 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
-  static const _primary = Color(ShopifyConstants.primaryColorHex);
+  static const _primary = AppColors.primary;
   static const _bg      = Color(0xFFF5F5F3);
 
   final _svc = ShopifyOrderService.instance;
@@ -214,8 +212,6 @@ class _OrderStateBadge extends StatelessWidget {
       case OrderState.delivered:
         return const _Badge(label: 'Delivered', color: Color(0xFF2E7D32));
       case OrderState.active:
-        // Wrap so the two badges flow to a second line on narrow cards
-        // instead of overflowing.
         return Wrap(
           spacing: 6,
           runSpacing: 6,
@@ -335,7 +331,7 @@ class OrderDetailScreen extends StatefulWidget {
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
-  static const _primary = Color(ShopifyConstants.primaryColorHex);
+  static const _primary = AppColors.primary;
   final _svc = ShopifyOrderService.instance;
 
   void _openCancelPage() {

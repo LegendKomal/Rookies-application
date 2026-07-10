@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/address_model.dart';
 import 'package:rookies_jeans/screens/profile/add_edit.dart';
 import 'package:rookies_jeans/services/address_service.dart';
@@ -14,32 +15,24 @@ class AddressBookScreen extends StatefulWidget {
 }
 
 class _AddressBookScreenState extends State<AddressBookScreen> {
-  static const _primary     = Color(ShopifyConstants.primaryColorHex);
+  static const _primary     = AppColors.primary;
   static const _bg          = Color(0xFFF5F5F3);
   static const _cardColor   = Colors.white;
   static const _border      = Color(0xFFEEEEEE);
   static const _secondaryTx = Color(0xFF777777);
-  static const _deleteRed   = Color(0xFFD32F2F);
+  static const _deleteRed   = AppColors.danger;
 
-  static const _fHead = ShopifyConstants.fontHeading;
-  static const _fBody = ShopifyConstants.fontBody;
-  static const _fBold = ShopifyConstants.fontBodyBold;
+  static const _fHead = AppFonts.heading;
+  static const _fBody = AppFonts.body;
+  static const _fBold = AppFonts.bold;
 
-  // Layout tuning.
-  static const double _kBaseWidth   = 375; // reference design width.
-  static const double _kMaxContentW = 640; // cap content on tablets/desktop.
+  static const double _kMaxContentW = 640;
 
   String? _selectedId;
   bool _isSettingDefault = false;
 
-  /// Width-based scale factor, clamped so text never gets too tiny or huge.
-  double _sf(BuildContext c) {
-    final w = MediaQuery.sizeOf(c).width;
-    return (w / _kBaseWidth).clamp(0.85, 1.35);
-  }
-
-  /// Scaled size helper.
-  double _s(BuildContext c, double base) => base * _sf(c);
+  double _s(BuildContext c, double base) =>
+      Responsive.of(c, baseW: 375).s(base);
 
   @override
   void initState() {
@@ -165,7 +158,6 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   Widget build(BuildContext context) {
     final isPickMode = widget.pickMode;
     final media = MediaQuery.of(context);
-    // Responsive app bar height (also grows a bit with the user's text scale).
     final toolbarHeight =
         (_s(context, 72)).clamp(64.0, 104.0) * media.textScaler.scale(1).clamp(1.0, 1.3);
 
@@ -191,8 +183,6 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 ),
               ),
               SizedBox(width: _s(context, 10)),
-              // Flexible + FittedBox lets the big display title shrink to fit
-              // on very narrow screens instead of overflowing.
               Flexible(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
@@ -251,7 +241,6 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
           final pad = _s(context, 16);
           return Stack(
             children: [
-              // Center + max width keeps lines readable on tablets/desktop.
               Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
@@ -438,8 +427,6 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                     ],
                     if (!isPickMode) ...[
                       SizedBox(height: _s(context, 10)),
-                      // Wrap prevents the action buttons from overflowing on
-                      // narrow screens; they flow to the next line instead.
                       Wrap(
                         spacing: _s(context, 14),
                         runSpacing: _s(context, 8),

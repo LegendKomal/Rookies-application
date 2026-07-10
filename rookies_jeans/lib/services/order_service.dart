@@ -1,7 +1,6 @@
-import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
 import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/shopify_api.dart';
 
 class ShopifyOrderException implements Exception {
   final String code;
@@ -74,20 +73,16 @@ class ShopifyOrderService {
     ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(ShopifyConstants.storefrontEndpoint),
-        headers: ShopifyConstants.headers,
-        body: jsonEncode({
-          'query': query,
-          'variables': {'customerAccessToken': token},
-        }),
+      final res = await ShopifyGraphQL.post(
+        query,
+        variables: {'customerAccessToken': token},
       );
 
-      if (response.statusCode != 200) {
+      if (res.statusCode != 200) {
         throw const ShopifyOrderException('fetch_failed');
       }
 
-      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final decoded = res.body;
       if (decoded['errors'] != null) throw const ShopifyOrderException('fetch_failed');
 
       final edges =

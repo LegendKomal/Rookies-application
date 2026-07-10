@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 
 class RookiesBottomNavBar extends StatelessWidget {
@@ -12,11 +12,11 @@ class RookiesBottomNavBar extends StatelessWidget {
     required this.onTap,
   });
 
-  static const Color _primary     = Color(ShopifyConstants.primaryColorHex);
+  static const Color _primary     = AppColors.primary;
   static const Color _inactive    = Color(0xFFAAAAAA);
-  static const Color _bg          = Color(ShopifyConstants.cardColorHex);
-  static const Color _border      = Color(ShopifyConstants.borderColorHex);
-  static const Color _badgeBg     = Color(0xFFD32F2F);
+  static const Color _bg          = AppColors.card;
+  static const Color _border      = AppColors.border;
+  static const Color _badgeBg     = AppColors.danger;
 
   static const int _cartIndex = 3;
 
@@ -38,8 +38,6 @@ class RookiesBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Scale off screen width so the bar and its icons stay proportional from
-    // small phones to tablets, while staying within touch-friendly bounds.
     final width = MediaQuery.of(context).size.width;
     final factor = (width / 400).clamp(0.9, 1.3).toDouble();
     final barHeight = (60 * factor).clamp(56.0, 76.0);

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
-import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/collections/collections.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
@@ -16,20 +16,18 @@ class WishlistPage extends StatefulWidget {
 }
 
 class _WishlistPageState extends State<WishlistPage> {
-  static const Color primary      = Color(ShopifyConstants.primaryColorHex);
-  static const Color bgColor      = Color(ShopifyConstants.bgColorHex);
-  static const Color cardColor    = Color(ShopifyConstants.cardColorHex);
-  static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
-  static const Color borderColor  = Color(ShopifyConstants.borderColorHex);
+  static const Color primary      = AppColors.primary;
+  static const Color bgColor      = AppColors.bg;
+  static const Color cardColor    = AppColors.card;
+  static const Color secondaryTxt = AppColors.secondaryText;
+  static const Color borderColor  = AppColors.border;
 
-  static const String _fHead = ShopifyConstants.fontHeading;
-  static const String _fBody = ShopifyConstants.fontBody;
-  static const String _fBold = ShopifyConstants.fontBodyBold;
+  static const String _fHead = AppFonts.heading;
+  static const String _fBody = AppFonts.body;
+  static const String _fBold = AppFonts.bold;
 
-  // ---- Responsive helpers -------------------------------------------------
-  double get _sf =>
-      (MediaQuery.of(context).size.width / 400).clamp(0.85, 1.25).toDouble();
-  double _s(double base) => base * _sf;
+  double _s(double base) =>
+      Responsive.of(context, baseW: 400, maxScale: 1.25).s(base);
 
   double _maxTileExtent(double width) {
     if (width >= 1024) return 240;
@@ -40,7 +38,6 @@ class _WishlistPageState extends State<WishlistPage> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    // Big heading scales to the width instead of a hardcoded 34.
     final titleSize = (width * 0.09).clamp(22.0, 40.0);
 
     return Scaffold(
@@ -338,8 +335,6 @@ class _WishlistPageState extends State<WishlistPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Wrap so struck-through + current price flow to a new line on narrow
-        // cards instead of overflowing.
         Wrap(
           crossAxisAlignment: WrapCrossAlignment.center,
           spacing: 6,

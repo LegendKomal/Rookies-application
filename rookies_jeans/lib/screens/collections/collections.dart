@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/screens/products/products.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
@@ -12,7 +12,7 @@ class ExploreCategoriesPage extends StatefulWidget {
 
 class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
   late Future<List<ShopifyCollection>> _future;
-  static const String _fHead = ShopifyConstants.fontHeading;
+  static const String _fHead = AppFonts.heading;
 
   @override
   void initState() {
@@ -31,13 +31,8 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    // Big heading scales to the screen instead of a hardcoded 34, and stays
-    // on one line via ellipsis on very narrow phones.
     final titleSize = (width * 0.09).clamp(20.0, 40.0);
-    // Toolbar height scales a little so the large title always fits.
     final toolbarHeight = (titleSize + 50).clamp(72.0, 104.0);
-    // Target tile width -> columns adapt automatically (2 on phones, more on
-    // tablets/foldables/desktop).
     final maxTileExtent = width >= 1024
         ? 260.0
         : width >= 600
@@ -45,9 +40,9 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
             : 220.0;
 
     return Scaffold(
-      backgroundColor: const Color(ShopifyConstants.bgColorHex),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        backgroundColor: const Color(ShopifyConstants.bgColorHex),
+        backgroundColor: AppColors.bg,
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
@@ -62,7 +57,7 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
                 child: const Icon(
                   Icons.arrow_back_ios_new,
                   size: 22,
-                  color: Color(ShopifyConstants.primaryColorHex),
+                  color: AppColors.primary,
                 ),
               ),
               const SizedBox(width: 10),
@@ -75,7 +70,7 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
                     fontSize: titleSize,
                     height: 1,
                     fontFamily: _fHead,
-                    color: const Color(ShopifyConstants.primaryColorHex),
+                    color: AppColors.primary,
                   ),
                 ),
               ),
@@ -140,8 +135,6 @@ class _CategoryTile extends StatelessWidget {
   final ShopifyCollection category;
   @override
   Widget build(BuildContext context) {
-    // Scale the label and overlay to the tile's own width so it looks right
-    // regardless of how many columns the grid decided to show.
     return LayoutBuilder(
       builder: (context, constraints) {
         final tileWidth = constraints.maxWidth;

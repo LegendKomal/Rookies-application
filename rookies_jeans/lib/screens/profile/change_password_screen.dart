@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -11,30 +11,22 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  static const Color primary = Color(ShopifyConstants.primaryColorHex);
+  static const Color primary = AppColors.primary;
   static const Color secondaryText = Color(0xFF666666);
 
-  static const String _fHead = ShopifyConstants.fontHeading;
-  static const String _fBody = ShopifyConstants.fontBody;
-  static const String _fBold = ShopifyConstants.fontBodyBold;
+  static const String _fHead = AppFonts.heading;
+  static const String _fBody = AppFonts.body;
+  static const String _fBold = AppFonts.bold;
 
-  // Layout tuning.
-  static const double _kBaseWidth   = 375; // reference design width.
-  static const double _kMaxContentW = 480; // cap form width on tablets/desktop.
+  static const double _kMaxContentW = 480;
 
   final _emailController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   bool _loading = false;
 
-  /// Width-based scale factor, clamped so text never gets too tiny or huge.
-  double _sf(BuildContext c) {
-    final w = MediaQuery.sizeOf(c).width;
-    return (w / _kBaseWidth).clamp(0.85, 1.35);
-  }
-
-  /// Scaled size helper.
-  double _s(BuildContext c, double base) => base * _sf(c);
+  double _s(BuildContext c, double base) =>
+      Responsive.of(c, baseW: 375).s(base);
 
   Future<void> _sendResetLink() async {
     if (!_formKey.currentState!.validate()) return;
@@ -105,8 +97,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 }
               },
             ),
-            // Flexible + FittedBox lets the big display title shrink to fit
-            // on very narrow screens instead of overflowing.
             Flexible(
               child: Padding(
                 padding: EdgeInsets.only(right: _s(context, 12)),
@@ -120,7 +110,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       fontSize: _s(context, 34).clamp(24.0, 46.0),
                       height: 1,
                       fontFamily: _fHead,
-                      color: const Color(ShopifyConstants.primaryColorHex),
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
@@ -136,8 +126,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             return SingleChildScrollView(
               padding: EdgeInsets.all(_s(context, 20)),
               child: ConstrainedBox(
-                // Fill height so the form can center vertically on big screens
-                // while still scrolling when the keyboard shrinks the viewport.
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Center(
                   child: ConstrainedBox(

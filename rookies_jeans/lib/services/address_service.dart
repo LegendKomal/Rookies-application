@@ -1,24 +1,11 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:rookies_jeans/constant/shopify_api.dart';
 import 'package:rookies_jeans/models/address_model.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
 class AddressService extends ChangeNotifier {
   AddressService._();
   static final AddressService instance = AddressService._();
-
-  static const String _shopDomain = 'rookies-jeans.myshopify.com';
-  static const String _storefrontToken = '8127f95aa12da6ed0234550d19abd043';
-  static const String _apiVersion = '2026-04';
-
-  String get _endpoint =>
-      'https://$_shopDomain/api/$_apiVersion/graphql.json';
-
-  Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        'X-Shopify-Storefront-Access-Token': _storefrontToken,
-      };
 
   List<ShopifyAddress> _addresses = [];
   bool _isLoading = false;
@@ -77,18 +64,14 @@ class AddressService extends ChangeNotifier {
     ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: _headers,
-        body: jsonEncode({
-          'query': query,
-          'variables': {'token': token},
-        }),
+      final res = await ShopifyGraphQL.post(
+        query,
+        variables: {'token': token},
+        tag: 'AddressService',
       );
 
-      _log('fetchAddresses status: ${response.statusCode}');
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final customer = data['data']?['customer'] as Map<String, dynamic>?;
+      _log('fetchAddresses status: ${res.statusCode}');
+      final customer = res.data?['customer'] as Map<String, dynamic>?;
 
       if (customer == null) {
         _error = 'Could not load addresses.';
@@ -148,17 +131,12 @@ class AddressService extends ChangeNotifier {
     ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: _headers,
-        body: jsonEncode({
-          'query': mutation,
-          'variables': {'token': token, 'address': addressInput},
-        }),
+      final res = await ShopifyGraphQL.post(
+        mutation,
+        variables: {'token': token, 'address': addressInput},
       );
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final result = data['data']?['customerAddressCreate'];
+      final result = res.data?['customerAddressCreate'];
       final errors = result?['customerUserErrors'] as List? ?? [];
 
       if (errors.isNotEmpty) {
@@ -208,21 +186,16 @@ class AddressService extends ChangeNotifier {
     ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: _headers,
-        body: jsonEncode({
-          'query': mutation,
-          'variables': {
-            'token': token,
-            'id': addressId,
-            'address': addressInput,
-          },
-        }),
+      final res = await ShopifyGraphQL.post(
+        mutation,
+        variables: {
+          'token': token,
+          'id': addressId,
+          'address': addressInput,
+        },
       );
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final result = data['data']?['customerAddressUpdate'];
+      final result = res.data?['customerAddressUpdate'];
       final errors = result?['customerUserErrors'] as List? ?? [];
 
       if (errors.isNotEmpty) {
@@ -261,17 +234,12 @@ class AddressService extends ChangeNotifier {
     ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: _headers,
-        body: jsonEncode({
-          'query': mutation,
-          'variables': {'token': token, 'id': addressId},
-        }),
+      final res = await ShopifyGraphQL.post(
+        mutation,
+        variables: {'token': token, 'id': addressId},
       );
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final result = data['data']?['customerAddressDelete'];
+      final result = res.data?['customerAddressDelete'];
       final errors = result?['customerUserErrors'] as List? ?? [];
 
       if (errors.isNotEmpty) {
@@ -311,19 +279,14 @@ class AddressService extends ChangeNotifier {
     ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: _headers,
-        body: jsonEncode({
-          'query': mutation,
-          'variables': {'token': token, 'addressId': addressId},
-        }),
+      final res = await ShopifyGraphQL.post(
+        mutation,
+        variables: {'token': token, 'addressId': addressId},
       );
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      _log('setDefaultAddress raw response: ${response.body}');
+      _log('setDefaultAddress raw response: ${res.body}');
 
-      final result = data['data']?['customerDefaultAddressUpdate'];
+      final result = res.data?['customerDefaultAddressUpdate'];
       final errors = result?['customerUserErrors'] as List? ?? [];
 
       if (errors.isNotEmpty) {

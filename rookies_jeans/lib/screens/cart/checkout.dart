@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 
 class CheckoutWebView extends StatefulWidget {
   const CheckoutWebView({super.key, required this.checkoutUrl});
@@ -13,19 +13,14 @@ class CheckoutWebView extends StatefulWidget {
 }
 
 class _CheckoutWebViewState extends State<CheckoutWebView> {
-  static const Color primary = Color(ShopifyConstants.primaryColorHex);
-  static const Color bgColor = Color(ShopifyConstants.bgColorHex);
+  static const Color primary = AppColors.primary;
+  static const Color bgColor = AppColors.bg;
 
-  static const String _fBold = ShopifyConstants.fontBodyBold;
-  static const String _fBody = ShopifyConstants.fontBody;
+  static const String _fBold = AppFonts.bold;
+  static const String _fBody = AppFonts.body;
 
-  // The WebView itself is inherently fluid (it fills whatever space it's
-  // given), so responsiveness here is mostly about the chrome around it.
-  // 400px logical width is the baseline (factor == 1.0).
-  double get _sf =>
-      (MediaQuery.of(context).size.width / 400).clamp(0.85, 1.3).toDouble();
-
-  double _s(double base) => base * _sf;
+  double _s(double base) =>
+      Responsive.of(context, baseW: 400, maxScale: 1.3).s(base);
 
   late final WebViewController _controller;
   bool _isLoading      = true;

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
@@ -10,36 +10,20 @@ import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/screens/cart/cart.dart';
 
-/// Small, dependency-free responsive helper.
-///
-/// Everything scales off the current screen width so the same widgets look
-/// right on a 320px phone, a 430px large phone, a 768px tablet and a 1280px+
-/// desktop/foldable. Grid columns are derived from a target card width, so the
-/// layout adds/removes columns automatically instead of being locked to 2.
 class _Responsive {
-  _Responsive(BuildContext context)
-      : _size = MediaQuery.of(context).size,
-        _devicePadding = MediaQuery.of(context).padding;
+  _Responsive(BuildContext context) : _r = Responsive.of(context, baseW: 400);
 
-  final Size _size;
-  final EdgeInsets _devicePadding;
+  final Responsive _r;
 
-  double get width => _size.width;
-  double get height => _size.height;
+  double get width => _r.width;
+  double get height => _r.height;
 
-  /// Usable width inside the horizontal safe-area insets.
-  double get safeWidth =>
-      (width - _devicePadding.left - _devicePadding.right).clamp(0.0, width);
+  double get safeWidth => _r.safeWidth;
 
-  bool get isTablet => width >= 600 && width < 1024;
-  bool get isDesktop => width >= 1024;
+  bool get isTablet => _r.isTablet;
+  bool get isDesktop => _r.isDesktop;
 
-  /// Linear text-scale factor. 400 logical px is treated as the baseline.
-  /// Clamped so tiny screens stay readable and huge screens don't explode.
-  double get _factor => (width / 400).clamp(0.85, 1.35);
-
-  /// Scale a font size responsively.
-  double sp(double base) => base * _factor;
+  double sp(double base) => _r.sp(base);
 }
 
 class ProductsPage extends StatefulWidget {
@@ -52,29 +36,23 @@ class ProductsPage extends StatefulWidget {
 }
 
 class _ProductsPageState extends State<ProductsPage> {
-  static const Color primary = Color(ShopifyConstants.primaryColorHex);
-  static const Color bgColor = Color(ShopifyConstants.bgColorHex);
-  static const Color cardColor = Color(ShopifyConstants.cardColorHex);
-  static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
-  static const Color borderColor = Color(ShopifyConstants.borderColorHex);
+  static const Color primary = AppColors.primary;
+  static const Color bgColor = AppColors.bg;
+  static const Color cardColor = AppColors.card;
+  static const Color secondaryTxt = AppColors.secondaryText;
+  static const Color borderColor = AppColors.border;
 
-  // ---- Single source of truth for grid geometry (used by the grid AND the
-  // ---- auto-scroll visibility math so they can never drift apart). ----
   static const double _kGridPadding = 12.0;
   static const double _kCrossSpacing = 12.0;
   static const double _kMainSpacing = 14.0;
   static const double _kAspect = 0.52;
 
-  /// Target max width of a single card. Flutter's max-extent delegate fits as
-  /// many columns as possible without exceeding this, so columns adapt to the
-  /// screen automatically (2 on phones, 3–4 on tablets, 5+ on desktop).
   double _maxCardExtent(_Responsive r) {
     if (r.isDesktop) return 260;
     if (r.isTablet) return 240;
-    return 230; // phones -> 2 columns across the usual 320–599px range
+    return 230;
   }
 
-  /// Mirror of SliverGridDelegateWithMaxCrossAxisExtent's column formula.
   int _columnsFor(_Responsive r) {
     final gridWidth = r.safeWidth - _kGridPadding * 2;
     final extent = _maxCardExtent(r);
@@ -95,12 +73,12 @@ class _ProductsPageState extends State<ProductsPage> {
   String? _endCursor;
   String? _error;
 
-  static const String _fHead = ShopifyConstants.fontHeading;
-  static const String _fBody = ShopifyConstants.fontBody;
-  static const String _fBold = ShopifyConstants.fontBodyBold;
-  static const String _fBodyBold = ShopifyConstants.fontAlteBold;
-  static const String _fNumber = ShopifyConstants.fontNumber;
-  static const String _fRupee = ShopifyConstants.fontRupee;
+  static const String _fHead = AppFonts.heading;
+  static const String _fBody = AppFonts.body;
+  static const String _fBold = AppFonts.bold;
+  static const String _fBodyBold = AppFonts.alteBold;
+  static const String _fNumber = AppFonts.number;
+  static const String _fRupee = AppFonts.rupee;
 
   ProductSortOption _sortOption = ProductSortOption.defaultSort;
 
@@ -422,12 +400,10 @@ class _ProductsPageState extends State<ProductsPage> {
 
             return SafeArea(
               top: false,
-              // Constrain height and make it scrollable so it never overflows
-              // on short screens / landscape / large system font settings.
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   maxHeight: r.height * 0.9,
-                  maxWidth: 640, // keep the sheet tidy on tablets/desktop
+                  maxWidth: 640,
                 ),
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
@@ -655,8 +631,6 @@ class _ProductsPageState extends State<ProductsPage> {
 
   Widget _topBar(BuildContext context) {
     final r = _Responsive(context);
-    // Collection heading was a fixed 35px which overflows on narrow phones and
-    // looks tiny on tablets. Scale it to the available width with sane bounds.
     final titleSize = (r.width * 0.085).clamp(22.0, 40.0);
     return Container(
       color: cardColor,
@@ -728,7 +702,6 @@ class _ProductsPageState extends State<ProductsPage> {
         90,
       ),
       itemCount: _products.length + (_isLoadingMore ? 1 : 0),
-      // Max-extent delegate => columns adapt to screen width automatically.
       gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: _maxCardExtent(r),
         mainAxisSpacing: _kMainSpacing,
@@ -834,8 +807,6 @@ class _ProductsPageState extends State<ProductsPage> {
       ),
       builder: (sheetContext) {
         final r = _Responsive(sheetContext);
-        // Left rail width scales with screen; capped so it never dominates a
-        // small phone nor looks lost on a wide tablet.
         final railWidth = (r.width * 0.32).clamp(96.0, 200.0);
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
@@ -879,7 +850,6 @@ class _ProductsPageState extends State<ProductsPage> {
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: 900),
                 child: SizedBox(
-                  // Taller share of the screen on short devices so controls fit.
                   height: r.height * (r.height < 600 ? 0.92 : 0.82),
                   child: Column(
                     children: [
@@ -1753,9 +1723,6 @@ class _ProductsPageState extends State<ProductsPage> {
 
     final saved = product.compareAtPrice! - product.price;
 
-    // Wrap (instead of a single Row) so the strikethrough price, current
-    // price and the "Save ₹X" chip flow onto the next line on narrow cards
-    // instead of overflowing.
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: 6,
@@ -2241,11 +2208,7 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
     final screenWidth = media.size.width;
     final screenHeight = media.size.height;
 
-    // Cap the dialog width so it looks like a focused peek on tablets/desktop
-    // instead of stretching edge to edge.
     final dialogWidth = (screenWidth * 0.88).clamp(0.0, 460.0);
-    // Image is square-ish; cap it against the available height too so the
-    // dialog never exceeds the screen in landscape / short devices.
     final imageHeight =
         (dialogWidth * 1.1).clamp(0.0, screenHeight * 0.5);
 
@@ -2366,8 +2329,6 @@ class _ProductPeekDialogState extends State<_ProductPeekDialog> {
                       ],
                     ),
                   ),
-                  // The details block can be taller than the remaining space on
-                  // short screens (many options / large fonts), so let it scroll.
                   Flexible(
                     child: GestureDetector(
                       onTap: () {},

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
-import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/address_model.dart';
 import 'package:rookies_jeans/models/cart_model.dart';
 import 'package:rookies_jeans/screens/cart/checkout.dart';
@@ -20,30 +19,21 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  static const Color primary      = Color(ShopifyConstants.primaryColorHex);
-  static const Color bgColor      = Color(ShopifyConstants.bgColorHex);
-  static const Color cardColor    = Color(ShopifyConstants.cardColorHex);
-  static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
-  static const Color borderColor  = Color(ShopifyConstants.borderColorHex);
+  static const Color primary      = AppColors.primary;
+  static const Color bgColor      = AppColors.bg;
+  static const Color cardColor    = AppColors.card;
+  static const Color secondaryTxt = AppColors.secondaryText;
+  static const Color borderColor  = AppColors.border;
 
-  static const String _fHead = ShopifyConstants.fontHeading;
-  static const String _fBody = ShopifyConstants.fontBody;
-  static const String _fBold = ShopifyConstants.fontBodyBold;
+  static const String _fHead = AppFonts.heading;
+  static const String _fBody = AppFonts.body;
+  static const String _fBold = AppFonts.bold;
 
-  // ---- Responsive helpers -------------------------------------------------
-  // Scales off screen width so the cart looks right on small phones, large
-  // phones, tablets and beyond. 400px logical width is the baseline.
-  double get _sf =>
-      (MediaQuery.of(context).size.width / 400).clamp(0.85, 1.3).toDouble();
+  double _s(double base) =>
+      Responsive.of(context, baseW: 400, maxScale: 1.3).s(base);
 
-  /// Scale a size value responsively.
-  double _s(double base) => base * _sf;
+  static const double _maxContentWidth = AppLayout.maxContentMedium;
 
-  /// Cap the content column so lists/bars don't stretch edge-to-edge on wide
-  /// screens (tablets, foldables, desktop/web).
-  static const double _maxContentWidth = 720;
-
-  /// Center a widget within the max content width.
   Widget _centered(Widget child) => Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: _maxContentWidth),
@@ -62,19 +52,8 @@ class _CartScreenState extends State<CartScreen> {
     });
   }
 
-  void _showToast(String message, {bool isError = false}) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: isError ? const Color(0xFFD32F2F) : primary,
-      textColor: Colors.white,
-      fontSize: 13,
-      webBgColor: isError ? '#D32F2F' : '#1A1A1A',
-      webPosition: 'center',
-      timeInSecForIosWeb: 2,
-    );
-  }
+  void _showToast(String message, {bool isError = false}) =>
+      AppToast.show(message, isError: isError);
 
   Future<void> _changeQuantity(ShopifyCartLine line, int newQuantity) async {
     setState(() => _pendingLineIds.add(line.lineId));
@@ -228,8 +207,6 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _topBar(ShopifyCart cart) {
-    // Big heading was a hardcoded 34 which overflows on narrow phones and
-    // looks small on tablets; scale it to the available width with bounds.
     final titleSize =
         (MediaQuery.of(context).size.width * 0.09).clamp(22.0, 40.0);
     return Container(

@@ -2,22 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
-// ---------------------------------------------------------------------------
-// Shared responsive helpers.
-// Scale factor is derived from screen width (reference = 375) and clamped so
-// UI never gets too small on tiny phones or oversized on tablets/desktop.
-// ---------------------------------------------------------------------------
-const double _kBaseWidth   = 375;
-const double _kMaxContentW = 640; // cap content width on large screens.
+const double _kMaxContentW = 640;
 
-double _sf(BuildContext c) {
-  final w = MediaQuery.sizeOf(c).width;
-  return (w / _kBaseWidth).clamp(0.85, 1.35);
-}
-
-double _s(BuildContext c, double base) => base * _sf(c);
+double _s(BuildContext c, double base) =>
+    Responsive.of(c, baseW: 375).s(base);
 
 class WebViewScreen extends StatefulWidget {
   const WebViewScreen({
@@ -34,7 +25,7 @@ class WebViewScreen extends StatefulWidget {
 }
 
 class _WebViewScreenState extends State<WebViewScreen> {
-  static const _primary = Color(ShopifyConstants.primaryColorHex);
+  static const _primary = AppColors.primary;
 
   late final WebViewController _controller;
   bool _isLoading = true;
@@ -212,12 +203,12 @@ class ProfileScreen extends StatelessWidget {
 class _LoggedOutProfile extends StatelessWidget {
   const _LoggedOutProfile();
 
-  static const _primary = Color(ShopifyConstants.primaryColorHex);
+  static const _primary = AppColors.primary;
   static const _bg      = Color(0xFFF5F5F3);
 
-  static const String _fHead = ShopifyConstants.fontHeading;
-  static const String _fBody = ShopifyConstants.fontBody;
-  static const String _fBold = ShopifyConstants.fontBodyBold;
+  static const String _fHead = AppFonts.heading;
+  static const String _fBody = AppFonts.body;
+  static const String _fBold = AppFonts.bold;
 
   @override
   Widget build(BuildContext context) {
@@ -228,8 +219,6 @@ class _LoggedOutProfile extends StatelessWidget {
           final media   = MediaQuery.of(context);
           final screenH = media.size.height;
           final isWide  = constraints.maxWidth > _kMaxContentW;
-          // Hero image scales with height but is capped so it doesn't dominate
-          // very tall (tablet/landscape) screens.
           final halfH = (screenH * (isWide ? 0.5 : 0.66)).clamp(220.0, 560.0);
 
           return Center(
@@ -342,11 +331,11 @@ class _LoggedOutProfile extends StatelessWidget {
 class _LoggedInProfile extends StatelessWidget {
   const _LoggedInProfile();
 
-  static const _primary = Color(ShopifyConstants.primaryColorHex);
+  static const _primary = AppColors.primary;
   static const _bg      = Color(0xFFFFFFFF);
 
-  static const String _fHead = ShopifyConstants.fontHeading;
-  static const String _fBold = ShopifyConstants.fontBodyBold;
+  static const String _fHead = AppFonts.heading;
+  static const String _fBold = AppFonts.bold;
 
   @override
   Widget build(BuildContext context) {
@@ -401,9 +390,6 @@ class _LoggedInProfile extends StatelessWidget {
                           ),
                         ),
                         SizedBox(height: _s(context, 28)),
-                        // Each quick action takes an equal share of the row and
-                        // its label wraps/shrinks, so 4 items never overflow on
-                        // narrow phones.
                         Row(
                           children: const [
                             Expanded(
@@ -460,7 +446,7 @@ class _MoreSection extends StatelessWidget {
   const _MoreSection({required this.showSignOut});
   final bool showSignOut;
 
-  static const String _fHead = ShopifyConstants.fontHeading;
+  static const String _fHead = AppFonts.heading;
 
   void _openWebView(BuildContext context, {
     required String title,
@@ -555,7 +541,7 @@ class _MoreTile extends StatelessWidget {
   final VoidCallback onTap;
   final IconData?    icon;
 
-  static const String _fBody = ShopifyConstants.fontBody;
+  static const String _fBody = AppFonts.body;
 
   @override
   Widget build(BuildContext context) {
@@ -613,7 +599,7 @@ class _QuickAction extends StatelessWidget {
   final String   route;
   final bool     useGo;
 
-  static const String _fBody = ShopifyConstants.fontBody;
+  static const String _fBody = AppFonts.body;
 
   @override
   Widget build(BuildContext context) {

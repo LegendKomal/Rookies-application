@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/address_model.dart';
 import 'package:rookies_jeans/services/address_service.dart';
 
@@ -14,16 +15,16 @@ class AddEditAddressScreen extends StatefulWidget {
 }
 
 class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
-  static const _primary = Color(ShopifyConstants.primaryColorHex);
+  static const _primary = AppColors.primary;
   static const _bg      = Color(0xFFF5F5F3);
-  static const _border  = Color(0xFFDDDDDD);
+  static const _border  = AppColors.border;
   static const _hint    = Color(0xFFAAAAAA);
   static const _label   = Color(0xFF888888);
   static const _text    = Color(0xFF111111);
 
-  static const _fHead = ShopifyConstants.fontHeading;
-  static const _fBody = ShopifyConstants.fontBody;
-  static const _fBold = ShopifyConstants.fontBodyBold;
+  static const _fHead = AppFonts.heading;
+  static const _fBody = AppFonts.body;
+  static const _fBold = AppFonts.bold;
 
   final _formKey = GlobalKey<FormState>();
 

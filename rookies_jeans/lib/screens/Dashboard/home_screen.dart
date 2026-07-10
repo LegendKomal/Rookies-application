@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/cart/cart.dart';
@@ -15,24 +16,7 @@ import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/widget/price_text.dart';
 import 'package:video_player/video_player.dart';
 
-class R {
-  const R._(this._sw, this._sh);
-  static const double _baseW = 390.0;
-  static const double _baseH = 844.0;
-  static const double _minScale = 0.85;
-  static const double _maxScale = 1.35;
-  final double _sw;
-  final double _sh;
-  factory R.of(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    return R._(mq.size.width, mq.size.height);
-  }
-  double get _wScale => (_sw / _baseW).clamp(_minScale, _maxScale);
-  double get _hScale => (_sh / _baseH).clamp(_minScale, _maxScale);
-  double sp(double size) => size * _wScale;
-  double dp(double size) => size * _wScale;
-  double vp(double size) => size * _hScale;
-}
+typedef R = Responsive;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -41,14 +25,14 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const Color primary      = Color(ShopifyConstants.primaryColorHex);
-  static const Color bgColor      = Color(ShopifyConstants.bgColorHex);
-  static const Color secondaryTxt = Color(ShopifyConstants.secondaryTextHex);
+  static const Color primary      = AppColors.primary;
+  static const Color bgColor      = AppColors.bg;
+  static const Color secondaryTxt = AppColors.secondaryText;
   static const Color borderColor  = Color.fromARGB(255, 80, 57, 57);
-  static const String _fHead = ShopifyConstants.fontHeading;
-  static const String _fBody = ShopifyConstants.fontBody;
-  static const String _fBold = ShopifyConstants.fontBodyBold;
-  static const String _fNumber = ShopifyConstants.fontNumber;
+  static const String _fHead = AppFonts.heading;
+  static const String _fBody = AppFonts.body;
+  static const String _fBold = AppFonts.bold;
+  static const String _fNumber = AppFonts.number;
   final Set<String> _addingToCartProductIds = {};
   bool _isLoading = true;
   late VideoPlayerController _videoCtrl;

@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/shopify_api.dart';
 import 'package:rookies_jeans/models/auth_model.dart';
 import 'package:rookies_jeans/models/shopify_customer_model.dart';
 
@@ -9,21 +10,12 @@ class ShopifyAuthService {
   ShopifyAuthService._();
   static final ShopifyAuthService instance = ShopifyAuthService._();
 
-  static const String _shopDomain = 'rookies-jeans.myshopify.com';
-  static const String _storefrontToken = '8127f95aa12da6ed0234550d19abd043';
-  static const String _apiVersion = '2026-04';
-
   static const String _customerTokenKey = 'shopify_customer_access_token';
   static const String _customerTokenExpiryKey = 'shopify_customer_access_token_expiry';
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  String get _endpoint => 'https://$_shopDomain/api/$_apiVersion/graphql.json';
-
-  Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        'X-Shopify-Storefront-Access-Token': _storefrontToken,
-      };
+  String get _endpoint => ShopifyConstants.storefrontEndpoint;
 
   void _log(String message) {
     if (kDebugMode) {
@@ -61,33 +53,29 @@ class ShopifyAuthService {
     ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: _headers,
-        body: jsonEncode({
-          'query': mutation,
-          'variables': {
-            'input': {
-              'email': email.trim(),
-              'password': password,
-            }
+      final res = await ShopifyGraphQL.post(
+        mutation,
+        variables: {
+          'input': {
+            'email': email.trim(),
+            'password': password,
           }
-        }),
+        },
       );
 
-      _log('AUTH LOGIN STATUS -> ${response.statusCode}');
+      _log('AUTH LOGIN STATUS -> ${res.statusCode}');
 
-      final Map<String, dynamic> decoded = jsonDecode(response.body);
+      final Map<String, dynamic> decoded = res.body;
 
       if (kDebugMode) {
         _log('AUTH LOGIN JSON -> ${jsonEncode(decoded)}');
       }
 
-      if (response.statusCode != 200) {
-        _log('AUTH LOGIN FAILED -> HTTP ${response.statusCode}');
+      if (res.statusCode != 200) {
+        _log('AUTH LOGIN FAILED -> HTTP ${res.statusCode}');
         return ShopifyAuthResult(
           success: false,
-          message: 'Login failed. HTTP ${response.statusCode}',
+          message: 'Login failed. HTTP ${res.statusCode}',
         );
       }
 
@@ -177,30 +165,26 @@ class ShopifyAuthService {
     ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: _headers,
-        body: jsonEncode({
-          'query': mutation,
-          'variables': {
-            'email': email.trim(),
-          }
-        }),
+      final res = await ShopifyGraphQL.post(
+        mutation,
+        variables: {
+          'email': email.trim(),
+        },
       );
 
-      _log('AUTH RECOVER STATUS -> ${response.statusCode}');
+      _log('AUTH RECOVER STATUS -> ${res.statusCode}');
 
-      final Map<String, dynamic> decoded = jsonDecode(response.body);
+      final Map<String, dynamic> decoded = res.body;
 
       if (kDebugMode) {
         _log('AUTH RECOVER JSON -> ${jsonEncode(decoded)}');
       }
 
-      if (response.statusCode != 200) {
-        _log('AUTH RECOVER FAILED -> HTTP ${response.statusCode}');
+      if (res.statusCode != 200) {
+        _log('AUTH RECOVER FAILED -> HTTP ${res.statusCode}');
         return ShopifyAuthResult(
           success: false,
-          message: 'Request failed. HTTP ${response.statusCode}',
+          message: 'Request failed. HTTP ${res.statusCode}',
         );
       }
 
@@ -271,27 +255,23 @@ class ShopifyAuthService {
     ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: _headers,
-        body: jsonEncode({
-          'query': query,
-          'variables': {
-            'customerAccessToken': token,
-          }
-        }),
+      final res = await ShopifyGraphQL.post(
+        query,
+        variables: {
+          'customerAccessToken': token,
+        },
       );
 
-      _log('CUSTOMER FETCH STATUS -> ${response.statusCode}');
+      _log('CUSTOMER FETCH STATUS -> ${res.statusCode}');
 
-      final Map<String, dynamic> decoded = jsonDecode(response.body);
+      final Map<String, dynamic> decoded = res.body;
 
       if (kDebugMode) {
         _log('CUSTOMER FETCH JSON -> ${jsonEncode(decoded)}');
       }
 
-      if (response.statusCode != 200) {
-        _log('CUSTOMER FETCH FAILED -> HTTP ${response.statusCode}');
+      if (res.statusCode != 200) {
+        _log('CUSTOMER FETCH FAILED -> HTTP ${res.statusCode}');
         return null;
       }
 
@@ -317,26 +297,26 @@ class ShopifyAuthService {
   }
 
   Future<bool> isLoggedIn() async {
-  final token = await _storage.read(key: _customerTokenKey);
-  final expiry = await _storage.read(key: _customerTokenExpiryKey);
+    final token = await _storage.read(key: _customerTokenKey);
+    final expiry = await _storage.read(key: _customerTokenExpiryKey);
 
-  if (token == null || token.isEmpty) {
-    _log('AUTH IS LOGGED IN -> false (no token)');
-    return false;
-  }
-
-  if (expiry != null && expiry.isNotEmpty) {
-    final expiryDate = DateTime.tryParse(expiry);
-    if (expiryDate != null && DateTime.now().isAfter(expiryDate)) {
-      _log('AUTH IS LOGGED IN -> false (token expired)');
-      await logout();
+    if (token == null || token.isEmpty) {
+      _log('AUTH IS LOGGED IN -> false (no token)');
       return false;
     }
-  }
 
-  _log('AUTH IS LOGGED IN -> true');
-  return true;
-}
+    if (expiry != null && expiry.isNotEmpty) {
+      final expiryDate = DateTime.tryParse(expiry);
+      if (expiryDate != null && DateTime.now().isAfter(expiryDate)) {
+        _log('AUTH IS LOGGED IN -> false (token expired)');
+        await logout();
+        return false;
+      }
+    }
+
+    _log('AUTH IS LOGGED IN -> true');
+    return true;
+  }
 
   Future<void> logout() async {
     _log('AUTH LOGOUT START');

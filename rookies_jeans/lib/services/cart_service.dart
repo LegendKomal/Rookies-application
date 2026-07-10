@@ -1,8 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/constant/shopify_api.dart';
 import 'package:rookies_jeans/models/cart_model.dart';
 
 class CartService extends ChangeNotifier {
@@ -91,12 +89,8 @@ class CartService extends ChangeNotifier {
   ''';
 
   Future<Map<String, dynamic>> _post(String query, Map<String, dynamic> variables) async {
-    final response = await http.post(
-      Uri.parse(ShopifyConstants.storefrontEndpoint),
-      headers: ShopifyConstants.headers,
-      body: jsonEncode({'query': query, 'variables': variables}),
-    );
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    final res = await ShopifyGraphQL.post(query, variables: variables);
+    return res.body;
   }
 
   Future<void> refresh() async {
