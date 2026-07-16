@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/screens/Navigation/bottom_navigation.dart';
 import 'package:rookies_jeans/screens/Dashboard/home_screen.dart';
 import 'package:rookies_jeans/screens/authentication/login.dart';
+import 'package:rookies_jeans/screens/authentication/register.dart';
 import 'package:rookies_jeans/screens/collections/collections.dart';
 import 'package:rookies_jeans/screens/orders/orders.dart';
 import 'package:rookies_jeans/screens/products/Wishlist.dart';
@@ -40,10 +41,9 @@ final GoRouter _appRouter = GoRouter(
     ),
 
     GoRoute(
-      path: '/register',
-      builder: (context, state) =>
-          const Scaffold(body: Center(child: Text('Create Account'))),
-    ),
+  path: '/register',
+  builder: (context, state) => const Register(),
+),
     GoRoute(path: '/orders', builder: (_, __) => const OrdersScreen()),
     GoRoute(
   path: '/addresses',

@@ -330,4 +330,169 @@ class ShopifyAuthService {
     _log('AUTH SAVED TOKEN -> ${_maskToken(token)}');
     return token;
   }
+
+   Future<ShopifyAuthResult> register({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String password,
+    String? phone,
+    bool acceptsMarketing = false,
+  }) async {
+    _log('AUTH REGISTER START -> email: $email');
+    _log('AUTH ENDPOINT -> $_endpoint');
+ 
+    const String mutation = r'''
+      mutation customerCreate($input: CustomerCreateInput!) {
+        customerCreate(input: $input) {
+          customer {
+            id
+            firstName
+            lastName
+            email
+            phone
+          }
+          customerUserErrors {
+            field
+            message
+            code
+          }
+        }
+      }
+    ''';
+ 
+    final Map<String, dynamic> input = {
+      'firstName': firstName.trim(),
+      'lastName': lastName.trim(),
+      'email': email.trim(),
+      'password': password,
+      'acceptsMarketing': acceptsMarketing,
+      // Shopify requires E.164 format (+919876543210). An invalid phone
+      // fails the whole mutation, so only send it when provided.
+      if (phone != null && phone.trim().isNotEmpty)
+        'phone': _toE164(phone.trim()),
+    };
+ 
+    try {
+      final res = await ShopifyGraphQL.post(
+        mutation,
+        variables: {'input': input},
+      );
+ 
+      _log('AUTH REGISTER STATUS -> ${res.statusCode}');
+ 
+      final Map<String, dynamic> decoded = res.body;
+ 
+      if (kDebugMode) {
+        _log('AUTH REGISTER JSON -> ${jsonEncode(decoded)}');
+      }
+ 
+      if (res.statusCode != 200) {
+        _log('AUTH REGISTER FAILED -> HTTP ${res.statusCode}');
+        return ShopifyAuthResult(
+          success: false,
+          message: 'Registration failed. HTTP ${res.statusCode}',
+        );
+      }
+ 
+      if (decoded['errors'] != null) {
+        _log('AUTH REGISTER GRAPHQL ERROR -> ${decoded['errors']}');
+        return ShopifyAuthResult(
+          success: false,
+          message: decoded['errors'][0]['message'] ?? 'Something went wrong.',
+        );
+      }
+ 
+      final data = decoded['data']?['customerCreate'];
+      if (data == null) {
+        _log('AUTH REGISTER FAILED -> data.customerCreate is null');
+        return ShopifyAuthResult(
+          success: false,
+          message: 'Invalid server response.',
+        );
+      }
+ 
+      final List errors = data['customerUserErrors'] ?? [];
+      if (errors.isNotEmpty) {
+        _log('AUTH REGISTER CUSTOMER USER ERRORS -> $errors');
+ 
+        final first = errors.first as Map<String, dynamic>;
+        final String? code = first['code']?.toString();
+ 
+        // Friendlier messages for Shopify's most common error codes
+        String message;
+        switch (code) {
+          case 'TAKEN':
+            message =
+                'An account with this email already exists. Try signing in.';
+            break;
+          case 'TOO_SHORT':
+            message = 'Password is too short (minimum 8 characters).';
+            break;
+          case 'TOO_LONG':
+            message = 'Password is too long (maximum 40 characters).';
+            break;
+          case 'CUSTOMER_DISABLED':
+            message =
+                'Account created. Please check your email to activate it.';
+            break;
+          default:
+            message = first['message']?.toString() ?? 'Registration failed.';
+        }
+ 
+        return ShopifyAuthResult(success: false, message: message);
+      }
+ 
+      final customerJson = data['customer'];
+      if (customerJson == null) {
+        _log('AUTH REGISTER FAILED -> customer is null');
+        return ShopifyAuthResult(
+          success: false,
+          message: 'Registration failed. Please try again.',
+        );
+      }
+ 
+      _log('AUTH REGISTER SUCCESS -> customer created, attempting auto-login');
+ 
+      // ------------------------------------------------------------------
+      // Auto-login so the token is saved via the same login() flow.
+      //
+      // NOTE: if your store has email verification enabled for classic
+      // customer accounts, the customer is created DISABLED and login
+      // fails until they activate via email. We handle that below.
+      // ------------------------------------------------------------------
+      final loginResult = await login(email: email, password: password);
+ 
+      if (loginResult.success) {
+        _log('AUTH REGISTER AUTO-LOGIN SUCCESS');
+        return loginResult;
+      }
+ 
+      _log('AUTH REGISTER AUTO-LOGIN FAILED -> ${loginResult.message}');
+ 
+      // Account exists but couldn't log in (usually needs activation).
+      return ShopifyAuthResult(
+        success: true,
+        message:
+            'Account created! Please check your email to activate it, then sign in.',
+        customer: ShopifyCustomer.fromJson(customerJson),
+      );
+    } catch (e, stack) {
+      _log('AUTH REGISTER EXCEPTION -> $e');
+      _log('AUTH REGISTER STACK -> $stack');
+      return ShopifyAuthResult(
+        success: false,
+        message: 'Something went wrong: $e',
+      );
+    }
+  }
+ 
+  /// Normalizes a phone number into E.164 format for Shopify.
+  /// Defaults to India (+91) for 10-digit numbers — change if needed.
+  String _toE164(String phone) {
+    final digits = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    if (digits.startsWith('+')) return digits;
+    if (digits.length == 10) return '+91$digits';
+    return '+$digits';
+  }
 }
