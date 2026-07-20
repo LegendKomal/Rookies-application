@@ -627,7 +627,7 @@ class _QuickAction extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              style: TextStyle( 
                 fontFamily: _fBody,
                 fontSize: _s(context, 11).clamp(10.0, 14.0),
                 color: const Color(0xFF555555),
