@@ -657,7 +657,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               color: Colors.white,
                               tooltip: 'Logout',
-                              onPressed: _logout,
+                              onPressed: () => context.go('/profile'),
                             ),
                           ],
                         ),
