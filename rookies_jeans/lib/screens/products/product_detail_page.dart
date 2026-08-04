@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/product_detail_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
+import 'package:rookies_jeans/screens/products/size_chart_view.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/services/wishlist_service.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
@@ -38,6 +39,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   static const String _fBodyBold = AppFonts.alteBold;
   static const String _fNumber = AppFonts.number;
 
+  String _numericProductId(String gid) => gid.split('/').last;
+
   double _s(double base) =>
       Responsive.of(context, baseW: 400, maxScale: 1.25).s(base);
   static const double _maxContentWidth = AppLayout.maxContentMedium;
@@ -59,6 +62,25 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   List<ShopifyProduct> _youMayAlsoLike = [];
   bool _isLoadingRelated = false;
   int? _expandedTileIndex;
+
+  void _openSizeChart() {
+  if (_product == null) return;
+  showModalBottomSheet( 
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) => SizeChartView(
+      shop: 'rookiesjeans.myshopify.com', // your actual .myshopify.com domain
+      productId: _numericProductId(_product!.id),
+      source: 'YOUR_KIWI_SOURCE_ID', // ask Kiwi support for this
+      // vendor: _product!.vendor,  // if your model has these
+      // type: _product!.productType,
+      // tags: _product!.tags.join(','),
+    ),
+  );
+}
 
   static const List<String> _descLabels = [
     'STYLE NO & COLOR', 'STYLE NO', 'COLLAR/NECK', 'COLLAR / NECK',
@@ -537,6 +559,23 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           ),
           // const Divider(height: 1),
           const SizedBox(height: 16),
+          GestureDetector(
+  onTap: _openSizeChart,
+  child: Padding(
+    padding: const EdgeInsets.symmetric(vertical: 14),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'Size Chart',
+          style: TextStyle(fontFamily: _fBold, fontSize: _s(14), color: primary),
+        ),
+        const Icon(Icons.straighten_rounded, size: 18, color: primary),
+      ],
+    ),
+  ),
+),
+const Divider(height: 1),
         ],
       ),
     );

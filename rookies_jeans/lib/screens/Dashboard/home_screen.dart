@@ -887,7 +887,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     )
                   : Container(color: const Color(0xFF555555)),
               Container(
-                decoration: BoxDecoration(
+                decoration: BoxDecoration( 
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
@@ -895,7 +895,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Colors.transparent,
                       Colors.black.withOpacity(0.62),
                     ],
-                  ),
+                  ),  
                 ),
               ),
               Positioned(
