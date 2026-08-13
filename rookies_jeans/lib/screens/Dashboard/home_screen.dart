@@ -2,19 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
-import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
-import 'package:rookies_jeans/models/product_model.dart';
-import 'package:rookies_jeans/screens/cart/cart.dart';
-import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/screens/products/products.dart';
 import 'package:rookies_jeans/screens/search/search.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
-import 'package:rookies_jeans/widget/price_text.dart';
-import 'package:video_player/video_player.dart';
 
 typedef R = Responsive;
 
@@ -28,109 +23,102 @@ class _HomeScreenState extends State<HomeScreen> {
   static const Color primary      = AppColors.primary;
   static const Color bgColor      = AppColors.bg;
   static const Color secondaryTxt = AppColors.secondaryText;
-  static const Color borderColor  = Color.fromARGB(255, 80, 57, 57);
-  static const String _fHead = AppFonts.heading;
-  static const String _fBody = AppFonts.body;
-  static const String _fBold = AppFonts.bold;
+  static const String _fHead   = AppFonts.heading;
+  static const String _fBody   = AppFonts.body;
+  static const String _fBold   = AppFonts.bold;
   static const String _fNumber = AppFonts.number;
-  final Set<String> _addingToCartProductIds = {};
+
   bool _isLoading = true;
-  late VideoPlayerController _videoCtrl;
-  bool _videoReady = false;
   final ScrollController _scrollCtrl = ScrollController();
   final List<_SectionAnchor> _sectionAnchors = [];
   bool _isSnapping = false;
   BuildContext? _scrollableContext;
-  List<ShopifyCollection> _categories    = [];
-  List<ShopifyProduct>    _oversizedShirts = [];
-  BalloonBannerData?      _balloonBanner;
-  final List<_PromoCollectionTile> _latestDropTiles = const [
-    _PromoCollectionTile(
-      title: 'NEW ARRIVALS',
-      subtitle: 'Fresh picks just landed',
-      handle: 'all',
-      imageAsset: 'assets/new_arrivals.jpg',
-      buttonText: 'SHOP NOW',
+
+  List<ShopifyCollection> _categories = [];
+
+  final List<_ShopTheLookProduct> _shopTheLookProducts = const [
+    _ShopTheLookProduct(
+      title: 'Product title',
+      price: '₹ 20',
+      imageAsset: 'assets/shop_the_look_item_1.jpg',
     ),
-    _PromoCollectionTile(
-      title: 'SUMMER EDIT',
-      subtitle: 'Lightweight staples for summer',
-      handle: 'summer-edit',
-      imageAsset: 'assets/summer_edit.jpg',
-      buttonText: 'SHOP NOW',
+    _ShopTheLookProduct(
+      title: 'Product title',
+      price: '₹ 20',
+      imageAsset: 'assets/shop_the_look_item_2.jpg',
     ),
-    _PromoCollectionTile(
-      title: 'HOT DEALS',
-      subtitle: 'Best prices before they are gone',
-      handle: 'hot-deals',
-      imageAsset: 'assets/hot_deals.jpg',
-      buttonText: 'SHOP NOW',
-    ),
-    _PromoCollectionTile(
-      title: 'TRENDING NOW',
-      subtitle: 'Most wanted styles right now',
-      handle: 'trending-now',
-      imageAsset: 'assets/trending_now.jpg',
-      buttonText: 'SHOP NOW',
+    _ShopTheLookProduct(
+      title: 'Product title',
+      price: '₹ 20',
+      imageAsset: 'assets/shop_the_look_item_3.jpg',
     ),
   ];
-  final List<_PromoCollectionTile> _ourCollectionPromoTiles = const [
+
+  final List<_PromoCollectionTile> _shopByCollectionTiles = const [
     _PromoCollectionTile(
       title: 'OVERSIZED TEES',
-      subtitle: 'Relaxed drape. Everyday attitude',
       handle: 'ss26-tshirts-oversize-fit-half-sleeve',
       imageAsset: 'assets/oversized_tees.jpg',
     ),
     _PromoCollectionTile(
       title: 'BALLOON FIT PANTS',
-      subtitle: 'Ease in every step',
       handle: 'baloon-fit-pants',
       imageAsset: 'assets/balloon_fit_pants.jpg',
     ),
     _PromoCollectionTile(
       title: 'OVERSIZED SHIRTS',
-      subtitle: 'Relaxed cuts. Effortless layering',
       handle: 'oversized-shirts',
       imageAsset: 'assets/oversized_shirts.jpg',
     ),
     _PromoCollectionTile(
       title: 'LINENS',
-      subtitle: 'Airy fabric. Summer essential',
       handle: 'ss26-linens',
       imageAsset: 'assets/linens.jpg',
     ),
     _PromoCollectionTile(
       title: 'LOOSE FIT JEANS',
-      subtitle: 'Denim that breathes',
       handle: 'ss26-loose-fit-jeans',
       imageAsset: 'assets/loose_fit_jeans.jpg',
     ),
     _PromoCollectionTile(
       title: 'BOOTCUT FIT JEANS',
-      subtitle: 'Classic shape. Effortless attitude',
       handle: 'ss26-bootcutjeans',
       imageAsset: 'assets/bootcut_fit_jeans.jpg',
+    ),
+  ];
+
+  final List<_InstagramPost> _instagramPosts = const [
+    _InstagramPost(
+      imageAsset: 'assets/instagram_1.jpg',
+      postUrl: 'https://www.instagram.com/p/REPLACE_ME_1/',
+    ),
+    _InstagramPost(
+      imageAsset: 'assets/instagram_2.jpg',
+      postUrl: 'https://www.instagram.com/p/REPLACE_ME_2/',
+    ),
+    _InstagramPost(
+      imageAsset: 'assets/instagram_3.jpg',
+      postUrl: 'https://www.instagram.com/p/REPLACE_ME_3/',
+    ),
+    _InstagramPost(
+      imageAsset: 'assets/instagram_4.jpg',
+      postUrl: 'https://www.instagram.com/p/REPLACE_ME_4/',
+    ),
+    _InstagramPost(
+      imageAsset: 'assets/instagram_5.jpg',
+      postUrl: 'https://www.instagram.com/p/REPLACE_ME_5/',
     ),
   ];
 
   @override
   void initState() {
     super.initState();
-    _videoCtrl  = VideoPlayerController.asset('assets/rookies_video.mp4')
-      ..initialize().then((_) {
-        if (!mounted) return;
-        setState(() => _videoReady = true);
-        _videoCtrl.setLooping(true);
-        _videoCtrl.setVolume(0);
-        _videoCtrl.play();
-      });
     _fetchAll();
     CartService.instance.initialize();
   }
 
   @override
   void dispose() {
-    _videoCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
@@ -198,33 +186,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (forceRefresh) {
       ShopifyStorefrontService.instance.clearCache();
     }
-    final results = await Future.wait([
-      ShopifyStorefrontService.instance.getLatestDropCollections(),
-      ShopifyStorefrontService.instance.getOversizedShirts(
-        first: ShopifyConstants.oversizedShirtsCount,
-      ),
-      ShopifyStorefrontService.instance.getBalloonBanner(),
-    ]);
+    final categories =
+        await ShopifyStorefrontService.instance.getLatestDropCollections();
     if (!mounted) return;
     setState(() {
-      _categories      = results[0] as List<ShopifyCollection>;
-      _oversizedShirts = results[1] as List<ShopifyProduct>;
-      _balloonBanner   = results[2] as BalloonBannerData?;
-      _isLoading       = false;
+      _categories = categories;
+      _isLoading  = false;
     });
-  }
-
-  void _openProductDetail(ShopifyProduct product) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProductDetailPage(
-          handle: product.handle,
-          title: product.title,
-          heroImageUrl: product.primaryImageUrl,
-        ),
-      ),
-    );
   }
 
   void _openCollection(ShopifyCollection collection) {
@@ -248,214 +216,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _openAssortedCollection() async {
-    const assortedCollection = ShopifyCollection(
-      id: 'assorted',
-      title: 'Assorted',
-      handle: 'assorted',
-      label: 'ASSORTED',
-    );
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-          builder: (_) => ProductsPage(collection: assortedCollection)),
-    );
-  }
-
-  void _goToCart() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const CartScreen()),
-    );
-  }
-
-  Future<bool> _addToCart(ShopifyProduct product, String variantId) async {
-    if (_addingToCartProductIds.contains(product.id)) return false;
-    setState(() => _addingToCartProductIds.add(product.id));
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    final success = await CartService.instance.addLine(variantId: variantId);
-    if (!mounted) return success;
-    setState(() => _addingToCartProductIds.remove(product.id));
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? '${product.title} added to cart'
-              : 'Failed to add product to cart',
-          style: TextStyle(
-            fontFamily: _fBody,
-            fontSize: R.of(context).sp(13),
-          ),
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-    return success;
-  }
-
-  void _showSizeSelector(ShopifyProduct product) {
-    if (product.variants.isEmpty) return;
-    String? selectedVariantId;
-    bool isAdding = false;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetContext) {
-        final r = R.of(sheetContext);
-        return StatefulBuilder(
-          builder: (sheetContext, setSheetState) {
-            final selectedVariant = selectedVariantId == null
-                ? null
-                : product.variants
-                    .firstWhere((v) => v.id == selectedVariantId);
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                r.dp(20),
-                r.dp(20),
-                r.dp(20),
-                MediaQuery.of(sheetContext).viewInsets.bottom + r.dp(24),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: _fHead,
-                      fontSize: r.sp(20),
-                      fontWeight: FontWeight.w600,
-                      color: primary,
-                    ),
-                  ),
-                  SizedBox(height: r.dp(4)),
-                  _priceBlock(product, r),
-                  SizedBox(height: r.dp(16)),
-                  Text(
-                    'SELECT SIZE',
-                    style: TextStyle(
-                      fontFamily: _fBold,
-                      fontSize: r.sp(12),
-                      letterSpacing: 1.2,
-                      color: secondaryTxt,
-                    ),
-                  ),
-                  SizedBox(height: r.dp(10)),
-                  Wrap(
-                    spacing: r.dp(10),
-                    runSpacing: r.dp(10),
-                    children: product.variants.map((variant) {
-                      final bool available = variant.availableForSale;
-                      final bool selected = variant.id == selectedVariantId;
-                      return GestureDetector(
-                        onTap: available
-                            ? () => setSheetState(
-                                () => selectedVariantId = variant.id)
-                            : null,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: r.dp(18),
-                            vertical: r.dp(10),
-                          ),
-                          decoration: BoxDecoration(
-                            color: selected ? primary : Colors.transparent,
-                            border: Border.all(
-                              color: available
-                                  ? primary
-                                  : const Color(0xFFCCCCCC),
-                              width: 1.2,
-                            ),
-                          ),
-                          child: Text(
-                            variant.title,
-                            style: TextStyle(
-                              fontFamily: _fBold,
-                              fontSize: r.sp(13),
-                              color: selected
-                                  ? Colors.white
-                                  : available
-                                      ? primary
-                                      : const Color(0xFFBBBBBB),
-                              decoration: available
-                                  ? TextDecoration.none
-                                  : TextDecoration.lineThrough,
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  SizedBox(height: r.dp(10)),
-                  if (selectedVariant != null)
-                    Text(
-                      selectedVariant.availableForSale
-                          ? 'In stock'
-                          : 'Out of stock',
-                      style: TextStyle(
-                        fontFamily: _fBody,
-                        fontSize: r.sp(12),
-                        color: selectedVariant.availableForSale
-                            ? const Color(0xFF2E7D32)
-                            : Colors.red,
-                      ),
-                    ),
-                  SizedBox(height: r.dp(20)),
-                  SizedBox(
-                    width: double.infinity,
-                    height: r.dp(46),
-                    child: ElevatedButton(
-                      onPressed: (selectedVariantId == null || isAdding)
-                          ? null
-                          : () async {
-                              setSheetState(() => isAdding = true);
-                              final success = await _addToCart(
-                                  product, selectedVariantId!);
-                              if (!sheetContext.mounted) return;
-                              setSheetState(() => isAdding = false);
-                              if (success) {
-                                Navigator.pop(sheetContext);
-                              }
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primary,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: primary.withOpacity(0.4),
-                        shape: const RoundedRectangleBorder(),
-                        elevation: 0,
-                      ),
-                      child: isAdding
-                          ? SizedBox(
-                              width: r.dp(20),
-                              height: r.dp(20),
-                              child: const CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              'ADD TO CART',
-                              style: TextStyle(
-                                fontFamily: _fBold,
-                                fontSize: r.sp(13),
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
+  Future<void> _openInstagramPost(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   Future<void> _logout() async {
@@ -489,50 +254,42 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: _sliverBannerWithOverlayBar(),
                           ),
                           _snapSection(
+                            id: 'denim_cargo',
+                            child: _sliverDenimCargoBlocks(),
+                          ),
+                          _snapSection(
+                            id: 'categories',
+                            child: _exploreCategoriesSection(),
+                          ),
+                          _snapSection(
                             id: 'bestseller_sales',
                             child: _sliverBestsellerSalesBlocks(),
                           ),
                           _snapSection(
-                            id: 'categories',
+                            id: 'shop_the_look',
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                _sliverHeadAsBox('EXPLORE CATEGORIES'),
-                                _categoriesGridAsBox(),
+                                _sliverHeadAsBox('SHOP THE LOOK'),
+                                _shopTheLookAsBox(),
                               ],
                             ),
                           ),
                           _snapSection(
-                            id: 'latest_drops',
+                            id: 'editorial',
+                            child: _editorialSection(),
+                          ),
+                          _snapSection(
+                            id: 'shop_by_collection',
+                            child: _shopByCollectionSection(),
+                          ),
+                          _snapSection(
+                            id: 'instagram',
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                _sliverCenteredHeadAsBox('LATEST DROPS'),
-                                _latestDropsAsBox(),
-                              ],
-                            ),
-                          ),
-                          _snapSection(
-                            id: 'balloon_banner',
-                            child: _balloonBannerAsBox(),
-                          ),
-                          _snapSection(
-                            id: 'oversized_shirts',
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _sliverHeadAsBox('OVERSIZED SHIRTS'),
-                                _oversizedShirtsAsBox(),
-                              ],
-                            ),
-                          ),
-                          _snapSection(
-                            id: 'our_collections',
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _sliverCenteredHeadAsBox('OUR COLLECTIONS'),
-                                _ourCollectionsAsBox(),
+                                _sliverCenteredHeadAsBox('FOLLOW US'),
+                                _instagramSectionAsBox(),
                               ],
                             ),
                           ),
@@ -561,6 +318,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return mq.size.height - mq.padding.top - mq.padding.bottom;
   }
 
+  // ---------------------------------------------------------------------
+  // 1. HERO BANNER (image, replaces the old video banner)
+  // ---------------------------------------------------------------------
+
   Widget _sliverBannerWithOverlayBar() {
     final r = R.of(context);
     return SizedBox(
@@ -568,7 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
       width: double.infinity,
       child: Stack(
         children: [
-          _videoBannerItem(),
+          _heroBannerImage(),
           Positioned(
             top: 0,
             left: 0,
@@ -673,25 +434,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _videoBannerItem() => Stack(
+  Widget _heroBannerImage() => Stack(
         fit: StackFit.expand,
         children: [
-          if (_videoReady)
-            ClipRect(
-              child: SizedBox.expand(
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  alignment: Alignment.center,
-                  child: SizedBox(
-                    width: _videoCtrl.value.size.width,
-                    height: _videoCtrl.value.size.height,
-                    child: VideoPlayer(_videoCtrl),
-                  ),
-                ),
-              ),
-            )
-          else
-            Container(color: const Color(0xFF6B7A5E)),
+          Image.asset(
+            'assets/hero_banner.jpg',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) =>
+                Container(color: const Color(0xFF6B7A5E)),
+          ),
           Positioned.fill(
             child: IgnorePointer(
               child: DecoratedBox(
@@ -768,6 +519,79 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  // ---------------------------------------------------------------------
+  // 2. DENIM & CARGO (same visual pattern as Bestseller / Sale)
+  // ---------------------------------------------------------------------
+
+  Widget _sliverDenimCargoBlocks() {
+    final r = R.of(context);
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double blockHeight =
+        (MediaQuery.of(context).size.height * 0.46).clamp(220.0, 420.0);
+    return Column(
+      children: [
+        _fullWidthImageBlock(
+          assetPath: 'assets/denim.jpg',
+          label: 'Denim',
+          width: screenWidth,
+          height: blockHeight,
+          onTap: () => _openCollectionByHandle('denim',
+              title: 'Denim', label: 'DENIM'),
+          r: r,
+        ),
+        _fullWidthImageBlock(
+          assetPath: 'assets/cargo.jpg',
+          label: 'Cargo',
+          width: screenWidth,
+          height: blockHeight,
+          onTap: () => _openCollectionByHandle('cargo',
+              title: 'Cargo', label: 'CARGO'),
+          r: r,
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // 3. EXPLORE CATEGORIES (heading + single-image auto-sliding banner)
+  // ---------------------------------------------------------------------
+
+  Widget _exploreCategoriesSection() {
+    final double bannerHeight =
+        (MediaQuery.of(context).size.height * 0.9).clamp(220.0, 420.0);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _sliverHeadAsBox('EXPLORE CATEGORIES'),
+        _categories.isEmpty
+            ? _empty()
+            : _AutoSlideCollectionBanner(
+                height: bannerHeight,
+                items: _categories
+                    .map((cat) => _SlideItem(
+                          image: cat.imageUrl != null
+                              ? CachedNetworkImage(
+                                  imageUrl: cat.imageUrl!,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => Container(
+                                      color: const Color(0xFF555555)),
+                                  errorWidget: (_, __, ___) => Container(
+                                      color: const Color(0xFF555555)),
+                                )
+                              : Container(color: const Color(0xFF555555)),
+                          label: cat.label,
+                          onTap: () => _openCollection(cat),
+                        ))
+                    .toList(),
+              ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // 4. BESTSELLER & SALE (unchanged)
+  // ---------------------------------------------------------------------
 
   Widget _sliverBestsellerSalesBlocks() {
     final r = R.of(context);
@@ -849,472 +673,246 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _categoriesGridAsBox() {
+  // ---------------------------------------------------------------------
+  // 5. SHOP THE LOOK
+  // ---------------------------------------------------------------------
+
+  Widget _shopTheLookAsBox() {
     final r = R.of(context);
-    return _categories.isEmpty
-        ? _empty()
-        : Padding(
-            padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-            child: GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              shrinkWrap: true,
-              itemCount: _categories.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: r.dp(10),
-                crossAxisSpacing: r.dp(10),
-                childAspectRatio: 0.80,
-              ),
-              itemBuilder: (_, i) => _categoryTile(_categories[i], r),
-            ),
-          );
-  }
-
-  Widget _categoryTile(ShopifyCollection cat, R r) => GestureDetector(
-        onTap: () => _openCollection(cat),
-        child: ClipRRect(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              cat.imageUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: cat.imageUrl!,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) =>
-                          Container(color: const Color(0xFF555555)),
-                      errorWidget: (_, __, ___) =>
-                          Container(color: const Color(0xFF555555)),
-                    )
-                  : Container(color: const Color(0xFF555555)),
-              Container(
-                decoration: BoxDecoration( 
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.62),
-                    ],
-                  ),  
-                ),
-              ),
-              Positioned(
-                left: r.dp(8),
-                bottom: r.dp(8),
-                child: Text(
-                  cat.label,
-                  style: TextStyle(
-                    fontFamily: _fHead,
-                    color: Colors.white,
-                    fontSize: r.sp(25),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-
-  Widget _balloonBannerAsBox() {
-    final r      = R.of(context);
-    final banner = _balloonBanner;
-    return GestureDetector(
-      onTap: _openAssortedCollection,
+    const accent = Color(0xFF2F6FED);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
       child: Container(
-        margin: EdgeInsets.fromLTRB(r.dp(16), r.dp(20), r.dp(16), r.dp(4)),
-        height: r.dp(150),
-        decoration: const BoxDecoration(),
-        child: ClipRRect(
-          child: banner?.imageUrl != null
-              ? CachedNetworkImage(
-                  imageUrl: banner!.imageUrl!,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) =>
-                      Container(color: const Color(0xFFD0D4C8)),
-                  errorWidget: (_, __, ___) => Image.asset(
-                    'assets/last-chance-banner.png',
-                    fit: BoxFit.cover,
-                  ),
-                )
-              : Image.asset(
-                  'assets/last-chance-banner.png',
-                  fit: BoxFit.cover,
-                ),
+        decoration: BoxDecoration(
+          border: Border.all(color: accent, width: 1.4),
         ),
-      ),
-    );
-  }
-
-  Widget _oversizedShirtsAsBox() {
-    final r = R.of(context);
-    return _oversizedShirts.isEmpty
-        ? _empty()
-        : SizedBox(
-            height: r.dp(185) + r.dp(7) + r.dp(18) + r.dp(5) + r.dp(30) +
-                    r.dp(6) + r.dp(18) + r.dp(8) + r.dp(32),
-            child: ListView.separated(
-              padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-              scrollDirection: Axis.horizontal,
-              itemCount: _oversizedShirts.length,
-              separatorBuilder: (_, __) => SizedBox(width: r.dp(12)),
-              itemBuilder: (_, i) => _productTile(_oversizedShirts[i], r),
-            ),
-          );
-  }
-
-  Widget _latestDropsAsBox() {
-    final r = R.of(context);
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-      child: GridView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        shrinkWrap: true,
-        itemCount: _latestDropTiles.length,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: r.dp(12),
-          mainAxisSpacing: r.dp(12),
-          childAspectRatio: 0.68,
-        ),
-        itemBuilder: (_, i) => _latestDropCard(_latestDropTiles[i], r),
-      ),
-    );
-  }
-
-  Widget _latestDropCard(_PromoCollectionTile tile, R r) => GestureDetector(
-        onTap: () => _openCollectionByHandle(
-          tile.handle,
-          title: tile.title,
-          label: tile.title,
-        ),
-        child: ClipRRect(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.asset(
-                tile.imageAsset,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    Container(color: const Color(0xFF555555)),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.10),
-                      Colors.black.withOpacity(0.42),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: r.dp(16),
-                right: r.dp(16),
-                bottom: r.dp(18),
-                child: Column(
-                  children: [
-                    Text(
-                      tile.title,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: _fHead,
-                        color: Colors.white,
-                        fontSize: r.sp(30),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    SizedBox(height: r.dp(8)),
-                    SizedBox(
-                      height: r.dp(42),
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () => _openCollectionByHandle(
-                          tile.handle,
-                          title: tile.title,
-                          label: tile.title,
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: Colors.white,
-                            width: 1,
-                          ),
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(
-                              horizontal: r.dp(10)),
-                          shape: RoundedRectangleBorder(),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              tile.buttonText,
-                              style: TextStyle(
-                                fontFamily: _fBold,
-                                fontSize: r.sp(15),
-                              ),
-                            ),
-                            SizedBox(width: r.dp(6)),
-                            Text(
-                              '→',
-                              style: TextStyle(
-                                fontSize: r.sp(11),
-                                height: 1.1,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-
-  Widget _ourCollectionsAsBox() {
-    final r = R.of(context);
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-      child: GridView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        shrinkWrap: true,
-        itemCount: _ourCollectionPromoTiles.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 0,
-          mainAxisSpacing: 0,
-          childAspectRatio: 0.68,
-        ),
-        itemBuilder: (_, i) =>
-            _ourCollectionCard(_ourCollectionPromoTiles[i], i, r),
-      ),
-    );
-  }
-
-  Widget _ourCollectionCard(_PromoCollectionTile tile, int index, R r) =>
-      GestureDetector(
-        onTap: () => _openCollectionByHandle(
-          tile.handle,
-          title: tile.title,
-          label: tile.title,
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                color: borderColor,
-                width: index < 2 ? 1 : 0.8,
-              ),
-              left: BorderSide(
-                color: borderColor,
-                width: index.isEven ? 1 : 0.4,
-              ),
-              right: const BorderSide(color: borderColor, width: 0.8),
-              bottom: const BorderSide(color: borderColor, width: 0.8),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                color: const Color(0xFFF5F5F5),
-                padding: EdgeInsets.fromLTRB(
-                    r.dp(8), r.dp(12), r.dp(8), r.dp(10)),
-                child: Column(
-                  children: [
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        tile.title,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        style: TextStyle(
-                          fontFamily: _fHead,
-                          fontSize: r.sp(15),
-                          fontWeight: FontWeight.w500,
-                          color: primary,
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: r.dp(4)),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: r.dp(4)),
-                      child: Text(
-                        tile.subtitle,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        softWrap: false,
-                        style: TextStyle(
-                          fontFamily: _fBold,
-                          fontSize: r.sp(13),
-                          color: secondaryTxt,
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Image.asset(
-                  tile.imageAsset,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      Container(color: const Color(0xFFE0E0E0)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-
-  Widget _productTile(ShopifyProduct product, R r) {
-    final double tileWidth   = r.dp(160);
-    final double imageHeight = r.dp(185);
-    final colorHexes = product.colorHexCodes;
-    return GestureDetector(
-      onTap: () => _openProductDetail(product),
-      child: SizedBox(
-        width: tileWidth,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ClipRRect(
-              child: SizedBox(
-                width: tileWidth,
-                height: imageHeight,
-                child: product.primaryImageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: product.primaryImageUrl!,
+            Stack(
+              children: [
+                AspectRatio(
+                  aspectRatio: 0.78,
+                  child: Image.asset(
+                    'assets/shop_the_look_hero.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(color: const Color(0xFF555555)),
+                  ),
+                ),
+                Positioned(
+                  top: r.dp(10),
+                  left: r.dp(10),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: r.dp(10), vertical: r.dp(6)),
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.crop_free,
+                            size: r.dp(14), color: Colors.white),
+                        SizedBox(width: r.dp(6)),
+                        Text(
+                          'Scene products item',
+                          style: TextStyle(
+                            fontFamily: _fBody,
+                            color: Colors.white,
+                            fontSize: r.sp(11),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: r.dp(10),
+                  right: r.dp(10),
+                  child: Container(
+                    width: r.dp(28),
+                    height: r.dp(28),
+                    decoration:
+                        const BoxDecoration(color: accent, shape: BoxShape.circle),
+                    child: Icon(Icons.add, size: r.dp(18), color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            ...List.generate(_shopTheLookProducts.length, (i) {
+              final item = _shopTheLookProducts[i];
+              return Container(
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: const Color(0xFFE5E5E5),
+                      width: i == 0 ? 1 : 0,
+                    ),
+                  ),
+                ),
+                padding: EdgeInsets.all(r.dp(12)),
+                child: Row(
+                  children: [
+                    Container(
+                      width: r.dp(56),
+                      height: r.dp(56),
+                      color: const Color(0xFFECECEC),
+                      child: Image.asset(
+                        item.imageAsset,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) =>
-                            Container(color: const Color(0xFFE0E0E0)),
-                        errorWidget: (_, __, ___) =>
-                            Container(color: const Color(0xFFE0E0E0)),
-                      )
-                    : Container(color: const Color(0xFFE0E0E0)),
-              ),
-            ),
-            SizedBox(height: r.dp(7)),
-            Text(
-              product.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: _fBody,
-                fontSize: r.sp(13),
-                fontWeight: FontWeight.w600,
-                color: primary,
-              ),
-            ),
-            SizedBox(height: r.dp(5)),
-            _priceBlock(product, r),
-            SizedBox(height: r.dp(6)),
-            if (colorHexes.isNotEmpty) _colorSwatches(colorHexes, r),
-            SizedBox(height: r.dp(8)),
-            _cartButtonForProduct(product, r),
+                        errorBuilder: (_, __, ___) => const SizedBox(),
+                      ),
+                    ),
+                    SizedBox(width: r.dp(12)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.title,
+                            style: TextStyle(
+                              fontFamily: _fBold,
+                              fontSize: r.sp(14),
+                              color: primary,
+                            ),
+                          ),
+                          SizedBox(height: r.dp(4)),
+                          Text(
+                            item.price,
+                            style: TextStyle(
+                              fontFamily: _fNumber,
+                              fontSize: r.sp(13),
+                              color: primary,
+                            ),
+                          ),
+                          SizedBox(height: r.dp(2)),
+                          Text(
+                            'Taxes included Shipping calculated at checkout',
+                            style: TextStyle(
+                              fontFamily: _fBody,
+                              fontSize: r.sp(11),
+                              color: secondaryTxt,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ),
       ),
     );
   }
 
-  Widget _cartButtonForProduct(ShopifyProduct product, R r) {
-    return AnimatedBuilder(
-      animation: CartService.instance,
-      builder: (context, _) {
-        final inCart = product.variants
-            .any((v) => CartService.instance.isInCart(v.id));
-        final isBusy = _addingToCartProductIds.contains(product.id);
-        return SizedBox(
-          width: double.infinity,
-          height: r.dp(32),
-          child: OutlinedButton(
-            onPressed: isBusy
-                ? null
-                : inCart
-                    ? _goToCart
-                    : () => _showSizeSelector(product),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: primary, width: 1.2),
-              shape: const RoundedRectangleBorder(),
-              padding: EdgeInsets.zero,
-              foregroundColor: primary,
-            ),
-            child: Text(
-              inCart ? 'GO TO CART' : 'SHOP NOW',
-              style: TextStyle(
-                fontFamily: _fBold,
-                fontSize: r.sp(11),
-                letterSpacing: 1.2,
+  // ---------------------------------------------------------------------
+  // 6. EDITORIAL (single full-screen image, same treatment as hero banner)
+  // ---------------------------------------------------------------------
+
+  Widget _editorialSection() {
+    return SizedBox(
+      height: _fullScreenBannerHeight(context),
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/editorial.jpg',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) =>
+                Container(color: const Color(0xFF6B7A5E)),
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.10),
+                  Colors.black.withOpacity(0.30),
+                ],
               ),
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
-  Widget _priceBlock(ShopifyProduct product, R r) {
-    if (!product.isOnSale) {
-      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: r.sp(14), color: primary, amountFontFamily: _fNumber);
-    }
-    final saved = (product.compareAtPrice! - product.price).round();
+  // ---------------------------------------------------------------------
+  // 7. SHOP BY COLLECTION (same single-image sliding banner as Explore Categories)
+  // ---------------------------------------------------------------------
+
+  Widget _shopByCollectionSection() {
+    final double bannerHeight =
+        (MediaQuery.of(context).size.height * 0.46).clamp(220.0, 420.0);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            Text('MRP ', style: TextStyle(fontFamily: _fBody, fontSize: r.sp(11), fontWeight: FontWeight.w500, color: const Color(0xFF9A9A9A))),
-            PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: r.sp(12), color: const Color(0xFF9A9A9A), amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
-          ],
-        ),
-        SizedBox(height: r.dp(2)),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: r.sp(15), color: primary, amountFontFamily: _fNumber),
-            SizedBox(width: r.dp(6)),
-            SavedAmountText(saved.toString(), currencyCode: product.currencyCode, fontSize: r.sp(11), color: const Color(0xFF2E7D32), fontFamily: _fNumber),
-          ],
+        _sliverHeadAsBox('SHOP BY COLLECTION'),
+        _AutoSlideCollectionBanner(
+          height: bannerHeight,
+          items: _shopByCollectionTiles
+              .map((tile) => _SlideItem(
+                    image: Image.asset(
+                      tile.imageAsset,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          Container(color: const Color(0xFFE0E0E0)),
+                    ),
+                    label: tile.title,
+                    onTap: () => _openCollectionByHandle(
+                      tile.handle,
+                      title: tile.title,
+                      label: tile.title,
+                    ),
+                  ))
+              .toList(),
         ),
       ],
     );
   }
 
-  Widget _colorSwatches(List<String> hexCodes, R r) {
-    final visible = hexCodes.take(5).toList();
-    return Row(
-      children: visible.map((hex) {
-        Color color;
-        try {
-          final cleaned = hex.replaceAll('#', '');
-          color = Color(int.parse('FF$cleaned', radix: 16));
-        } catch (_) {
-          color = const Color(0xFFCCCCCC);
-        }
-        return Container(
-          margin: EdgeInsets.only(right: r.dp(5)),
-          width:  r.dp(18),
-          height: r.dp(18),
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: const Color(0xFFDDDDDD),
-              width: 1,
+  // ---------------------------------------------------------------------
+  // 8. INSTAGRAM (5 tappable posts, opens Instagram)
+  // ---------------------------------------------------------------------
+
+  Widget _instagramSectionAsBox() {
+    final r = R.of(context);
+    return SizedBox(
+      height: r.dp(140),
+      child: ListView.separated(
+        padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+        scrollDirection: Axis.horizontal,
+        itemCount: _instagramPosts.length,
+        separatorBuilder: (_, __) => SizedBox(width: r.dp(8)),
+        itemBuilder: (_, i) {
+          final post = _instagramPosts[i];
+          return GestureDetector(
+            onTap: () => _openInstagramPost(post.postUrl),
+            child: SizedBox(
+              width: r.dp(140),
+              height: r.dp(140),
+              child: Image.asset(
+                post.imageAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    Container(color: const Color(0xFFE0E0E0)),
+              ),
             ),
-          ),
-        );
-      }).toList(),
+          );
+        },
+      ),
     );
   }
+
+  // ---------------------------------------------------------------------
+  // Loading / empty states (unchanged)
+  // ---------------------------------------------------------------------
 
   Widget _shimmer() {
     final r = R.of(context);
@@ -1375,6 +973,125 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// ---------------------------------------------------------------------
+// Auto-sliding single-image-at-a-time banner (right-to-left transition,
+// advances every 5 seconds). Used by Explore Categories and Shop By
+// Collection — same look as the full-width hero banner, one item visible
+// at a time, with a bottom-left label and a tap handler per slide.
+// ---------------------------------------------------------------------
+
+class _SlideItem {
+  final Widget image;
+  final String label;
+  final VoidCallback onTap;
+  const _SlideItem({
+    required this.image,
+    required this.label,
+    required this.onTap,
+  });
+}
+
+class _AutoSlideCollectionBanner extends StatefulWidget {
+  final List<_SlideItem> items;
+  final double height;
+  final Duration interval;
+  const _AutoSlideCollectionBanner({
+    required this.items,
+    required this.height,
+    this.interval = const Duration(seconds: 5),
+  });
+
+  @override
+  State<_AutoSlideCollectionBanner> createState() =>
+      _AutoSlideCollectionBannerState();
+}
+
+class _AutoSlideCollectionBannerState
+    extends State<_AutoSlideCollectionBanner> {
+  late final PageController _controller;
+  Timer? _timer;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController();
+    if (widget.items.length > 1) {
+      _startAutoSlide();
+    }
+  }
+
+  void _startAutoSlide() {
+    _timer = Timer.periodic(widget.interval, (_) {
+      if (!mounted) return;
+      _index = (_index + 1) % widget.items.length;
+      _controller.animateToPage(
+        _index,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = R.of(context);
+    return SizedBox(
+      height: widget.height,
+      width: double.infinity,
+      child: PageView.builder(
+        controller: _controller,
+        itemCount: widget.items.length,
+        onPageChanged: (i) => _index = i,
+        itemBuilder: (_, i) {
+          final item = widget.items[i];
+          return GestureDetector(
+            onTap: item.onTap,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                item.image,
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.10),
+                        Colors.black.withOpacity(0.45),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: r.dp(18),
+                  bottom: r.dp(14),
+                  child: Text(
+                    item.label,
+                    style: TextStyle(
+                      fontFamily: AppFonts.heading,
+                      color: Colors.white,
+                      fontSize: r.sp(28),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _SectionAnchor {
   final String    id;
   final GlobalKey key;
@@ -1383,15 +1100,28 @@ class _SectionAnchor {
 
 class _PromoCollectionTile {
   final String title;
-  final String subtitle;
   final String handle;
   final String imageAsset;
-  final String buttonText;
   const _PromoCollectionTile({
     required this.title,
-    required this.subtitle,
     required this.handle,
     required this.imageAsset,
-    this.buttonText = 'SHOP NOW',
   });
+}
+
+class _ShopTheLookProduct {
+  final String title;
+  final String price;
+  final String imageAsset;
+  const _ShopTheLookProduct({
+    required this.title,
+    required this.price,
+    required this.imageAsset,
+  });
+}
+
+class _InstagramPost {
+  final String imageAsset;
+  final String postUrl;
+  const _InstagramPost({required this.imageAsset, required this.postUrl});
 }

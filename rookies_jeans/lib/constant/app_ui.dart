@@ -74,6 +74,7 @@ class Responsive {
   double get height => size.height;
 
   double get safeWidth =>
+   
       (width - padding.left - padding.right).clamp(0.0, width);
 
   bool get isTablet => width >= 600 && width < 1024;

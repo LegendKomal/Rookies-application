@@ -46,7 +46,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _checkLoginStatus() async {
   await Future.delayed(const Duration(seconds: 3));
-
+ 
   if (!mounted) return;
 
   // context.go(loggedIn ? '/home' : '/login');
