@@ -13,6 +13,10 @@ import 'package:rookies_jeans/services/cart_service.dart';
 
 typedef R = Responsive;
 
+// Shared by _shopTheLookAsBox (height math) and _ShopTheLookAutoSlideCard
+// (the actual painted border) so the two can never get out of sync.
+const double _kCardBorderWidth = 0.75;
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -36,21 +40,73 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<ShopifyCollection> _categories = [];
 
-  final List<_ShopTheLookProduct> _shopTheLookProducts = const [
-    _ShopTheLookProduct(
-      title: 'Product title',
-      price: '₹ 20',
-      imageAsset: 'assets/shop_the_look_item_1.jpg',
+  // Each "look" now carries its own outfit image AND the products shown
+  // with it, so the whole card (image + product rows) slides as one unit.
+  final List<_ShopTheLookOutfit> _shopTheLookOutfits = const [
+    _ShopTheLookOutfit(
+      imageAsset: 'assets/shop_the_look_outfit_1.jpg',
+      products: [
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_1.jpg',
+        ),
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_2.jpg',
+        ),
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_3.jpg',
+        ),
+      ],
     ),
-    _ShopTheLookProduct(
-      title: 'Product title',
-      price: '₹ 20',
-      imageAsset: 'assets/shop_the_look_item_2.jpg',
+    _ShopTheLookOutfit(
+      imageAsset: 'assets/shop_the_look_outfit_2.jpg',
+      products: [
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_1.jpg',
+        ),
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_2.jpg',
+        ),
+      ],
     ),
-    _ShopTheLookProduct(
-      title: 'Product title',
-      price: '₹ 20',
-      imageAsset: 'assets/shop_the_look_item_3.jpg',
+    _ShopTheLookOutfit(
+      imageAsset: 'assets/shop_the_look_outfit_3.jpg',
+      products: [
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_3.jpg',
+        ),
+      ],
+    ),
+    _ShopTheLookOutfit(
+      imageAsset: 'assets/shop_the_look_outfit_4.jpg',
+      products: [
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_1.jpg',
+        ),
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_2.jpg',
+        ),
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_3.jpg',
+        ),
+      ],
     ),
   ];
 
@@ -267,13 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           _snapSection(
                             id: 'shop_the_look',
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _sliverHeadAsBox('SHOP THE LOOK'),
-                                _shopTheLookAsBox(),
-                              ],
-                            ),
+                            child: _shopTheLookSection(),
                           ),
                           _snapSection(
                             id: 'editorial',
@@ -485,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _sliverHeadAsBox(String title) {
     final r = R.of(context);
     return Padding(
-      padding: EdgeInsets.fromLTRB(r.dp(16), r.dp(50), r.dp(16), r.dp(10)),
+      padding: EdgeInsets.fromLTRB(r.dp(16), r.dp(18), r.dp(16), r.dp(10)),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
@@ -559,7 +609,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _exploreCategoriesSection() {
     final double bannerHeight =
-        (MediaQuery.of(context).size.height * 0.9).clamp(220.0, 420.0);
+        (MediaQuery.of(context).size.height * 0.9).clamp(220.0, 550.0);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -674,137 +724,89 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ---------------------------------------------------------------------
-  // 5. SHOP THE LOOK
+  // 5. SHOP THE LOOK (whole card — image + product rows — auto-slides)
   // ---------------------------------------------------------------------
+
+  Widget _shopTheLookSection() {
+    // The header takes its natural size; the card claims whatever height is
+    // left via Expanded. Because Expanded can never ask for more than its
+    // parent has, this can't overflow regardless of screen size or font scale.
+    return SizedBox(
+      height: _fullScreenBannerHeight(context),
+      child: Column(
+        children: [
+          _sliverHeadAsBox('SHOP THE LOOK'),
+          Expanded(child: _shopTheLookAsBox()),
+        ],
+      ),
+    );
+  }
 
   Widget _shopTheLookAsBox() {
     final r = R.of(context);
-    const accent = Color(0xFF2F6FED);
+
+    // Different looks can carry different numbers of products, so we size
+    // every card to fit the one with the most rows; shorter cards get a
+    // little extra breathing room at the bottom.
+    final int maxProducts = _shopTheLookOutfits
+        .map((o) => o.products.length)
+        .fold<int>(0, (a, b) => a > b ? a : b);
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: accent, width: 1.4),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Stack(
-              children: [
-                AspectRatio(
-                  aspectRatio: 0.78,
-                  child: Image.asset(
-                    'assets/shop_the_look_hero.jpg',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        Container(color: const Color(0xFF555555)),
-                  ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // constraints.maxHeight is exactly what Expanded handed us, so
+          // everything below is derived from real available space instead
+          // of fixed numbers — this is what makes it responsive.
+          final double available = constraints.maxHeight;
+
+          // _ShopTheLookAutoSlideCardState wraps each page in a
+          // Container(border: Border.all(width: _kCardBorderWidth)).
+          // Flutter auto-insets a Container's child by the border width on
+          // every side, which is exactly the 1.5px this used to overflow
+          // by. Reserving it here up front is the actual fix.
+          const double borderInsets = _kCardBorderWidth * 2;
+          final double usable =
+              (available - borderInsets).clamp(0.0, available);
+
+          // Fill the ENTIRE available height, the same way the hero banner
+          // fills the full screen — no upper cap, so there's never a gap.
+          // The only clamp is a readability floor for pathologically short
+          // screens; if that floor can't be met we just fill what's there.
+          double heroHeight = usable * 0.55;
+          heroHeight = heroHeight < 160.0 ? 160.0 : heroHeight;
+          heroHeight = heroHeight > usable ? usable : heroHeight;
+
+          final double remainingForRows =
+              (usable - heroHeight).clamp(0.0, usable);
+          double productRowHeight =
+              maxProducts > 0 ? remainingForRows / maxProducts : 0.0;
+          if (maxProducts > 0 && productRowHeight < 56.0) {
+            productRowHeight = 56.0;
+          }
+
+          // Rebuild the exact content height from the values above so the
+          // box we hand the card always matches what it will actually
+          // paint — in the normal case this equals `available` exactly.
+          final double cardHeight =
+              heroHeight + (productRowHeight * maxProducts) + borderInsets;
+
+          return Center(
+            child: ConstrainedBox(
+              // Stops the card from stretching edge-to-edge on tablets/web.
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: SizedBox(
+                height: cardHeight,
+                child: _ShopTheLookAutoSlideCard(
+                  outfits: _shopTheLookOutfits,
+                  heroHeight: heroHeight,
+                  productRowHeight: productRowHeight,
                 ),
-                Positioned(
-                  top: r.dp(10),
-                  left: r.dp(10),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: r.dp(10), vertical: r.dp(6)),
-                    decoration: BoxDecoration(
-                      color: accent,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.crop_free,
-                            size: r.dp(14), color: Colors.white),
-                        SizedBox(width: r.dp(6)),
-                        Text(
-                          'Scene products item',
-                          style: TextStyle(
-                            fontFamily: _fBody,
-                            color: Colors.white,
-                            fontSize: r.sp(11),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: r.dp(10),
-                  right: r.dp(10),
-                  child: Container(
-                    width: r.dp(28),
-                    height: r.dp(28),
-                    decoration:
-                        const BoxDecoration(color: accent, shape: BoxShape.circle),
-                    child: Icon(Icons.add, size: r.dp(18), color: Colors.white),
-                  ),
-                ),
-              ],
+              ),
             ),
-            ...List.generate(_shopTheLookProducts.length, (i) {
-              final item = _shopTheLookProducts[i];
-              return Container(
-                decoration: BoxDecoration(
-                  border: Border(
-                    top: BorderSide(
-                      color: const Color(0xFFE5E5E5),
-                      width: i == 0 ? 1 : 0,
-                    ),
-                  ),
-                ),
-                padding: EdgeInsets.all(r.dp(12)),
-                child: Row(
-                  children: [
-                    Container(
-                      width: r.dp(56),
-                      height: r.dp(56),
-                      color: const Color(0xFFECECEC),
-                      child: Image.asset(
-                        item.imageAsset,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox(),
-                      ),
-                    ),
-                    SizedBox(width: r.dp(12)),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.title,
-                            style: TextStyle(
-                              fontFamily: _fBold,
-                              fontSize: r.sp(14),
-                              color: primary,
-                            ),
-                          ),
-                          SizedBox(height: r.dp(4)),
-                          Text(
-                            item.price,
-                            style: TextStyle(
-                              fontFamily: _fNumber,
-                              fontSize: r.sp(13),
-                              color: primary,
-                            ),
-                          ),
-                          SizedBox(height: r.dp(2)),
-                          Text(
-                            'Taxes included Shipping calculated at checkout',
-                            style: TextStyle(
-                              fontFamily: _fBody,
-                              fontSize: r.sp(11),
-                              color: secondaryTxt,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -1088,6 +1090,234 @@ class _AutoSlideCollectionBannerState
           );
         },
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------
+// Shop The Look — each outfit carries its own products. The PageView
+// now builds one full card (border + hero image + that outfit's product
+// rows) per page, so the whole card slides left as a unit every 5
+// seconds instead of only the picture swapping underneath a fixed list.
+// ---------------------------------------------------------------------
+
+class _ShopTheLookOutfit {
+  final String imageAsset;
+  final List<_ShopTheLookProduct> products;
+  const _ShopTheLookOutfit({
+    required this.imageAsset,
+    required this.products,
+  });
+}
+
+class _ShopTheLookAutoSlideCard extends StatefulWidget {
+  final List<_ShopTheLookOutfit> outfits;
+  final double heroHeight;
+  final double productRowHeight;
+  final Duration interval;
+  const _ShopTheLookAutoSlideCard({
+    required this.outfits,
+    required this.heroHeight,
+    required this.productRowHeight,
+    this.interval = const Duration(seconds: 5),
+  });
+
+  @override
+  State<_ShopTheLookAutoSlideCard> createState() =>
+      _ShopTheLookAutoSlideCardState();
+}
+
+class _ShopTheLookAutoSlideCardState
+    extends State<_ShopTheLookAutoSlideCard> {
+  late final PageController _controller;
+  Timer? _timer;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController();
+    if (widget.outfits.length > 1) {
+      _startAutoSlide();
+    }
+  }
+
+  void _startAutoSlide() {
+    _timer = Timer.periodic(widget.interval, (_) {
+      if (!mounted) return;
+      _index = (_index + 1) % widget.outfits.length;
+      _controller.animateToPage(
+        _index,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = R.of(context);
+    const accent = Color(0xFF2F6FED);
+
+    if (widget.outfits.isEmpty) {
+      return Container(color: const Color(0xFF555555));
+    }
+
+    return PageView.builder(
+      controller: _controller,
+      itemCount: widget.outfits.length,
+      onPageChanged: (i) => _index = i,
+      itemBuilder: (_, i) {
+        final outfit = widget.outfits[i];
+        return Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: accent, width: _kCardBorderWidth),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: widget.heroHeight,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.asset(
+                      outfit.imageAsset,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          Container(color: const Color(0xFF555555)),
+                    ),
+                    Positioned(
+                      top: r.dp(10),
+                      left: r.dp(10),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: r.dp(10), vertical: r.dp(6)),
+                        decoration: BoxDecoration(
+                          color: accent,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.crop_free,
+                                size: r.dp(14), color: Colors.white),
+                            SizedBox(width: r.dp(6)),
+                            Flexible(
+                              child: Text(
+                                'Scene products item',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: AppFonts.body,
+                                  color: Colors.white,
+                                  fontSize: r.sp(11),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: r.dp(10),
+                      right: r.dp(10),
+                      child: Container(
+                        width: r.dp(28),
+                        height: r.dp(28),
+                        decoration: const BoxDecoration(
+                            color: accent, shape: BoxShape.circle),
+                        child: Icon(Icons.add,
+                            size: r.dp(18), color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ...List.generate(outfit.products.length, (j) {
+                final item = outfit.products[j];
+                return SizedBox(
+                  height: widget.productRowHeight,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: const Color(0xFFE5E5E5),
+                          width: j == 0 ? 1 : 0,
+                        ),
+                      ),
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: r.dp(12)),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: r.dp(40),
+                          height: r.dp(40),
+                          color: const Color(0xFFECECEC),
+                          child: Image.asset(
+                            item.imageAsset,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const SizedBox(),
+                          ),
+                        ),
+                        SizedBox(width: r.dp(10)),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: AppFonts.bold,
+                                  fontSize: r.sp(12),
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              SizedBox(height: r.dp(2)),
+                              Text(
+                                item.price,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: AppFonts.number,
+                                  fontSize: r.sp(11),
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              SizedBox(height: r.dp(1)),
+                              Text(
+                                'Taxes included Shipping calculated at checkout',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: AppFonts.body,
+                                  fontSize: r.sp(9),
+                                  color: AppColors.secondaryText,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
     );
   }
 }
