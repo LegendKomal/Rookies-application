@@ -13,8 +13,6 @@ import 'package:rookies_jeans/services/cart_service.dart';
 
 typedef R = Responsive;
 
-// Shared by _shopTheLookAsBox (height math) and _ShopTheLookAutoSlideCard
-// (the actual painted border) so the two can never get out of sync.
 const double _kCardBorderWidth = 0.75;
 
 class HomeScreen extends StatefulWidget {
@@ -32,16 +30,15 @@ class _HomeScreenState extends State<HomeScreen> {
   static const String _fBold   = AppFonts.bold;
   static const String _fNumber = AppFonts.number;
 
+  static const double _kBottomNavHeight = 60.0;
+  static const double _kShopTheLookToEditorialGap = 24.0;
+  static const double _kInstagramBlockSpacing = 2.0;
+
   bool _isLoading = true;
   final ScrollController _scrollCtrl = ScrollController();
-  final List<_SectionAnchor> _sectionAnchors = [];
-  bool _isSnapping = false;
-  BuildContext? _scrollableContext;
 
   List<ShopifyCollection> _categories = [];
 
-  // Each "look" now carries its own outfit image AND the products shown
-  // with it, so the whole card (image + product rows) slides as one unit.
   final List<_ShopTheLookOutfit> _shopTheLookOutfits = const [
     _ShopTheLookOutfit(
       imageAsset: 'assets/shop_the_look_outfit_1.jpg',
@@ -179,64 +176,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _registerAnchor(_SectionAnchor anchor) {
-    if (!_sectionAnchors.any((a) => a.key == anchor.key)) {
-      _sectionAnchors.add(anchor);
-    }
-  }
-
-  List<double> _collectSectionOffsets() {
-    final offsets = <double>[];
-    for (final anchor in _sectionAnchors) {
-      final ctx = anchor.key.currentContext;
-      if (ctx == null) continue;
-      final box = ctx.findRenderObject() as RenderBox?;
-      if (box == null || !box.attached) continue;
-      final scrollBox =
-          _scrollableContext?.findRenderObject() as RenderBox?;
-      if (scrollBox == null) continue;
-      final position = box.localToGlobal(Offset.zero, ancestor: scrollBox);
-      offsets.add(_scrollCtrl.offset + position.dy);
-    }
-    offsets.sort();
-    return offsets;
-  }
-
-  bool _handleScrollNotification(ScrollNotification notification) {
-    if (notification is ScrollEndNotification && !_isSnapping) {
-      _snapToNearestSection();
-    }
-    return false;
-  }
-
-  Future<void> _snapToNearestSection() async {
-    final offsets   = _collectSectionOffsets();
-    if (offsets.isEmpty) return;
-    final current   = _scrollCtrl.offset;
-    final maxScroll = _scrollCtrl.position.maxScrollExtent;
-    double nearest   = offsets.first;
-    double bestDelta = (offsets.first - current).abs();
-    for (final o in offsets) {
-      final delta = (o - current).abs();
-      if (delta < bestDelta) {
-        bestDelta = delta;
-        nearest   = o;
-      }
-    }
-    final target = nearest.clamp(0.0, maxScroll);
-    if ((target - current).abs() < 1.0) return;
-    _isSnapping = true;
-    try {
-      await _scrollCtrl.animateTo(
-        target,
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-      );
-    } finally {
-      _isSnapping = false;
-    }
-  }
-
   Future<void> _fetchAll({bool forceRefresh = false}) async {
     if (mounted) setState(() => _isLoading = true);
     if (forceRefresh) {
@@ -287,79 +226,57 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _sectionAnchors.clear();
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
         child: _isLoading
             ? _shimmer()
-            : Builder(
-                builder: (scrollableContext) {
-                  _scrollableContext = scrollableContext;
-                  return NotificationListener<ScrollNotification>(
-                    onNotification: _handleScrollNotification,
-                    child: RefreshIndicator(
-                      color: primary,
-                      onRefresh: _fetchAll,
-                      child: CustomScrollView(
-                        controller: _scrollCtrl,
-                        physics: const ClampingScrollPhysics(),
-                        slivers: [
-                          _snapSection(
-                            id: 'banner',
-                            child: _sliverBannerWithOverlayBar(),
-                          ),
-                          _snapSection(
-                            id: 'denim_cargo',
-                            child: _sliverDenimCargoBlocks(),
-                          ),
-                          _snapSection(
-                            id: 'categories',
-                            child: _exploreCategoriesSection(),
-                          ),
-                          _snapSection(
-                            id: 'bestseller_sales',
-                            child: _sliverBestsellerSalesBlocks(),
-                          ),
-                          _snapSection(
-                            id: 'shop_the_look',
-                            child: _shopTheLookSection(),
-                          ),
-                          _snapSection(
-                            id: 'editorial',
-                            child: _editorialSection(),
-                          ),
-                          _snapSection(
-                            id: 'shop_by_collection',
-                            child: _shopByCollectionSection(),
-                          ),
-                          _snapSection(
-                            id: 'instagram',
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _sliverCenteredHeadAsBox('FOLLOW US'),
-                                _instagramSectionAsBox(),
-                              ],
-                            ),
-                          ),
-                          const SliverToBoxAdapter(
-                              child: SizedBox(height: 40)),
+            : RefreshIndicator(
+                color: primary,
+                onRefresh: _fetchAll,
+                child: CustomScrollView(
+                  controller: _scrollCtrl,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _sliverBannerWithOverlayBar(),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _sliverDenimCargoBlocks(),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _exploreCategoriesSection(),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _sliverBestsellerSalesBlocks(),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _shopTheLookSection(),
+                    ),
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: _kShopTheLookToEditorialGap),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _editorialSection(),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _shopByCollectionSection(),
+                    ),
+                    SliverToBoxAdapter(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _sliverCenteredHeadAsBox('FOLLOW US'),
+                          _instagramSectionAsBox(),
                         ],
                       ),
                     ),
-                  );
-                },
+                    const SliverToBoxAdapter(
+                        child: SizedBox(height: 40)),
+                  ],
+                ),
               ),
       ),
-    );
-  }
-
-  Widget _snapSection({required String id, required Widget child}) {
-    final key = GlobalKey(debugLabel: id);
-    _registerAnchor(_SectionAnchor(id: id, key: key));
-    return SliverToBoxAdapter(
-      child: KeyedSubtree(key: key, child: child),
     );
   }
 
@@ -368,9 +285,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return mq.size.height - mq.padding.top - mq.padding.bottom;
   }
 
-  // ---------------------------------------------------------------------
-  // 1. HERO BANNER (image, replaces the old video banner)
-  // ---------------------------------------------------------------------
+  /// Editorial section now fills the screen and stops just above the
+  /// bottom nav bar, matching how `_shopTheLookSection` sizes itself.
+  double _editorialSectionHeight(BuildContext context) =>
+      _fullScreenBannerHeight(context) - _kBottomNavHeight;
+
+  double _exploreAndCollectionBannerHeight(BuildContext context) =>
+      (MediaQuery.of(context).size.height * 0.9).clamp(220.0, 550.0);
 
   Widget _sliverBannerWithOverlayBar() {
     final r = R.of(context);
@@ -570,10 +491,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // 2. DENIM & CARGO (same visual pattern as Bestseller / Sale)
-  // ---------------------------------------------------------------------
-
   Widget _sliverDenimCargoBlocks() {
     final r = R.of(context);
     final double screenWidth = MediaQuery.of(context).size.width;
@@ -603,13 +520,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // 3. EXPLORE CATEGORIES (heading + single-image auto-sliding banner)
-  // ---------------------------------------------------------------------
-
   Widget _exploreCategoriesSection() {
-    final double bannerHeight =
-        (MediaQuery.of(context).size.height * 0.9).clamp(220.0, 550.0);
+    final double bannerHeight = _exploreAndCollectionBannerHeight(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -638,10 +550,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
   }
-
-  // ---------------------------------------------------------------------
-  // 4. BESTSELLER & SALE (unchanged)
-  // ---------------------------------------------------------------------
 
   Widget _sliverBestsellerSalesBlocks() {
     final r = R.of(context);
@@ -723,16 +631,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // 5. SHOP THE LOOK (whole card — image + product rows — auto-slides)
-  // ---------------------------------------------------------------------
-
   Widget _shopTheLookSection() {
-    // The header takes its natural size; the card claims whatever height is
-    // left via Expanded. Because Expanded can never ask for more than its
-    // parent has, this can't overflow regardless of screen size or font scale.
+    final double sectionHeight =
+        _fullScreenBannerHeight(context) - _kBottomNavHeight;
+    // final double sectionHeight = _fullScreenBannerHeight(context);
+
     return SizedBox(
-      height: _fullScreenBannerHeight(context),
+      height: sectionHeight,
       child: Column(
         children: [
           _sliverHeadAsBox('SHOP THE LOOK'),
@@ -745,9 +650,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _shopTheLookAsBox() {
     final r = R.of(context);
 
-    // Different looks can carry different numbers of products, so we size
-    // every card to fit the one with the most rows; shorter cards get a
-    // little extra breathing room at the bottom.
     final int maxProducts = _shopTheLookOutfits
         .map((o) => o.products.length)
         .fold<int>(0, (a, b) => a > b ? a : b);
@@ -756,24 +658,12 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // constraints.maxHeight is exactly what Expanded handed us, so
-          // everything below is derived from real available space instead
-          // of fixed numbers — this is what makes it responsive.
           final double available = constraints.maxHeight;
 
-          // _ShopTheLookAutoSlideCardState wraps each page in a
-          // Container(border: Border.all(width: _kCardBorderWidth)).
-          // Flutter auto-insets a Container's child by the border width on
-          // every side, which is exactly the 1.5px this used to overflow
-          // by. Reserving it here up front is the actual fix.
           const double borderInsets = _kCardBorderWidth * 2;
           final double usable =
               (available - borderInsets).clamp(0.0, available);
 
-          // Fill the ENTIRE available height, the same way the hero banner
-          // fills the full screen — no upper cap, so there's never a gap.
-          // The only clamp is a readability floor for pathologically short
-          // screens; if that floor can't be met we just fill what's there.
           double heroHeight = usable * 0.55;
           heroHeight = heroHeight < 160.0 ? 160.0 : heroHeight;
           heroHeight = heroHeight > usable ? usable : heroHeight;
@@ -786,15 +676,11 @@ class _HomeScreenState extends State<HomeScreen> {
             productRowHeight = 56.0;
           }
 
-          // Rebuild the exact content height from the values above so the
-          // box we hand the card always matches what it will actually
-          // paint — in the normal case this equals `available` exactly.
           final double cardHeight =
               heroHeight + (productRowHeight * maxProducts) + borderInsets;
 
           return Center(
             child: ConstrainedBox(
-              // Stops the card from stretching edge-to-edge on tablets/web.
               constraints: const BoxConstraints(maxWidth: 480),
               child: SizedBox(
                 height: cardHeight,
@@ -811,13 +697,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // 6. EDITORIAL (single full-screen image, same treatment as hero banner)
-  // ---------------------------------------------------------------------
-
   Widget _editorialSection() {
     return SizedBox(
-      height: _fullScreenBannerHeight(context),
+      height: _editorialSectionHeight(context),
       width: double.infinity,
       child: Stack(
         fit: StackFit.expand,
@@ -845,13 +727,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // 7. SHOP BY COLLECTION (same single-image sliding banner as Explore Categories)
-  // ---------------------------------------------------------------------
-
   Widget _shopByCollectionSection() {
-    final double bannerHeight =
-        (MediaQuery.of(context).size.height * 0.46).clamp(220.0, 420.0);
+    final double bannerHeight = _exploreAndCollectionBannerHeight(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -879,42 +756,34 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // 8. INSTAGRAM (5 tappable posts, opens Instagram)
-  // ---------------------------------------------------------------------
-
   Widget _instagramSectionAsBox() {
-    final r = R.of(context);
-    return SizedBox(
-      height: r.dp(140),
-      child: ListView.separated(
-        padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-        scrollDirection: Axis.horizontal,
-        itemCount: _instagramPosts.length,
-        separatorBuilder: (_, __) => SizedBox(width: r.dp(8)),
-        itemBuilder: (_, i) {
-          final post = _instagramPosts[i];
-          return GestureDetector(
-            onTap: () => _openInstagramPost(post.postUrl),
-            child: SizedBox(
-              width: r.dp(140),
-              height: r.dp(140),
-              child: Image.asset(
-                post.imageAsset,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    Container(color: const Color(0xFFE0E0E0)),
-              ),
-            ),
-          );
-        },
-      ),
+    final double screenWidth = MediaQuery.of(context).size.width;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (int i = 0; i < _instagramPosts.length; i++) ...[
+          if (i > 0) const SizedBox(height: _kInstagramBlockSpacing),
+          _instagramBlock(_instagramPosts[i], screenWidth),
+        ],
+      ],
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Loading / empty states (unchanged)
-  // ---------------------------------------------------------------------
+  Widget _instagramBlock(_InstagramPost post, double width) {
+    return GestureDetector(
+      onTap: () => _openInstagramPost(post.postUrl),
+      child: SizedBox(
+        width: width,
+        height: width,
+        child: Image.asset(
+          post.imageAsset,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) =>
+              Container(color: const Color(0xFFE0E0E0)),
+        ),
+      ),
+    );
+  }
 
   Widget _shimmer() {
     final r = R.of(context);
@@ -974,13 +843,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
-// ---------------------------------------------------------------------
-// Auto-sliding single-image-at-a-time banner (right-to-left transition,
-// advances every 5 seconds). Used by Explore Categories and Shop By
-// Collection — same look as the full-width hero banner, one item visible
-// at a time, with a bottom-left label and a tap handler per slide.
-// ---------------------------------------------------------------------
 
 class _SlideItem {
   final Widget image;
@@ -1093,13 +955,6 @@ class _AutoSlideCollectionBannerState
     );
   }
 }
-
-// ---------------------------------------------------------------------
-// Shop The Look — each outfit carries its own products. The PageView
-// now builds one full card (border + hero image + that outfit's product
-// rows) per page, so the whole card slides left as a unit every 5
-// seconds instead of only the picture swapping underneath a fixed list.
-// ---------------------------------------------------------------------
 
 class _ShopTheLookOutfit {
   final String imageAsset;
@@ -1320,12 +1175,6 @@ class _ShopTheLookAutoSlideCardState
       },
     );
   }
-}
-
-class _SectionAnchor {
-  final String    id;
-  final GlobalKey key;
-  const _SectionAnchor({required this.id, required this.key});
 }
 
 class _PromoCollectionTile {
