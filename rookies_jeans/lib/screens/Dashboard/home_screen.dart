@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart'; // NEW: needed for Simulation in _NoFlingScrollPhysics
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -34,8 +35,62 @@ class _HomeScreenState extends State<HomeScreen> {
   static const double _kShopTheLookToEditorialGap = 24.0;
   static const double _kInstagramBlockSpacing = 2.0;
 
+  // ────────────────────────────────────────────────────────────────────────
+  // SNAP-SCROLL CONFIGURATION
+  // Tune these to change how the snap feels. `_kSnapThresholdFraction` is
+  // the main one: it's the fraction of the CURRENT section's height that
+  // the user must scroll past before the page commits to moving to the
+  // next/previous section. Lower = snaps on the tiniest nudge,
+  // higher = requires a more deliberate scroll.
+  // ────────────────────────────────────────────────────────────────────────
+
+  /// Fraction (0.0–1.0) of the current section's height that counts as a
+  /// "committed" scroll toward the next/previous section.
+  static const double _kSnapThresholdFraction = 0.04;
+
+  /// Absolute floor for the threshold in logical pixels. Guarantees a small
+  /// gesture (or a single mouse-wheel tick) is always enough, even on very
+  /// short sections.
+  static const double _kSnapThresholdMinPx = 12.0;
+
+  /// How long to wait, after the most recent scroll update, before deciding
+  /// the gesture has settled and evaluating whether to snap. Acts as a
+  /// debounce so a continuous trackpad swipe (which fires many rapid scroll
+  /// events) is treated as one gesture instead of many tiny ones.
+  static const Duration _kSnapSettleDelay = Duration(milliseconds: 50);   
+
+  static const Duration _kSnapAnimationDuration = Duration(milliseconds: 380);
+  static const Curve _kSnapAnimationCurve = Curves.easeOutCubic;
+
+  /// Number of "snap stops" — must match the number of KeyedSubtree(key:
+  /// _sectionKeys[i]) entries wired up in build() below.
+  static const int _kSectionCount = 8;
+
+  /// Fixed-height spacers that live between measured sections in the sliver
+  /// list (see build()) need to be accounted for in the offset table, since
+  /// they're not one of the measured sections themselves. Maps
+  /// "index of the section right before the gap" -> gap height.
+  static const Map<int, double> _kGapAfterSectionIndex = <int, double>{
+    4: _kShopTheLookToEditorialGap, // gap between "Shop the look" and "Editorial"
+  };
+
   bool _isLoading = true;
   final ScrollController _scrollCtrl = ScrollController();
+
+  // One GlobalKey per snap-stop section, used to measure its real rendered
+  // height after layout (heights here depend on MediaQuery/content, so we
+  // measure rather than re-deriving every formula).
+  final List<GlobalKey> _sectionKeys =
+      List<GlobalKey>.generate(_kSectionCount, (_) => GlobalKey());
+
+  // Scroll offset at which each section begins. Recomputed after layout.
+  List<double> _sectionOffsets =
+      List<double>.filled(_kSectionCount, 0.0);
+
+  int _currentSectionIndex = 0;
+  bool _isSnapping = false;
+  double? _gestureBaseOffset;
+  Timer? _settleTimer;
 
   List<ShopifyCollection> _categories = [];
 
@@ -172,6 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _settleTimer?.cancel(); // NEW
     _scrollCtrl.dispose();
     super.dispose();
   }
@@ -224,8 +280,172 @@ class _HomeScreenState extends State<HomeScreen> {
     context.go('/home');
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // SNAP-SCROLL LOGIC (NEW)
+  // ──────────────────────────────────────────────────────────────────────
+
+  int _clampSectionIndex(int index) {
+    if (_sectionOffsets.isEmpty) return 0;
+    if (index < 0) return 0;
+    if (index > _sectionOffsets.length - 1) return _sectionOffsets.length - 1;
+    return index;
+  }
+
+  double _clampOffset(double value, double max) {
+    if (max < 0) return 0;
+    if (value < 0) return 0;
+    if (value > max) return max;
+    return value;
+  }
+
+  /// Measures each section's real rendered height and rebuilds the
+  /// cumulative offset table. Safe to call every frame — it only calls
+  /// setState when the measured offsets actually changed (e.g. after a
+  /// rotation, a font finishing loading, or first layout), so it settles
+  /// after at most one extra rebuild instead of looping.
+  void _recomputeSectionOffsets() {
+    if (!mounted) return;
+
+    final List<double> next = List<double>.filled(_sectionKeys.length, 0.0);
+    double running = 0;
+    for (int i = 0; i < _sectionKeys.length; i++) {
+      next[i] = running;
+      final renderObject = _sectionKeys[i].currentContext?.findRenderObject();
+      if (renderObject is RenderBox && renderObject.hasSize) {
+        running += renderObject.size.height;
+      }
+      running += _kGapAfterSectionIndex[i] ?? 0.0;
+    }
+
+    bool changed = next.length != _sectionOffsets.length;
+    if (!changed) {
+      for (int i = 0; i < next.length; i++) {
+        if ((next[i] - _sectionOffsets[i]).abs() > 0.5) {
+          changed = true;
+          break;
+        }
+      }
+    }
+    if (changed) {
+      setState(() => _sectionOffsets = next);
+    }
+  }
+
+  int _nearestSectionIndexForOffset(double offset) {
+    int nearest = 0;
+    double bestDistance = double.infinity;
+    for (int i = 0; i < _sectionOffsets.length; i++) {
+      final double distance = (offset - _sectionOffsets[i]).abs();
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        nearest = i;
+      }
+    }
+    return nearest;
+  }
+
+  double _currentSectionHeight() {
+    final int i = _currentSectionIndex;
+    final double start = _sectionOffsets[i];
+    final double end = i + 1 < _sectionOffsets.length
+        ? _sectionOffsets[i + 1]
+        : (_scrollCtrl.hasClients
+            ? _scrollCtrl.position.maxScrollExtent
+            : start);
+    final double height = end - start;
+    return height < 1.0 ? 1.0 : height;
+  }
+
+  void _armSettleTimer() {
+    _settleTimer?.cancel();
+    _settleTimer = Timer(_kSnapSettleDelay, _evaluateSnap);
+  }
+
+  /// Called once a gesture (drag, fling-attempt, or mouse-wheel burst) has
+  /// settled. Compares how far the offset moved from the section it
+  /// started at against the threshold, then commits to the next, previous,
+  /// or the same section.
+  void _evaluateSnap() {
+    if (!mounted || !_scrollCtrl.hasClients || _sectionOffsets.isEmpty) return;
+
+    final double? base = _gestureBaseOffset;
+    _gestureBaseOffset = null;
+    if (base == null) return;
+
+    final double delta = _scrollCtrl.offset - base;
+    final double dynamicThreshold =
+        _currentSectionHeight() * _kSnapThresholdFraction;
+    final double threshold = dynamicThreshold > _kSnapThresholdMinPx
+        ? dynamicThreshold
+        : _kSnapThresholdMinPx;
+
+    int target = _currentSectionIndex;
+    if (delta > threshold) {
+      target = _currentSectionIndex + 1;
+    } else if (delta < -threshold) {
+      target = _currentSectionIndex - 1;
+    }
+    _snapToSection(_clampSectionIndex(target));
+  }
+
+  Future<void> _snapToSection(int index) async {
+    if (!_scrollCtrl.hasClients || _sectionOffsets.isEmpty) return;
+
+    final int clampedIndex = _clampSectionIndex(index);
+    final double maxExtent = _scrollCtrl.position.maxScrollExtent;
+    final double rawTarget = clampedIndex == _sectionOffsets.length - 1
+        ? maxExtent
+        : _sectionOffsets[clampedIndex];
+    final double target = _clampOffset(rawTarget, maxExtent);
+
+    _isSnapping = true;
+    _currentSectionIndex = clampedIndex;
+    try {
+      await _scrollCtrl.animateTo(
+        target,
+        duration: _kSnapAnimationDuration,
+        curve: _kSnapAnimationCurve,
+      );
+    } finally {
+      if (mounted) _isSnapping = false;
+    }
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (_sectionOffsets.isEmpty || !_scrollCtrl.hasClients) return false;
+
+    // A real user drag/swipe just began. If it interrupts an in-flight
+    // snap animation, hand control back to the user immediately instead of
+    // letting the two animations fight (prevents jitter on rapid/repeated
+    // gestures).
+    if (notification is ScrollStartNotification &&
+        notification.dragDetails != null) {
+      _isSnapping = false;
+      _currentSectionIndex = _nearestSectionIndexForOffset(_scrollCtrl.offset);
+      _gestureBaseOffset = _sectionOffsets[_currentSectionIndex];
+      _settleTimer?.cancel();
+      return false;
+    }
+
+    // Ignore notifications generated by our own animateTo call.
+    if (_isSnapping) return false;
+
+    if (notification is ScrollUpdateNotification ||
+        notification is ScrollEndNotification) {
+      _gestureBaseOffset ??= _sectionOffsets[_currentSectionIndex];
+      _armSettleTimer();
+    }
+    return false; // never swallow — RefreshIndicator etc. still need this
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!_isLoading) {
+      // Measure sections after every layout pass; cheap no-op once settled.
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _recomputeSectionOffsets());
+    }
+
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
@@ -234,46 +454,78 @@ class _HomeScreenState extends State<HomeScreen> {
             : RefreshIndicator(
                 color: primary,
                 onRefresh: _fetchAll,
-                child: CustomScrollView(
-                  controller: _scrollCtrl,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: _sliverBannerWithOverlayBar(),
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: _handleScrollNotification,
+                  child: CustomScrollView(
+                    controller: _scrollCtrl,
+                    // AlwaysScrollableScrollPhysics is preserved (needed for
+                    // pull-to-refresh even when content fits on screen);
+                    // it now delegates to our no-fling, clamping physics.
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: _NoFlingScrollPhysics(),
                     ),
-                    SliverToBoxAdapter(
-                      child: _sliverDenimCargoBlocks(),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _exploreCategoriesSection(),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _sliverBestsellerSalesBlocks(),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _shopTheLookSection(),
-                    ),
-                    const SliverToBoxAdapter(
-                      child: SizedBox(height: _kShopTheLookToEditorialGap),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _editorialSection(),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _shopByCollectionSection(),
-                    ),
-                    SliverToBoxAdapter(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _sliverCenteredHeadAsBox('FOLLOW US'),
-                          _instagramSectionAsBox(),
-                        ],
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: KeyedSubtree(
+                          key: _sectionKeys[0],
+                          child: _sliverBannerWithOverlayBar(),
+                        ),
                       ),
-                    ),
-                    const SliverToBoxAdapter(
-                        child: SizedBox(height: 40)),
-                  ],
+                      SliverToBoxAdapter(
+                        child: KeyedSubtree(
+                          key: _sectionKeys[1],
+                          child: _sliverDenimCargoBlocks(),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: KeyedSubtree(
+                          key: _sectionKeys[2],
+                          child: _exploreCategoriesSection(),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: KeyedSubtree(
+                          key: _sectionKeys[3],
+                          child: _sliverBestsellerSalesBlocks(),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: KeyedSubtree(
+                          key: _sectionKeys[4],
+                          child: _shopTheLookSection(),
+                        ),
+                      ),
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: _kShopTheLookToEditorialGap),
+                      ),
+                      SliverToBoxAdapter(
+                        child: KeyedSubtree(
+                          key: _sectionKeys[5],
+                          child: _editorialSection(),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: KeyedSubtree(
+                          key: _sectionKeys[6],
+                          child: _shopByCollectionSection(),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: KeyedSubtree(
+                          key: _sectionKeys[7],
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _sliverCenteredHeadAsBox('FOLLOW US'),
+                              _instagramSectionAsBox(),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SliverToBoxAdapter(
+                          child: SizedBox(height: 40)),
+                    ],
+                  ),
                 ),
               ),
       ),
@@ -299,7 +551,7 @@ class _HomeScreenState extends State<HomeScreen> {
       height: _fullScreenBannerHeight(context),
       width: double.infinity,
       child: Stack(
-        children: [
+        children: [ 
           _heroBannerImage(),
           Positioned(
             top: 0,
@@ -409,7 +661,7 @@ class _HomeScreenState extends State<HomeScreen> {
         fit: StackFit.expand,
         children: [
           Image.asset(
-            'assets/hero_banner.jpg',
+            'assets/banner.jpeg',
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) =>
                 Container(color: const Color(0xFF6B7A5E)),
@@ -499,7 +751,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       children: [
         _fullWidthImageBlock(
-          assetPath: 'assets/denim.jpg',
+          assetPath: 'assets/denim.png',
           label: 'Denim',
           width: screenWidth,
           height: blockHeight,
@@ -508,7 +760,7 @@ class _HomeScreenState extends State<HomeScreen> {
           r: r,
         ),
         _fullWidthImageBlock(
-          assetPath: 'assets/cargo.jpg',
+          assetPath: 'assets/cargo.png',
           label: 'Cargo',
           width: screenWidth,
           height: blockHeight,
@@ -844,6 +1096,29 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// NEW: Scroll physics that disables momentum/fling. When the user releases
+// a drag, the scroll stops exactly where the finger lifted (no coasting).
+// Our own NotificationListener + animateTo logic then takes over to produce
+// the actual smooth snap. This is what stops a single gesture from
+// skipping multiple sections and prevents our animation from fighting the
+// engine's own ballistic scroll.
+// ──────────────────────────────────────────────────────────────────────────
+class _NoFlingScrollPhysics extends ClampingScrollPhysics {
+  const _NoFlingScrollPhysics({ScrollPhysics? parent}) : super(parent: parent);
+
+  @override
+  _NoFlingScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return _NoFlingScrollPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  Simulation? createBallisticSimulation(
+      ScrollMetrics position, double velocity) {
+    return null;
+  }
+}
+
 class _SlideItem {
   final Widget image;
   final String label;
@@ -1049,50 +1324,6 @@ class _ShopTheLookAutoSlideCardState
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) =>
                           Container(color: const Color(0xFF555555)),
-                    ),
-                    Positioned(
-                      top: r.dp(10),
-                      left: r.dp(10),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: r.dp(10), vertical: r.dp(6)),
-                        decoration: BoxDecoration(
-                          color: accent,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.crop_free,
-                                size: r.dp(14), color: Colors.white),
-                            SizedBox(width: r.dp(6)),
-                            Flexible(
-                              child: Text(
-                                'Scene products item',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontFamily: AppFonts.body,
-                                  color: Colors.white,
-                                  fontSize: r.sp(11),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: r.dp(10),
-                      right: r.dp(10),
-                      child: Container(
-                        width: r.dp(28),
-                        height: r.dp(28),
-                        decoration: const BoxDecoration(
-                            color: accent, shape: BoxShape.circle),
-                        child: Icon(Icons.add,
-                            size: r.dp(18), color: Colors.white),
-                      ),
                     ),
                   ],
                 ),

@@ -37,6 +37,13 @@ enum ProductSortOption {
 }
 
 class ShopifyStorefrontService {
+
+  static const List<Map<String, String>> _variantMetafieldIdentifiers = [
+    {'namespace': 'custom', 'key': 'fit'},
+    {'namespace': 'custom', 'key': 'material'},
+    {'namespace': 'custom', 'key': 'fabric'},
+  ];
+
   ShopifyStorefrontService._();
   static final ShopifyStorefrontService instance = ShopifyStorefrontService._();
 
@@ -405,9 +412,9 @@ class ShopifyStorefrontService {
         () => _fetchProductByHandle(handle),
       );
 
-  Future<ShopifyProductDetail?> _fetchProductByHandle(String handle) async {
+    Future<ShopifyProductDetail?> _fetchProductByHandle(String handle) async {
     const String query = r'''
-query getProduct($handle: String!) {
+query getProduct($handle: String!, $identifiers: [HasMetafieldsIdentifier!]!) {
   productByHandle(handle: $handle) {
     id title handle description
     priceRange { minVariantPrice { amount currencyCode } }
@@ -421,6 +428,12 @@ query getProduct($handle: String!) {
           priceV2 { amount currencyCode }
           compareAtPriceV2 { amount currencyCode }
           selectedOptions { name value }
+          metafields(identifiers: $identifiers) {
+            namespace
+            key
+            value
+            type
+          }
         }
       }
     }
@@ -433,7 +446,10 @@ query getProduct($handle: String!) {
     try {
       final res = await ShopifyGraphQL.post(
         query,
-        variables: {'handle': handle},
+        variables: {
+          'handle': handle,
+          'identifiers': _variantMetafieldIdentifiers, // NEW
+        },
       );
       _log('getProductByHandle [$handle] → ${res.statusCode}');
       final decoded = res.body;

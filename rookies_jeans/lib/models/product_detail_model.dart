@@ -83,6 +83,28 @@ class ShopifyProductDetail {
   }
 }
 
+class VariantMetafield {
+  final String namespace;
+  final String key;
+  final String value;
+  final String type;
+
+  const VariantMetafield({
+    required this.namespace,
+    required this.key,
+    required this.value,
+    required this.type,
+  });
+
+  factory VariantMetafield.fromJson(Map<String, dynamic> json) =>
+      VariantMetafield(
+        namespace: json['namespace'] as String? ?? '',
+        key: json['key'] as String? ?? '',
+        value: json['value'] as String? ?? '',
+        type: json['type'] as String? ?? '',
+      );
+}
+
 class ProductDetailVariant {
   final String id;
   final String title;
@@ -90,6 +112,7 @@ class ProductDetailVariant {
   final double? price;
   final double? compareAtPrice;
   final List<SelectedDetailOption> selectedOptions;
+  final List<VariantMetafield> metafields; // NEW
 
   const ProductDetailVariant({
     required this.id,
@@ -98,7 +121,16 @@ class ProductDetailVariant {
     this.price,
     this.compareAtPrice,
     required this.selectedOptions,
+    this.metafields = const [], // NEW
   });
+
+  /// Convenience lookup by key (namespace defaults to "custom").
+  String? metafield(String key, {String namespace = 'custom'}) {
+    for (final m in metafields) {
+      if (m.key == key && m.namespace == namespace) return m.value;
+    }
+    return null;
+  }
 
   factory ProductDetailVariant.fromJson(Map<String, dynamic> json) =>
       ProductDetailVariant(
@@ -114,6 +146,10 @@ class ProductDetailVariant {
                 .map((o) => SelectedDetailOption.fromJson(
                     o as Map<String, dynamic>))
                 .toList(),
+        metafields: ((json['metafields'] as List?) ?? [])
+            .where((m) => m != null) // Shopify returns null for missing identifiers
+            .map((m) => VariantMetafield.fromJson(m as Map<String, dynamic>))
+            .toList(), // NEW
       );
 }
 

@@ -513,6 +513,41 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         ),
       );
 
+        Widget _variantMetafieldsSection() {
+    final metafields = _selectedVariant?.metafields ?? const [];
+    if (metafields.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: metafields.map((m) {
+          final label = m.key.replaceAll('_', ' ').toUpperCase();
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: RichText(
+              text: TextSpan(
+                style: TextStyle(
+                  fontFamily: _fBody,
+                  fontSize: _s(12),
+                  color: secondaryTxt,
+                  height: 1.5,
+                ),
+                children: [
+                  TextSpan(
+                    text: '$label: ',
+                    style: const TextStyle(fontFamily: _fBold, color: primary),
+                  ),
+                  TextSpan(text: m.value),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   Widget _infoSection(ShopifyProductDetail p) {
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -531,7 +566,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           const SizedBox(height: 8),
           _priceBlock(p),
           const SizedBox(height: 16),
+
           ...p.options.map((opt) => _optionSelector(opt)),
+_variantMetafieldsSection(),
           const SizedBox(height: 20),
           _availabilityChip(),
           const SizedBox(height: 20),
