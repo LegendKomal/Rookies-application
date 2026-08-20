@@ -420,7 +420,17 @@ query getProduct($handle: String!, $identifiers: [HasMetafieldsIdentifier!]!) {
     priceRange { minVariantPrice { amount currencyCode } }
     compareAtPriceRange { minVariantPrice { amount currencyCode } }
     images(first: 10) { edges { node { url altText } } }
-    options { name values }
+    options {
+  name
+  values
+  optionValues {
+    name
+    swatch {
+      color
+      image { previewImage { url } }
+    }
+  }
+}
     variants(first: 50) {
       edges {
         node {
@@ -455,6 +465,14 @@ query getProduct($handle: String!, $identifiers: [HasMetafieldsIdentifier!]!) {
       final decoded = res.body;
       if (decoded['errors'] != null || decoded['data'] == null) return null;
       final node = decoded['data']['productByHandle'];
+      _log('RAW options: ${node['options']}');
+final rawVariantEdges = (node['variants']?['edges'] as List?) ?? [];
+_log('RAW variant count: ${rawVariantEdges.length}');
+for (final e in rawVariantEdges) {
+  final v = e['node'];
+  _log('RAW variant: id=${v['id']} title=${v['title']} selectedOptions=${v['selectedOptions']}');
+}
+
       if (node == null) return null;
       return ShopifyProductDetail.fromJson(node as Map<String, dynamic>);
     } catch (e) {

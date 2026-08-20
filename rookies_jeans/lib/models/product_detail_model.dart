@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class ShopifyProductDetail {
   final String id;
   final String title;
@@ -30,8 +32,8 @@ class ShopifyProductDetail {
   bool get isOnSale => compareAtPrice != null && compareAtPrice! > price;
 
   String get formattedPrice => currencyCode == 'INR'
-    ? price.toStringAsFixed(0)
-    : '$currencyCode ${price.toStringAsFixed(2)}';
+      ? price.toStringAsFixed(0)
+      : '$currencyCode ${price.toStringAsFixed(2)}';
 
   String get formattedCompareAtPrice {
     if (compareAtPrice == null) return '';
@@ -50,19 +52,17 @@ class ShopifyProductDetail {
             'INR';
 
     final imgEdges = (json['images']?['edges'] as List?) ?? [];
-    final images =
-        imgEdges.map((e) => e['node']['url'] as String).toList();
+    final images = imgEdges.map((e) => e['node']['url'] as String).toList();
 
     final varEdges = (json['variants']?['edges'] as List?) ?? [];
     final variants = varEdges
-        .map((e) => ProductDetailVariant.fromJson(
-            e['node'] as Map<String, dynamic>))
+        .map((e) =>
+            ProductDetailVariant.fromJson(e['node'] as Map<String, dynamic>))
         .toList();
 
     final optList = (json['options'] as List?) ?? [];
     final options = optList
-        .map((o) =>
-            ProductDetailOption.fromJson(o as Map<String, dynamic>))
+        .map((o) => ProductDetailOption.fromJson(o as Map<String, dynamic>))
         .toList();
 
     return ShopifyProductDetail(
@@ -71,8 +71,7 @@ class ShopifyProductDetail {
       handle: json['handle'] as String,
       description: json['description'] as String? ?? '',
       price: double.tryParse(priceStr) ?? 0,
-      compareAtPrice:
-          compareStr != null ? double.tryParse(compareStr) : null,
+      compareAtPrice: compareStr != null ? double.tryParse(compareStr) : null,
       currencyCode: currency,
       imageUrls: images,
       variants: variants,
@@ -83,6 +82,8 @@ class ShopifyProductDetail {
   }
 }
 
+/// A single metafield attached to a product variant
+/// (e.g. custom.fit, custom.material, custom.fabric).
 class VariantMetafield {
   final String namespace;
   final String key;
@@ -95,6 +96,33 @@ class VariantMetafield {
     required this.value,
     required this.type,
   });
+
+  /// Human-friendly label derived from the metafield key.
+  /// e.g. "fabric_composition" -> "FABRIC COMPOSITION"
+  String get label => key.replaceAll('_', ' ').toUpperCase();
+
+  /// Human-friendly value.
+  /// - Shopify "list.*" metafield types are stored as a JSON-encoded
+  ///   array string (e.g. '["Cotton","Elastane"]') and are rendered
+  ///   here as a comma-separated list.
+  /// - "boolean" metafields ("true"/"false") render as Yes/No.
+  /// - Everything else is returned as-is.
+  String get formattedValue {
+    if (type.startsWith('list.')) {
+      try {
+        final decoded = jsonDecode(value);
+        if (decoded is List) {
+          return decoded.map((e) => e.toString()).join(', ');
+        }
+      } catch (_) {
+        // Not valid JSON - fall back to the raw value below.
+      }
+    }
+    if (type == 'boolean') {
+      return value.toLowerCase() == 'true' ? 'Yes' : 'No';
+    }
+    return value;
+  }
 
   factory VariantMetafield.fromJson(Map<String, dynamic> json) =>
       VariantMetafield(
@@ -112,7 +140,7 @@ class ProductDetailVariant {
   final double? price;
   final double? compareAtPrice;
   final List<SelectedDetailOption> selectedOptions;
-  final List<VariantMetafield> metafields; // NEW
+  final List<VariantMetafield> metafields;
 
   const ProductDetailVariant({
     required this.id,
@@ -121,7 +149,7 @@ class ProductDetailVariant {
     this.price,
     this.compareAtPrice,
     required this.selectedOptions,
-    this.metafields = const [], // NEW
+    this.metafields = const [],
   });
 
   /// Convenience lookup by key (namespace defaults to "custom").
@@ -137,19 +165,20 @@ class ProductDetailVariant {
         id: json['id'] as String,
         title: json['title'] as String,
         availableForSale: json['availableForSale'] as bool? ?? false,
-        price: double.tryParse(
-            json['priceV2']?['amount'] as String? ?? ''),
+        price: double.tryParse(json['priceV2']?['amount'] as String? ?? ''),
         compareAtPrice: double.tryParse(
             json['compareAtPriceV2']?['amount'] as String? ?? ''),
-        selectedOptions:
-            ((json['selectedOptions'] as List?) ?? [])
-                .map((o) => SelectedDetailOption.fromJson(
-                    o as Map<String, dynamic>))
-                .toList(),
+        selectedOptions: ((json['selectedOptions'] as List?) ?? [])
+            .map((o) =>
+                SelectedDetailOption.fromJson(o as Map<String, dynamic>))
+            .toList(),
+        // Shopify returns a `null` entry in the metafields list for any
+        // identifier that doesn't have a value set on that variant, so
+        // those are filtered out here.
         metafields: ((json['metafields'] as List?) ?? [])
-            .where((m) => m != null) // Shopify returns null for missing identifiers
+            .where((m) => m != null)
             .map((m) => VariantMetafield.fromJson(m as Map<String, dynamic>))
-            .toList(), // NEW
+            .toList(),
       );
 }
 
@@ -164,15 +193,59 @@ class SelectedDetailOption {
       );
 }
 
+class ProductDetailOptionValue {
+  final String name;
+  final String? swatchColorHex; // e.g. "#E63946"
+  final String? swatchImageUrl;
+
+  const ProductDetailOptionValue({
+    required this.name,
+    this.swatchColorHex,
+    this.swatchImageUrl,
+  });
+
+  factory ProductDetailOptionValue.fromJson(Map<String, dynamic> json) {
+    final swatch = json['swatch'] as Map<String, dynamic>?;
+    return ProductDetailOptionValue(
+      name: json['name'] as String,
+      swatchColorHex: swatch?['color'] as String?,
+      swatchImageUrl:
+          swatch?['image']?['previewImage']?['url'] as String?,
+    );
+  }
+}
+
 class ProductDetailOption {
   final String name;
   final List<String> values;
+  final List<ProductDetailOptionValue> optionValues;
 
-  const ProductDetailOption({required this.name, required this.values});
+  const ProductDetailOption({
+    required this.name,
+    required this.values,
+    this.optionValues = const [],
+  });
 
-  factory ProductDetailOption.fromJson(Map<String, dynamic> json) =>
-      ProductDetailOption(
-        name: json['name'] as String,
-        values: ((json['values'] as List?) ?? []).cast<String>(),
-      );
+  bool get isColorOption =>
+      name.toLowerCase() == 'color' || name.toLowerCase() == 'colour';
+
+  /// Swatch info for a given option value, if linked to one.
+  ProductDetailOptionValue? swatchFor(String valueName) {
+    for (final v in optionValues) {
+      if (v.name == valueName) return v;
+    }
+    return null;
+  }
+
+  factory ProductDetailOption.fromJson(Map<String, dynamic> json) {
+    final rawValues = (json['optionValues'] as List?) ?? [];
+    return ProductDetailOption(
+      name: json['name'] as String,
+      values: ((json['values'] as List?) ?? []).cast<String>(),
+      optionValues: rawValues
+          .map((v) =>
+              ProductDetailOptionValue.fromJson(v as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 }

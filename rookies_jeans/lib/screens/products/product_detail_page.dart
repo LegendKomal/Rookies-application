@@ -175,6 +175,18 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         _isLoading = false;
       });
 
+debugPrint('=== PRODUCT DEBUG (${product.handle}) ===');
+debugPrint('Options: ${product.options.length}');
+for (final o in product.options) {
+  debugPrint('  "${o.name}": ${o.values}');
+}
+debugPrint('Variants: ${product.variants.length}');
+for (final v in product.variants) {
+  final sel = v.selectedOptions.map((s) => '${s.name}=${s.value}').join(', ');
+  debugPrint('  "${v.title}" | available=${v.availableForSale} | $sel');
+}
+debugPrint('==========================================');
+
       _updateVariant();
       _fetchRelatedProducts();
     } catch (e, st) {
@@ -522,7 +534,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: metafields.map((m) {
-          final label = m.key.replaceAll('_', ' ').toUpperCase();
           return Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: RichText(
@@ -535,10 +546,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 ),
                 children: [
                   TextSpan(
-                    text: '$label: ',
+                    text: '${m.label}: ',
                     style: const TextStyle(fontFamily: _fBold, color: primary),
                   ),
-                  TextSpan(text: m.value),
+                  TextSpan(text: m.formattedValue),
                 ],
               ),
             ),
@@ -1018,7 +1029,7 @@ const Divider(height: 1),
     );
   }
 
-  Widget _optionSelector(ProductDetailOption opt) {
+    Widget _optionSelector(ProductDetailOption opt) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1043,40 +1054,110 @@ const Divider(height: 1),
         ),
         const SizedBox(height: 8),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: opt.isColorOption ? 12 : 8,
+          runSpacing: 12,
           children: opt.values.map((val) {
             final isSelected = _selectedOptions[opt.name] == val;
-            return GestureDetector(
-              onTap: () {
-                setState(() => _selectedOptions[opt.name] = val);
-                _updateVariant();
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? primary : cardColor,
-                  border: Border.all(
-                    color: isSelected ? primary : borderColor,
-                    width: isSelected ? 1.5 : 0.8,
-                  ),
-                ),
-                child: Text(
-                  val,
-                  style: TextStyle(
-                    fontFamily: _fBody,
-                    fontSize: _s(12),
-                    color: isSelected ? Colors.white : primary,
-                  ),
-                ),
-              ),
-            );
+            return opt.isColorOption
+                ? _colorSwatchChip(opt, val, isSelected)
+                : _textOptionChip(opt, val, isSelected);
           }).toList(),
         ),
         const SizedBox(height: 16),
       ],
+    );
+  }
+
+  Widget _textOptionChip(ProductDetailOption opt, String val, bool isSelected) {
+    return GestureDetector(
+      onTap: () {
+        setState(() => _selectedOptions[opt.name] = val);
+        _updateVariant();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? primary : cardColor,
+          border: Border.all(
+            color: isSelected ? primary : borderColor,
+            width: isSelected ? 1.5 : 0.8,
+          ),
+        ),
+        child: Text(
+          val,
+          style: TextStyle(
+            fontFamily: _fBody,
+            fontSize: _s(12),
+            color: isSelected ? Colors.white : primary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color? _hexToColor(String? hex) {
+    if (hex == null || hex.isEmpty) return null;
+    var h = hex.replaceAll('#', '');
+    if (h.length == 6) h = 'FF$h';
+    final value = int.tryParse(h, radix: 16);
+    return value != null ? Color(value) : null;
+  }
+
+  Widget _colorSwatchChip(ProductDetailOption opt, String val, bool isSelected) {
+    final swatch = opt.swatchFor(val);
+    final color = _hexToColor(swatch?.swatchColorHex);
+    final imageUrl = swatch?.swatchImageUrl;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() => _selectedOptions[opt.name] = val);
+        _updateVariant();
+      },
+      child: Column(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color ?? const Color(0xFFEEEEEE),
+              image: imageUrl != null
+                  ? DecorationImage(
+                      image: CachedNetworkImageProvider(imageUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+              border: Border.all(
+                color: isSelected ? primary : borderColor,
+                width: isSelected ? 2 : 1,
+              ),
+            ),
+            child: (color == null && imageUrl == null)
+                ? Center(
+                    child: Text(
+                      val.isNotEmpty ? val[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        fontFamily: _fBody,
+                        fontSize: 10,
+                        color: primary,
+                      ),
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            val,
+            style: TextStyle(
+              fontFamily: _fBody,
+              fontSize: _s(10),
+              color: primary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
