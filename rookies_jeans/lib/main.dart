@@ -126,6 +126,15 @@ class ScaffoldWithNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
+      // This Scaffold's background is what shows through any gap behind
+      // the floating glass pill (rounded corners, blur edges) and through
+      // any space below content that doesn't fill the screen. Previously
+      // this fell back to the app theme's `scaffoldBackgroundColor`
+      // (0xFFF5F5F3, an off-white/cream), which is what produced the
+      // visible whitish strip above the nav bar. Set it explicitly to
+      // black so it blends with the dark photography instead.
+      backgroundColor: Colors.black,
       body: navigationShell,
       bottomNavigationBar: RookiesBottomNavBar(
         currentIndex: navigationShell.currentIndex,

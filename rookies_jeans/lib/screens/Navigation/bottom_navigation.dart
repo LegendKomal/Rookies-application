@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
@@ -12,26 +13,22 @@ class RookiesBottomNavBar extends StatelessWidget {
     required this.onTap,
   });
 
-  static const Color _primary     = AppColors.primary;
-  static const Color _inactive    = Color(0xFFAAAAAA);
-  static const Color _bg          = AppColors.card;
-  static const Color _border      = AppColors.border;
-  static const Color _badgeBg     = AppColors.danger;
+  static const Color _glassTint     = Colors.black;
+  static const double _glassOpacity = 0.28;
+  static const Color _glassBorder   = Colors.white;
+  static const double _blurAmount   = 24;
+
+  static const Color _activeCircleColor  = Colors.white;
+  static const Color _activeIconColor    = Color(0xFF111111);
+  static const Color _inactiveIconColor  = Colors.white70;
+  static const Color _badgeBg            = AppColors.danger;
 
   static const int _cartIndex = 3;
-
-  // static const List<_NavItem> _items = [
-  //   _NavItem(label: 'Home',      icon: Icons.home_outlined,           activeIcon: Icons.home_rounded),
-  //   _NavItem(label: 'Category',  icon: Icons.grid_view_outlined,      activeIcon: Icons.grid_view_rounded),
-  //   _NavItem(label: 'Wishlist',  icon: Icons.favorite_border_rounded,  activeIcon: Icons.favorite_rounded),
-  //   _NavItem(label: 'Cart',      icon: Icons.shopping_bag_outlined,   activeIcon: Icons.shopping_bag_rounded),
-  //   _NavItem(label: 'Profile',   icon: Icons.person_outline_rounded,  activeIcon: Icons.person_rounded),
-  // ];
 
   static const List<_NavItem> _items = [
     _NavItem(icon: Icons.home_outlined,           activeIcon: Icons.home_rounded),
     _NavItem(icon: Icons.grid_view_outlined,      activeIcon: Icons.grid_view_rounded),
-    _NavItem(icon: Icons.favorite_border_rounded,  activeIcon: Icons.favorite_rounded),
+    _NavItem(icon: Icons.favorite_border_rounded, activeIcon: Icons.favorite_rounded),
     _NavItem(icon: Icons.shopping_bag_outlined,   activeIcon: Icons.shopping_bag_rounded),
     _NavItem(icon: Icons.person_outline_rounded,  activeIcon: Icons.person_rounded),
   ];
@@ -40,51 +37,106 @@ class RookiesBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final factor = (width / 400).clamp(0.9, 1.3).toDouble();
-    final barHeight = (60 * factor).clamp(56.0, 76.0);
-    final iconSize = (22 * factor).clamp(20.0, 30.0);
+    final barHeight = (48 * factor).clamp(46.0, 58.0);
+    final iconSize = (16 * factor).clamp(18.0, 20.0);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: _bg,
-        border: Border(top: BorderSide(color: _border, width: 1)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 12,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
+    return Material(
+      type: MaterialType.transparency,
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: barHeight,
-          child: Row(
-            children: List.generate(_items.length, (i) {
-              final item    = _items[i];
-              final active  = i == currentIndex;
-              return Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => onTap(i),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _NavIcon(
-                        icon: active ? item.activeIcon : item.icon,
-                        active: active,
-                        iconSize: iconSize,
-                        showCartBadge: i == _cartIndex,
-                        activeColor: _primary,
-                        inactiveColor: _inactive,
-                        badgeColor: _badgeBg,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(100),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: _blurAmount, sigmaY: _blurAmount),
+              child: Stack(
+                children: [
+                  Container(
+                    height: barHeight,
+                    decoration: BoxDecoration(
+                      color: _glassTint.withOpacity(_glassOpacity),
+                      borderRadius: BorderRadius.circular(100),
+                      border: Border.all(
+                        color: _glassBorder.withOpacity(0.15),
+                        width: 1,
                       ),
-                      const SizedBox(height: 3),
-                    ],
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.18),
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            }),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(100),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.white.withOpacity(0.10),
+                              Colors.white.withOpacity(0.0),
+                            ],
+                            stops: const [0.0, 0.55],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 0,
+                    left: 24,
+                    right: 24,
+                    child: IgnorePointer(
+                      child: Container(
+                        height: 1,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.white.withOpacity(0.0),
+                              Colors.white.withOpacity(0.45),
+                              Colors.white.withOpacity(0.0),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    height: barHeight,
+                    child: Row(
+                      children: List.generate(_items.length, (i) {
+                        final item = _items[i];
+                        final active = i == currentIndex;
+                        return Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => onTap(i),
+                            child: Center(
+                              child: _NavIcon(
+                                icon: active ? item.activeIcon : item.icon,
+                                active: active,
+                                iconSize: iconSize,
+                                showCartBadge: i == _cartIndex,
+                                activeCircleColor: _activeCircleColor,
+                                activeIconColor: _activeIconColor,
+                                inactiveIconColor: _inactiveIconColor,
+                                badgeColor: _badgeBg,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -98,8 +150,9 @@ class _NavIcon extends StatelessWidget {
     required this.active,
     required this.iconSize,
     required this.showCartBadge,
-    required this.activeColor,
-    required this.inactiveColor,
+    required this.activeCircleColor,
+    required this.activeIconColor,
+    required this.inactiveIconColor,
     required this.badgeColor,
   });
 
@@ -107,23 +160,39 @@ class _NavIcon extends StatelessWidget {
   final bool active;
   final double iconSize;
   final bool showCartBadge;
-  final Color activeColor;
-  final Color inactiveColor;
+  final Color activeCircleColor;
+  final Color activeIconColor;
+  final Color inactiveIconColor;
   final Color badgeColor;
 
   @override
   Widget build(BuildContext context) {
+    final double circleSize = iconSize + 14;
+
     final iconWidget = AnimatedSwitcher(
       duration: const Duration(milliseconds: 200),
       child: Icon(
         icon,
         key: ValueKey(active),
         size: iconSize,
-        color: active ? activeColor : inactiveColor,
+        color: active ? activeIconColor : inactiveIconColor,
       ),
     );
 
-    if (!showCartBadge) return iconWidget;
+    final content = AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      width: circleSize,
+      height: circleSize,
+      decoration: BoxDecoration(
+        color: active ? activeCircleColor : Colors.transparent,
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: iconWidget,
+    );
+
+    if (!showCartBadge) return content;
 
     return AnimatedBuilder(
       animation: CartService.instance,
@@ -132,11 +201,11 @@ class _NavIcon extends StatelessWidget {
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            iconWidget,
+            content,
             if (count > 0)
               Positioned(
-                right: -8,
-                top: -4,
+                right: -2,
+                top: -2,
                 child: _CountBadge(count: count, color: badgeColor),
               ),
           ],
@@ -160,19 +229,19 @@ class _CountBadge extends StatelessWidget {
       curve: Curves.easeOutBack,
       scale: 1,
       child: Container(
-        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+        constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white, width: 1.2),
+          border: Border.all(color: Colors.white, width: 1.1),
         ),
         alignment: Alignment.center,
         child: Text(
           label,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 9,
+            fontSize: 8,
             fontWeight: FontWeight.w800,
             height: 1.2,
           ),
@@ -183,11 +252,9 @@ class _CountBadge extends StatelessWidget {
 }
 
 class _NavItem {
-  // final String label;
   final IconData icon;
   final IconData activeIcon;
   const _NavItem({
-    // required this.label,
     required this.icon,
     required this.activeIcon,
   });
