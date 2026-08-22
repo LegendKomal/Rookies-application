@@ -274,6 +274,30 @@ class _HomeScreenState extends State<HomeScreen> {
       line2: 'JESSE',
       handle: 'jeans-jesse',
     ),
+    _OccasionTile(
+      imageAsset: 'assets/jeans_jamie.jpg',
+      line1: 'JEANS',
+      line2: 'JAMIE',
+      handle: 'jeans-jamie',
+    ),
+    _OccasionTile(
+      imageAsset: 'assets/jeans_jude.jpg',
+      line1: 'JEANS',
+      line2: 'JUDE',
+      handle: 'jeans-jude',
+    ),
+    _OccasionTile(
+      imageAsset: 'assets/jeans_jax.jpg',
+      line1: 'JEANS',
+      line2: 'JAX',
+      handle: 'jeans-jax',
+    ),
+    _OccasionTile(
+      imageAsset: 'assets/jeans_joel.jpg',
+      line1: 'JEANS',
+      line2: 'JOEL',
+      handle: 'jeans-joel',
+    ),
   ];
 
   final List<_InstagramPost> _instagramPosts = const [
