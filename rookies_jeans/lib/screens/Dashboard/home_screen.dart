@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
+import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/products/products.dart';
 import 'package:rookies_jeans/screens/search/search.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
@@ -27,18 +27,10 @@ class _HomeScreenState extends State<HomeScreen> {
   static const String _fBold   = AppFonts.bold;
   static const String _fNumber = AppFonts.number;
 
-  // Height reserved at the bottom of scroll content so the last section
-  // isn't hidden behind the floating glass pill nav bar.
   static const double _kBottomNavHeight = 60.0;
   static const double _kBottomNavClearance = 84.0;
   static const double _kSectionGap = 24.0;
 
-  // How many pixels of scroll it takes for the floating top bar to go
-  // from fully transparent (over the hero image) to fully solid.
-  static const double _kTopBarFadeDistance = 220.0;
-
-  // Placeholder hero copy — swap for real CMS/Shopify metaobject content
-  // whenever it's available. The headline runs continuously as a ticker.
   static const String _heroMarqueeText = 'READY FOR MORE';
   static const String _heroSubtitle =
       'Renaisse redefines streetwear with bold silhouettes and clean essentials.';
@@ -47,14 +39,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ShopifyCollection> _categories = [];
 
   final ScrollController _scrollController = ScrollController();
-  final ValueNotifier<double> _scrollProgress = ValueNotifier<double>(0.0);
 
   _CollectionTab _selectedCollectionTab = _CollectionTab.newArrivals;
 
-  // Per-tab pagination state for "Explore collection". Each tab keeps its
-  // own loaded-items list, next-page cursor, and hasNextPage flag so
-  // switching tabs doesn't lose progress and "Show More" always appends
-  // exactly one page (6 products) to the current tab.
   final Map<_CollectionTab, List<_ShopifyProductItem>> _collectionProductsByTab = {
     _CollectionTab.newArrivals: [],
     _CollectionTab.bestsellers: [],
@@ -135,19 +122,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   ];
 
-  // ---------------------------------------------------------------------
-  // Explore collection — product fetching (6-at-a-time pagination)
-  // ---------------------------------------------------------------------
-  //
-  // `_loadMoreCollectionProducts` is what "Show More" calls. It always
-  // asks for exactly one page (6 products) for whichever tab is active and
-  // appends them to that tab's already-loaded list.
-  //
-  // `_fetchProductsPage` is the SINGLE INTEGRATION POINT to wire in real
-  // data — see the TODO inside it. Until that's connected it paginates
-  // through local sample data so the loading state / 6-at-a-time / "no
-  // more results" behaviour all work correctly end to end.
-
   Future<void> _loadMoreCollectionProducts(_CollectionTab tab) async {
     if (_isLoadingCollectionProducts) return;
     if (_collectionHasMoreByTab[tab] == false) return;
@@ -170,96 +144,75 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<_ProductsPage> _fetchProductsPage(_CollectionTab tab, {String? after}) async {
-    // -----------------------------------------------------------------
-    // TODO: replace this whole body with your real Shopify Storefront
-    // product query, e.g. something like:
-    //
-    //   final result = await ShopifyStorefrontService.instance.getProducts(
-    //     collectionHandle: _collectionHandleForTab(tab),
-    //     first: 6,
-    //     after: after,
-    //   );
-    //   return _ProductsPage(
-    //     items: result.products.map(_mapShopifyProductToItem).toList(),
-    //     endCursor: result.pageInfo.endCursor,
-    //     hasNextPage: result.pageInfo.hasNextPage,
-    //   );
-    //
-    // `after` is the opaque cursor from the previous page (null for the
-    // first page) — pass it straight through to your Storefront query.
-    // -----------------------------------------------------------------
-    await Future.delayed(const Duration(milliseconds: 350)); // simulated latency
-    final List<_ShopifyProductItem> all = _placeholderProductsFor(tab);
-    final int start = after == null ? 0 : int.parse(after);
-    final int end = (start + 6).clamp(0, all.length);
-    final bool hasNext = end < all.length;
-    return _ProductsPage(
-      items: all.sublist(start.clamp(0, all.length), end),
-      endCursor: hasNext ? '$end' : null,
-      hasNextPage: hasNext,
+    final String handle = _collectionHandleForTab(tab);
+    try {
+      final PaginatedProductsResponse response = await ShopifyStorefrontService
+          .instance
+          .getProductsByCollectionPaginated(
+        handle,
+        first: 6,
+        after: after,
+      );
+
+      return _ProductsPage(
+        items: response.products.map(_mapShopifyProduct).toList(),
+        endCursor: response.endCursor,
+        hasNextPage: response.hasNextPage,
+      );
+    } catch (e) {
+      debugPrint('Failed to fetch products for "$handle": $e');
+      return const _ProductsPage(items: [], endCursor: null, hasNextPage: false);
+    }
+  }
+
+  _ShopifyProductItem _mapShopifyProduct(ShopifyProduct product) {
+    String? compareAtPrice;
+    String? discountLabel;
+    if (product.isOnSale) {
+      final double comparePrice = product.compareAtPrice!;
+      compareAtPrice = '₹ ${_formatInr(comparePrice)}';
+      final int percentOff =
+          (((comparePrice - product.price) / comparePrice) * 100).round();
+      discountLabel = '$percentOff% OFF';
+    }
+
+    return _ShopifyProductItem(
+      id: product.id,
+      title: product.title,
+      price: '₹ ${_formatInr(product.price)}',
+      compareAtPrice: compareAtPrice,
+      discountLabel: discountLabel,
+      imageUrl: product.primaryImageUrl,
     );
+  }
+
+  String _formatInr(num amount) {
+    final int rounded = amount.round();
+    final bool negative = rounded < 0;
+    String s = rounded.abs().toString();
+    if (s.length <= 3) return (negative ? '-' : '') + s;
+
+    final String last3 = s.substring(s.length - 3);
+    String remaining = s.substring(0, s.length - 3);
+    final List<String> groups = [last3];
+    while (remaining.length > 2) {
+      groups.insert(0, remaining.substring(remaining.length - 2));
+      remaining = remaining.substring(0, remaining.length - 2);
+    }
+    if (remaining.isNotEmpty) groups.insert(0, remaining);
+    return (negative ? '-' : '') + groups.join(',');
   }
 
   String _collectionHandleForTab(_CollectionTab tab) {
     switch (tab) {
       case _CollectionTab.newArrivals:
-        return 'new-arrivals';
+        return 'summer-edit';
       case _CollectionTab.bestsellers:
-        return 'bestsellers';
+        return 'trending-now';
       case _CollectionTab.sale:
-        return 'sale';
+        return 'mid-season-deals';
     }
   }
-
-  // Sample data standing in for the real Shopify fetch above — enough
-  // items per tab (10) to demonstrate two "Show More" pages (6 + 4).
-  List<_ShopifyProductItem> _placeholderProductsFor(_CollectionTab tab) {
-    const assets = [
-      'assets/collection_cargo_olive.jpg',
-      'assets/collection_cargo_black.jpg',
-      'assets/collection_jeans_medblue.jpg',
-      'assets/collection_jeans_lightblue.jpg',
-      'assets/collection_shirt_black.jpg',
-      'assets/collection_cargo_white.jpg',
-    ];
-    const titlesByTab = {
-      _CollectionTab.newArrivals: [
-        'Olive Comfort Straight Fit Stretch Cargo Pants',
-        'Black Balloon Fit Cargo Pants',
-        'Med Blue Mid Rise Cropped Length Loose Boot Leg Stretch Jeans',
-        'Light Blue Mid Rise Loose Boot Leg Stretch Jeans',
-        'Black 100% Cotton Oversized Solid Shirt',
-        'White Balloon Fit Stretch Cargo Pants',
-      ],
-      _CollectionTab.bestsellers: [
-        'Black 100% Cotton Oversized Solid Shirt',
-        'Olive Comfort Straight Fit Stretch Cargo Pants',
-        'Med Blue Mid Rise Cropped Length Loose Boot Leg Stretch Jeans',
-      ],
-      _CollectionTab.sale: [
-        'White Balloon Fit Stretch Cargo Pants',
-        'Light Blue Mid Rise Loose Boot Leg Stretch Jeans',
-        'Med Blue Mid Rise Cropped Length Loose Boot Leg Stretch Jeans',
-      ],
-    };
-    final titles = titlesByTab[tab]!;
-    return List.generate(10, (i) {
-      final String title = titles[i % titles.length];
-      final bool onSale = i.isEven;
-      final int base = 1799 + (i * 100);
-      return _ShopifyProductItem(
-        id: '${tab.name}-$i',
-        title: title,
-        price: '₹ ${base + (onSale ? 0 : 200)}',
-        compareAtPrice: onSale ? '₹ ${base + 200}' : null,
-        discountLabel: onSale ? '${5 + (i % 4) * 3}% OFF' : null,
-        imageUrl: null, // real fetch will populate this from Shopify
-        imageAssetFallback: assets[i % assets.length],
-      );
-    });
-  }
-
-
 
   final List<_OccasionTile> _occasionTiles = const [
     _OccasionTile(
@@ -333,23 +286,12 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _fetchAll();
     _loadMoreCollectionProducts(_selectedCollectionTab);
-    _scrollController.addListener(_handleScroll);
   }
 
   @override
   void dispose() {
-    _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
-    _scrollProgress.dispose();
     super.dispose();
-  }
-
-  void _handleScroll() {
-    final progress =
-        (_scrollController.offset / _kTopBarFadeDistance).clamp(0.0, 1.0);
-    if (_scrollProgress.value != progress) {
-      _scrollProgress.value = progress;
-    }
   }
 
   Future<void> _fetchAll({bool forceRefresh = false}) async {
@@ -410,12 +352,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // IMPORTANT: this Scaffold is transparent on purpose.
-    // HomeScreen is expected to be hosted inside a parent Scaffold that owns
-    // `bottomNavigationBar: RookiesBottomNavBar(...)` and sets
-    // `extendBody: true`. The Container(color: bgColor) below still gives
-    // this screen a correct light background if it's ever previewed on its
-    // own.
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
@@ -424,87 +360,78 @@ class _HomeScreenState extends State<HomeScreen> {
             ? _shimmer()
             : Container(
                 color: bgColor,
-                child: Stack(
-                  children: [
-                    RefreshIndicator(
-                      color: primary,
-                      onRefresh: _fetchAll,
-                      child: CustomScrollView(
-                        controller: _scrollController,
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        slivers: [
-                          SliverToBoxAdapter(child: _heroSection()),
-                          SliverToBoxAdapter(
-                            child: _PromoBlockCard(
-                              assetPath: 'assets/denim.png',
-                              label: 'Denim',
-                              buttonLabel: 'Shop Denim',
-                              height: _promoBlockHeight(context),
-                              onTap: () => _openCollectionByHandle('denim',
-                                  title: 'Denim', label: 'DENIM'),
-                            ),
-                          ),
-                          SliverToBoxAdapter(
-                            child: _PromoBlockCard(
-                              assetPath: 'assets/cargo.png',
-                              label: 'Cargos',
-                              buttonLabel: 'Shop Cargos',
-                              height: _promoBlockHeight(context),
-                              onTap: () => _openCollectionByHandle('cargo',
-                                  title: 'Cargo', label: 'CARGO'),
-                            ),
-                          ),
-                          SliverToBoxAdapter(
-                            child: _sliverHeadAsBox('EXPLORE CATEGORIES'),
-                          ),
-                          SliverToBoxAdapter(child: _exploreCategoriesCarousel()),
-                          SliverToBoxAdapter(
-                            child: _PromoBlockCard(
-                              assetPath: 'assets/shoes.jpg',
-                              label: 'Shoes',
-                              buttonLabel: 'Shop Shoes',
-                              height: _promoBlockHeight(context),
-                              onTap: () => _openCollectionByHandle('shoes',
-                                  title: 'Shoes', label: 'SHOES'),
-                            ),
-                          ),
-                          SliverToBoxAdapter(
-                            child: _PromoBlockCard(
-                              assetPath: 'assets/accessories.jpg',
-                              label: 'Accessories',
-                              buttonLabel: 'Shop Accessories',
-                              height: _promoBlockHeight(context),
-                              onTap: () => _openCollectionByHandle('accessories',
-                                  title: 'Accessories', label: 'ACCESSORIES'),
-                            ),
-                          ),
-                          SliverToBoxAdapter(child: _exploreCollectionSection()),
-                          const SliverToBoxAdapter(
-                            child: SizedBox(height: _kSectionGap),
-                          ),
-                          SliverToBoxAdapter(child: _shopTheLookSection()),
-                          SliverToBoxAdapter(child: _shopByOccasionsSection()),
-                          SliverToBoxAdapter(
-                            child: _sliverCenteredHeadAsBox('FOLLOW US @ROOKIESJEANS'),
-                          ),
-                          SliverToBoxAdapter(child: _instagramList()),
-                          const SliverToBoxAdapter(
-                            child: SizedBox(height: _kBottomNavClearance),
-                          ),
-                        ],
+                child: RefreshIndicator(
+                  color: primary,
+                  onRefresh: _fetchAll,
+                  child: CustomScrollView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverToBoxAdapter(child: _heroSection()),
+                      SliverToBoxAdapter(
+                        child: _PromoBlockCard(
+                          assetPath: 'assets/denim.png',
+                          label: 'Denim',
+                          buttonLabel: 'Shop Denim',
+                          height: _promoBlockHeight(context),
+                          onTap: () => _openCollectionByHandle('denim',
+                              title: 'Denim', label: 'DENIM'),
+                        ),
                       ),
-                    ),
-                    _floatingTopBar(),
-                  ],
+                      SliverToBoxAdapter(
+                        child: _PromoBlockCard(
+                          assetPath: 'assets/cargo.png',
+                          label: 'Cargos',
+                          buttonLabel: 'Shop Cargos',
+                          height: _promoBlockHeight(context),
+                          onTap: () => _openCollectionByHandle('cargo',
+                              title: 'Cargo', label: 'CARGO'),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: _sliverHeadAsBox('EXPLORE CATEGORIES'),
+                      ),
+                      SliverToBoxAdapter(child: _exploreCategoriesCarousel()),
+                      SliverToBoxAdapter(
+                        child: _PromoBlockCard(
+                          assetPath: 'assets/shoes.jpg',
+                          label: 'Shoes',
+                          buttonLabel: 'Shop Shoes',
+                          height: _promoBlockHeight(context),
+                          onTap: () => _openCollectionByHandle('shoes',
+                              title: 'Shoes', label: 'SHOES'),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: _PromoBlockCard(
+                          assetPath: 'assets/accessories.jpg',
+                          label: 'Accessories',
+                          buttonLabel: 'Shop Accessories',
+                          height: _promoBlockHeight(context),
+                          onTap: () => _openCollectionByHandle('accessories',
+                              title: 'Accessories', label: 'ACCESSORIES'),
+                        ),
+                      ),
+                      SliverToBoxAdapter(child: _exploreCollectionSection()),
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: _kSectionGap),
+                      ),
+                      SliverToBoxAdapter(child: _shopTheLookSection()),
+                      SliverToBoxAdapter(child: _shopByOccasionsSection()),
+                      SliverToBoxAdapter(
+                        child: _sliverCenteredHeadAsBox('FOLLOW US @ROOKIESJEANS'),
+                      ),
+                      SliverToBoxAdapter(child: _instagramList()),
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: _kBottomNavClearance),
+                      ),
+                    ],
+                  ),
                 ),
               ),
       ),
     );
   }
-
-  // ---------------------------------------------------------------------
-  // Sizing helpers
-  // ---------------------------------------------------------------------
 
   double _fullScreenBannerHeight(BuildContext context) {
     final mq = MediaQuery.of(context);
@@ -514,105 +441,62 @@ class _HomeScreenState extends State<HomeScreen> {
   double _promoBlockHeight(BuildContext context) =>
       (MediaQuery.of(context).size.height * 0.46).clamp(220.0, 420.0);
 
-  // ---------------------------------------------------------------------
-  // Floating glass top bar — transparent over the hero, solidifies on
-  // scroll. No hamburger, no cart: search · logo · wishlist / account.
-  // ---------------------------------------------------------------------
-
-  Widget _floatingTopBar() {
+  Widget _topBar() {
     final r = R.of(context);
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: ValueListenableBuilder<double>(
-        valueListenable: _scrollProgress,
-        builder: (context, progress, _) {
-          final panelColor = Color.lerp(Colors.transparent, bgColor, progress)!;
-          final iconColor = Color.lerp(Colors.white, primary, progress)!;
-          return ClipRect(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(
-                sigmaX: 8 * progress,
-                sigmaY: 8 * progress,
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: panelColor.withOpacity(progress),
-                  boxShadow: progress > 0.4
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06 * progress),
-                            blurRadius: 14,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : const [],
-                ),
-                child: SizedBox(
-                  height: r.dp(56),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: r.dp(8),
-                      vertical: r.dp(6),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: IconButton(
-                              icon: Icon(Icons.search_rounded, size: r.dp(22)),
-                              color: iconColor,
-                              onPressed: _openSearch,
-                            ),
-                          ),
-                        ),
-                        Image.asset(
-                          'assets/logo2.png',
-                          height: r.dp(14),
-                          fit: BoxFit.contain,
-                          color: iconColor,
-                          colorBlendMode: BlendMode.srcIn,
-                        ),
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(Icons.favorite_border_rounded,
-                                      size: r.dp(22)),
-                                  color: iconColor,
-                                  onPressed: () => context.go('/wishlist'),
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.person_outline_rounded,
-                                      size: r.dp(22)),
-                                  color: iconColor,
-                                  tooltip: 'Account',
-                                  onPressed: () => context.go('/profile'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+    return SizedBox(
+      height: r.dp(56),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: r.dp(8),
+          vertical: r.dp(6),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  icon: Icon(Icons.search_rounded, size: r.dp(22)),
+                  color: Colors.white,
+                  onPressed: _openSearch,
                 ),
               ),
             ),
-          );
-        },
+            Image.asset(
+              'assets/logo2.png',
+              height: r.dp(14),
+              fit: BoxFit.contain,
+              color: Colors.white,
+              colorBlendMode: BlendMode.srcIn,
+            ),
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.favorite_border_rounded,
+                          size: r.dp(22)),
+                      color: Colors.white,
+                      onPressed: () => context.go('/wishlist'),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.person_outline_rounded,
+                          size: r.dp(22)),
+                      color: Colors.white,
+                      tooltip: 'Account',
+                      onPressed: () => context.go('/profile'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
-
-  // ---------------------------------------------------------------------
-  // Hero — running "READY FOR MORE" ticker + tagline + Shop now
-  // ---------------------------------------------------------------------
 
   Widget _heroSection() {
     final r = R.of(context);
@@ -622,6 +506,12 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Stack(
         children: [
           _heroBannerImage(),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: _topBar(),
+          ),
           Positioned(
             left: 0,
             right: 0,
@@ -641,9 +531,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Full-bleed running ticker — deliberately ignores the
-                  // side padding below so it reads edge-to-edge, like a
-                  // marquee, matching the reference site.
                   _HeroMarqueeText(
                     text: _heroMarqueeText,
                     height: r.dp(44),
@@ -665,7 +552,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         SizedBox(height: r.dp(14)),
                         GestureDetector(
-                          onTap: () {}, // TODO: point at the featured collection/handle
+                          onTap: () {},
                           child: Container(
                             padding: EdgeInsets.symmetric(
                               horizontal: r.dp(22),
@@ -751,10 +638,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       );
 
-  // ---------------------------------------------------------------------
-  // Section headers (dark text — content sits on the light page background)
-  // ---------------------------------------------------------------------
-
   Widget _sliverHeadAsBox(String title) {
     final r = R.of(context);
     return Padding(
@@ -793,14 +676,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Explore categories — horizontally scrollable cards (swipe, no arrows)
-  // ---------------------------------------------------------------------
-
-  // Naive keyword split — ShopifyCollection doesn't carry a "type" field,
-  // so we bucket by label until a real topwear/bottomwear tag/metafield is
-  // available from Shopify. Anything that doesn't match a bottomwear
-  // keyword is treated as topwear.
   static const List<String> _bottomwearKeywords = [
     'pant', 'jean', 'cargo', 'trouser', 'short', 'jogger', 'chino', 'bottom',
   ];
@@ -919,10 +794,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
-  // ---------------------------------------------------------------------
-  // Explore collection — pill tabs + 2-col product grid + "Show More"
-  // ---------------------------------------------------------------------
 
   Widget _exploreCollectionSection() {
     final r = R.of(context);
@@ -1110,7 +981,7 @@ class _HomeScreenState extends State<HomeScreen> {
         SizedBox(height: r.dp(8)),
         Text(
           product.title,
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontFamily: _fBody,
@@ -1148,10 +1019,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
   }
-
-  // ---------------------------------------------------------------------
-  // Shop the look
-  // ---------------------------------------------------------------------
 
   Widget _shopTheLookSection() {
     final double sectionHeight =
@@ -1213,10 +1080,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Shop by occasions — horizontally scrollable cards
-  // ---------------------------------------------------------------------
-
   Widget _shopByOccasionsSection() {
     final r = R.of(context);
     final double cardWidth = MediaQuery.of(context).size.width * 0.44;
@@ -1227,21 +1090,11 @@ class _HomeScreenState extends State<HomeScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+          padding: EdgeInsets.fromLTRB(r.dp(16), r.dp(28), r.dp(16), 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'GLOW MUST-HAVES',
-                style: TextStyle(
-                  fontFamily: _fBody,
-                  fontSize: r.sp(11),
-                  color: secondaryTxt,
-                  letterSpacing: 1.0,
-                ),
-              ),
-              SizedBox(height: r.dp(6)),
               Text(
                 'SHOP BY OCCASIONS',
                 style: TextStyle(
@@ -1340,10 +1193,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Follow us — single-column Instagram posts, ROOKIES wordmark + @handle
-  // ---------------------------------------------------------------------
-
   Widget _instagramList() {
     final double screenWidth = MediaQuery.of(context).size.width;
     return Column(
@@ -1416,10 +1265,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Loading skeleton
-  // ---------------------------------------------------------------------
-
   Widget _shimmer() {
     final r = R.of(context);
     return Container(
@@ -1480,10 +1325,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
-// ===========================================================================
-// Hero running ticker — full-bleed, continuously auto-scrolling headline
-// ===========================================================================
 
 class _HeroMarqueeText extends StatefulWidget {
   final String text;
@@ -1551,10 +1392,6 @@ class _HeroMarqueeTextState extends State<_HeroMarqueeText> {
     );
   }
 }
-
-// ===========================================================================
-// Promo block card — sharp corners, "SHOP X" button, tap-scale feedback
-// ===========================================================================
 
 class _PromoBlockCard extends StatefulWidget {
   final String assetPath;
@@ -1655,15 +1492,8 @@ class _PromoBlockCardState extends State<_PromoBlockCard> {
   }
 }
 
-// ===========================================================================
-// Explore-collection product models
-// ===========================================================================
-
 enum _CollectionTab { newArrivals, bestsellers, sale }
 
-/// A single product card's worth of data. `imageUrl` is what a real
-/// Shopify fetch will populate; `imageAssetFallback` is only used by the
-/// local placeholder data in `_placeholderProductsFor`.
 class _ShopifyProductItem {
   final String id;
   final String title;
@@ -1683,8 +1513,6 @@ class _ShopifyProductItem {
   });
 }
 
-/// One page of paginated product results — mirrors the shape a Shopify
-/// Storefront GraphQL connection (edges + pageInfo) naturally produces.
 class _ProductsPage {
   final List<_ShopifyProductItem> items;
   final String? endCursor;
@@ -1695,10 +1523,6 @@ class _ProductsPage {
     required this.hasNextPage,
   });
 }
-
-// ===========================================================================
-// Shop the look card
-// ===========================================================================
 
 class _ShopTheLookOutfit {
   final String imageAsset;
@@ -1915,10 +1739,6 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
   }
 }
 
-// ===========================================================================
-// Animated shimmer skeleton block
-// ===========================================================================
-
 class _ShimmerBox extends StatefulWidget {
   final double height;
   final double? width;
@@ -1978,10 +1798,6 @@ class _ShimmerBoxState extends State<_ShimmerBox>
     );
   }
 }
-
-// ===========================================================================
-// Data models
-// ===========================================================================
 
 class _OccasionTile {
   final String imageAsset;

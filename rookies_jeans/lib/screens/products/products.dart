@@ -655,6 +655,10 @@ class _ProductsPageState extends State<ProductsPage> {
             ),
           ),
           Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: _filterButton(context),
+          ),
+          Padding(
             padding: const EdgeInsets.only(right: 8),
             child: _sortButton(context),
           ),
@@ -662,6 +666,36 @@ class _ProductsPageState extends State<ProductsPage> {
       ),
     );
   }
+
+  Widget _filterButton(BuildContext context) => Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(6),
+          onTap: () => _openFilterSheet(context),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.tune_rounded, size: 17, color: primary),
+                const SizedBox(width: 4),
+                Text(
+                  _activeFilterCount > 0
+                      ? 'FILTERS ($_activeFilterCount)'
+                      : 'FILTERS',
+                  style: const TextStyle(
+                    fontFamily: _fBody,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 
   Widget _sortButton(BuildContext context) => Material(
         color: Colors.transparent,
