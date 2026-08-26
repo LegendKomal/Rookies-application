@@ -4,7 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
+import 'package:rookies_jeans/models/banner_model.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
+import 'package:rookies_jeans/models/home_content_models.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/products/products.dart';
 import 'package:rookies_jeans/screens/search/search.dart';
@@ -38,6 +40,12 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   List<ShopifyCollection> _categories = [];
 
+  List<HomeBanner> _heroBanners = [];
+  List<PromoBlockContent> _promoBlocksContent = [];
+  List<ShopTheLookEntry> _shopTheLookEntries = [];
+  List<OccasionTileContent> _occasionTilesContent = [];
+  List<InstagramPostContent> _instagramPostsContent = [];
+
   final ScrollController _scrollController = ScrollController();
 
   _CollectionTab _selectedCollectionTab = _CollectionTab.newArrivals;
@@ -59,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
   };
   bool _isLoadingCollectionProducts = false;
 
-  final List<_ShopTheLookOutfit> _shopTheLookOutfits = const [
+  final List<_ShopTheLookOutfit> _defaultShopTheLookOutfits = const [
     _ShopTheLookOutfit(
       imageAsset: 'assets/shop_the_look_outfit_1.jpg',
       products: [
@@ -214,46 +222,34 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  final List<_OccasionTile> _occasionTiles = const [
+  final List<_OccasionTile> _defaultOccasionTiles = const [
     _OccasionTile(
-      imageAsset: 'assets/jeans_jann.jpg',
-      line1: 'JEANS',
-      line2: 'JANN',
+      imageAsset: 'assets/jeans_jann.jpeg',
       handle: 'jeans-jann',
     ),
     _OccasionTile(
-      imageAsset: 'assets/jeans_jesse.jpg',
-      line1: 'JEANS',
-      line2: 'JESSE',
+      imageAsset: 'assets/jeans_jesse.jpeg',
       handle: 'jeans-jesse',
     ),
     _OccasionTile(
-      imageAsset: 'assets/jeans_jamie.jpg',
-      line1: 'JEANS',
-      line2: 'JAMIE',
+      imageAsset: 'assets/jeans_lennon.jpeg',
       handle: 'jeans-jamie',
     ),
     _OccasionTile(
-      imageAsset: 'assets/jeans_jude.jpg',
-      line1: 'JEANS',
-      line2: 'JUDE',
+      imageAsset: 'assets/jeans_mojo.jpeg',
       handle: 'jeans-jude',
     ),
     _OccasionTile(
-      imageAsset: 'assets/jeans_jax.jpg',
-      line1: 'JEANS',
-      line2: 'JAX',
+      imageAsset: 'assets/jeans_nikki.jpeg',
       handle: 'jeans-jax',
     ),
     _OccasionTile(
-      imageAsset: 'assets/jeans_joel.jpg',
-      line1: 'JEANS',
-      line2: 'JOEL',
+      imageAsset: 'assets/jeans_springsteen.jpeg',
       handle: 'jeans-joel',
     ),
   ];
 
-  final List<_InstagramPost> _instagramPosts = const [
+  final List<_InstagramPost> _defaultInstagramPosts = const [
     _InstagramPost(
       imageAsset: 'assets/instagram_1.jpg',
       postUrl: 'https://www.instagram.com/p/REPLACE_ME_1/',
@@ -281,6 +277,126 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   ];
 
+  final List<_PromoBlockData> _defaultPromoBlocks = const [
+    _PromoBlockData(
+      assetPath: 'assets/denim.png',
+      label: 'Denim',
+      buttonLabel: 'Shop Denim',
+      collectionHandle: 'denim',
+    ),
+    _PromoBlockData(
+      assetPath: 'assets/cargo.png',
+      label: 'Cargos',
+      buttonLabel: 'Shop Cargos',
+      collectionHandle: 'cargo',
+    ),
+    _PromoBlockData(
+      assetPath: 'assets/shoes.jpg',
+      label: 'Shoes',
+      buttonLabel: 'Shop Shoes',
+      collectionHandle: 'shoes',
+    ),
+    _PromoBlockData(
+      assetPath: 'assets/accessories.jpg',
+      label: 'Accessories',
+      buttonLabel: 'Shop Accessories',
+      collectionHandle: 'accessories',
+    ),
+  ];
+
+  String? get _heroBannerImageUrl {
+    for (final banner in _heroBanners) {
+      if (banner.imageUrl != null) return banner.imageUrl;
+    }
+    return null;
+  }
+
+  List<_PromoBlockData> get _promoBlocksToDisplay {
+    if (_promoBlocksContent.isEmpty) return _defaultPromoBlocks;
+    return _promoBlocksContent
+        .map((p) => _PromoBlockData(
+              assetPath: null,
+              imageUrl: p.imageUrl,
+              label: p.label,
+              buttonLabel: p.buttonLabel ?? 'Shop ${p.label}',
+              collectionHandle: p.collectionHandle,
+            ))
+        .toList();
+  }
+
+  List<_ShopTheLookOutfit> get _shopTheLookOutfitsToDisplay {
+    if (_shopTheLookEntries.isEmpty) return _defaultShopTheLookOutfits;
+    return _shopTheLookEntries
+        .where((e) => e.imageUrl != null && e.products.isNotEmpty)
+        .map((e) => _ShopTheLookOutfit(
+              imageAsset: 'assets/shop_the_look_outfit_1.jpg',
+              imageUrl: e.imageUrl,
+              products: e.products
+                  .map((p) => _ShopTheLookProduct(
+                        title: p.title,
+                        price: p.price != null
+                            ? '₹ ${_formatInr(p.price!)}'
+                            : '',
+                        imageAsset: 'assets/shop_the_look_item_1.jpg',
+                        imageUrl: p.imageUrl,
+                      ))
+                  .toList(),
+            ))
+        .toList();
+  }
+
+  List<_OccasionTile> get _occasionTilesToDisplay {
+    if (_occasionTilesContent.isEmpty) return _defaultOccasionTiles;
+    return _occasionTilesContent
+        .map((t) => _OccasionTile(
+              imageAsset: 'assets/jeans_jann.jpeg',
+              imageUrl: t.imageUrl,
+              handle: t.collectionHandle,
+            ))
+        .toList();
+  }
+
+  List<_InstagramPost> get _instagramPostsToDisplay {
+    if (_instagramPostsContent.isEmpty) return _defaultInstagramPosts;
+    return _instagramPostsContent
+        .map((p) => _InstagramPost(
+              imageAsset: 'assets/instagram_1.jpg',
+              imageUrl: p.imageUrl,
+              postUrl: p.postUrl,
+              username: p.username,
+            ))
+        .toList();
+  }
+
+  List<_PromoBlockData> get _promoBlocksFirstHalf {
+    final blocks = _promoBlocksToDisplay;
+    return blocks.take((blocks.length / 2).ceil()).toList();
+  }
+
+  List<_PromoBlockData> get _promoBlocksSecondHalf {
+    final blocks = _promoBlocksToDisplay;
+    return blocks.skip((blocks.length / 2).ceil()).toList();
+  }
+
+  List<Widget> _promoBlockSlivers(List<_PromoBlockData> blocks) {
+    return blocks
+        .map((block) => SliverToBoxAdapter(
+              child: _PromoBlockCard(
+                assetPath: block.assetPath,
+                imageUrl: block.imageUrl,
+                label: block.label,
+                buttonLabel: block.buttonLabel,
+                height: _promoBlockHeight(context),
+                onTap: () => _openCollectionByHandle(
+                  block.collectionHandle,
+                  title: block.label,
+                  label: block.label.toUpperCase(),
+                ),
+              ),
+            ))
+        .toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -299,12 +415,24 @@ class _HomeScreenState extends State<HomeScreen> {
     if (forceRefresh) {
       ShopifyStorefrontService.instance.clearCache();
     }
-    final categories =
-        await ShopifyStorefrontService.instance.getLatestDropCollections();
+    final service = ShopifyStorefrontService.instance;
+    final results = await Future.wait([
+      service.getLatestDropCollections(),
+      service.getHomeBanners(),
+      service.getPromoBlocks(),
+      service.getShopTheLookEntries(),
+      service.getOccasionTilesContent(),
+      service.getInstagramPostsContent(),
+    ]);
     if (!mounted) return;
     setState(() {
-      _categories = categories;
-      _isLoading  = false;
+      _categories = results[0] as List<ShopifyCollection>;
+      _heroBanners = results[1] as List<HomeBanner>;
+      _promoBlocksContent = results[2] as List<PromoBlockContent>;
+      _shopTheLookEntries = results[3] as List<ShopTheLookEntry>;
+      _occasionTilesContent = results[4] as List<OccasionTileContent>;
+      _instagramPostsContent = results[5] as List<InstagramPostContent>;
+      _isLoading = false;
     });
   }
 
@@ -368,50 +496,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     slivers: [
                       SliverToBoxAdapter(child: _heroSection()),
-                      SliverToBoxAdapter(
-                        child: _PromoBlockCard(
-                          assetPath: 'assets/denim.png',
-                          label: 'Denim',
-                          buttonLabel: 'Shop Denim',
-                          height: _promoBlockHeight(context),
-                          onTap: () => _openCollectionByHandle('denim',
-                              title: 'Denim', label: 'DENIM'),
-                        ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: _PromoBlockCard(
-                          assetPath: 'assets/cargo.png',
-                          label: 'Cargos',
-                          buttonLabel: 'Shop Cargos',
-                          height: _promoBlockHeight(context),
-                          onTap: () => _openCollectionByHandle('cargo',
-                              title: 'Cargo', label: 'CARGO'),
-                        ),
-                      ),
+                      ..._promoBlockSlivers(_promoBlocksFirstHalf),
                       SliverToBoxAdapter(
                         child: _sliverHeadAsBox('EXPLORE CATEGORIES'),
                       ),
                       SliverToBoxAdapter(child: _exploreCategoriesCarousel()),
-                      SliverToBoxAdapter(
-                        child: _PromoBlockCard(
-                          assetPath: 'assets/shoes.jpg',
-                          label: 'Shoes',
-                          buttonLabel: 'Shop Shoes',
-                          height: _promoBlockHeight(context),
-                          onTap: () => _openCollectionByHandle('shoes',
-                              title: 'Shoes', label: 'SHOES'),
-                        ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: _PromoBlockCard(
-                          assetPath: 'assets/accessories.jpg',
-                          label: 'Accessories',
-                          buttonLabel: 'Shop Accessories',
-                          height: _promoBlockHeight(context),
-                          onTap: () => _openCollectionByHandle('accessories',
-                              title: 'Accessories', label: 'ACCESSORIES'),
-                        ),
-                      ),
+                      ..._promoBlockSlivers(_promoBlocksSecondHalf),
                       SliverToBoxAdapter(child: _exploreCollectionSection()),
                       const SliverToBoxAdapter(
                         child: SizedBox(height: _kSectionGap),
@@ -593,12 +683,21 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _heroBannerImage() => Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            'assets/banner.jpeg',
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) =>
-                Container(color: const Color(0xFF6B7A5E)),
-          ),
+          _heroBannerImageUrl != null
+              ? CachedNetworkImage(
+                  imageUrl: _heroBannerImageUrl!,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) =>
+                      Container(color: const Color(0xFF6B7A5E)),
+                  errorWidget: (_, __, ___) =>
+                      Container(color: const Color(0xFF6B7A5E)),
+                )
+              : Image.asset(
+                  'assets/banner.jpeg',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Container(color: const Color(0xFF6B7A5E)),
+                ),
           Positioned.fill(
             child: IgnorePointer(
               child: DecoratedBox(
@@ -1037,7 +1136,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _shopTheLookAsBox() {
     final r = R.of(context);
 
-    final int maxProducts = _shopTheLookOutfits
+    final List<_ShopTheLookOutfit> outfits = _shopTheLookOutfitsToDisplay;
+    final int maxProducts = outfits
         .map((o) => o.products.length)
         .fold<int>(0, (a, b) => a > b ? a : b);
 
@@ -1068,7 +1168,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: SizedBox(
                 height: cardHeight,
                 child: _ShopTheLookAutoSlideCard(
-                  outfits: _shopTheLookOutfits,
+                  outfits: outfits,
                   heroHeight: heroHeight,
                   productRowHeight: productRowHeight,
                 ),
@@ -1108,20 +1208,21 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         SizedBox(height: r.dp(16)),
-        SizedBox(
-          height: cardHeight,
-          child: ListView.separated(
-            padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: _occasionTiles.length,
-            separatorBuilder: (_, __) => SizedBox(width: r.dp(10)),
-            itemBuilder: (_, i) {
-              final tile = _occasionTiles[i];
-              return _occasionCard(tile, cardWidth, cardHeight, r);
-            },
-          ),
-        ),
+        Builder(builder: (context) {
+          final tiles = _occasionTilesToDisplay;
+          return SizedBox(
+            height: cardHeight,
+            child: ListView.separated(
+              padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: tiles.length,
+              separatorBuilder: (_, __) => SizedBox(width: r.dp(10)),
+              itemBuilder: (_, i) =>
+                  _occasionCard(tiles[i], cardWidth, cardHeight, r),
+            ),
+          );
+        }),
         SizedBox(height: r.dp(20)),
       ],
     );
@@ -1131,8 +1232,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: () => _openCollectionByHandle(
         tile.handle,
-        title: '${tile.line1} ${tile.line2}',
-        label: '${tile.line1} ${tile.line2}',
       ),
       child: SizedBox(
         width: width,
@@ -1140,12 +1239,21 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset(
-              tile.imageAsset,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  Container(color: const Color(0xFFE0E0E0)),
-            ),
+            tile.imageUrl != null
+                ? CachedNetworkImage(
+                    imageUrl: tile.imageUrl!,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) =>
+                        Container(color: const Color(0xFFE0E0E0)),
+                    errorWidget: (_, __, ___) =>
+                        Container(color: const Color(0xFFE0E0E0)),
+                  )
+                : Image.asset(
+                    tile.imageAsset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(color: const Color(0xFFE0E0E0)),
+                  ),
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -1158,35 +1266,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: r.dp(16),
-              child: Column(
-                children: [
-                  Text(
-                    tile.line1,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: _fBold,
-                      color: Colors.white,
-                      fontSize: r.sp(15),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    tile.line2,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: _fBold,
-                      color: Colors.white,
-                      fontSize: r.sp(15),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),
@@ -1195,12 +1274,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _instagramList() {
     final double screenWidth = MediaQuery.of(context).size.width;
+    final posts = _instagramPostsToDisplay;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (int i = 0; i < _instagramPosts.length; i++) ...[
+        for (int i = 0; i < posts.length; i++) ...[
           if (i > 0) const SizedBox(height: 2),
-          _instagramBlock(_instagramPosts[i], screenWidth),
+          _instagramBlock(posts[i], screenWidth),
         ],
       ],
     );
@@ -1216,12 +1296,21 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset(
-              post.imageAsset,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  Container(color: const Color(0xFFE0E0E0)),
-            ),
+            post.imageUrl != null
+                ? CachedNetworkImage(
+                    imageUrl: post.imageUrl!,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) =>
+                        Container(color: const Color(0xFFE0E0E0)),
+                    errorWidget: (_, __, ___) =>
+                        Container(color: const Color(0xFFE0E0E0)),
+                  )
+                : Image.asset(
+                    post.imageAsset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(color: const Color(0xFFE0E0E0)),
+                  ),
             Positioned(
               left: r.dp(12),
               top: r.dp(12),
@@ -1394,13 +1483,15 @@ class _HeroMarqueeTextState extends State<_HeroMarqueeText> {
 }
 
 class _PromoBlockCard extends StatefulWidget {
-  final String assetPath;
+  final String? assetPath;
+  final String? imageUrl;
   final String label;
   final String buttonLabel;
   final double height;
   final VoidCallback onTap;
   const _PromoBlockCard({
-    required this.assetPath,
+    this.assetPath,
+    this.imageUrl,
     required this.label,
     required this.buttonLabel,
     required this.height,
@@ -1431,12 +1522,21 @@ class _PromoBlockCardState extends State<_PromoBlockCard> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.asset(
-                widget.assetPath,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    Container(color: const Color(0xFF555555)),
-              ),
+              widget.imageUrl != null
+                  ? CachedNetworkImage(
+                      imageUrl: widget.imageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) =>
+                          Container(color: const Color(0xFF555555)),
+                      errorWidget: (_, __, ___) =>
+                          Container(color: const Color(0xFF555555)),
+                    )
+                  : Image.asset(
+                      widget.assetPath ?? 'assets/denim.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          Container(color: const Color(0xFF555555)),
+                    ),
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -1526,9 +1626,11 @@ class _ProductsPage {
 
 class _ShopTheLookOutfit {
   final String imageAsset;
+  final String? imageUrl;
   final List<_ShopTheLookProduct> products;
   const _ShopTheLookOutfit({
     required this.imageAsset,
+    this.imageUrl,
     required this.products,
   });
 }
@@ -1618,12 +1720,21 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.asset(
-                      outfit.imageAsset,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          Container(color: const Color(0xFF555555)),
-                    ),
+                    outfit.imageUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: outfit.imageUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) =>
+                                Container(color: const Color(0xFF555555)),
+                            errorWidget: (_, __, ___) =>
+                                Container(color: const Color(0xFF555555)),
+                          )
+                        : Image.asset(
+                            outfit.imageAsset,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                Container(color: const Color(0xFF555555)),
+                          ),
                     DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -1680,11 +1791,20 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                           width: r.dp(42),
                           height: r.dp(42),
                           color: const Color(0xFFECECEC),
-                          child: Image.asset(
-                            item.imageAsset,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const SizedBox(),
-                          ),
+                          child: item.imageUrl != null
+                              ? CachedNetworkImage(
+                                  imageUrl: item.imageUrl!,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => const SizedBox(),
+                                  errorWidget: (_, __, ___) =>
+                                      const SizedBox(),
+                                )
+                              : Image.asset(
+                                  item.imageAsset,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      const SizedBox(),
+                                ),
                         ),
                         SizedBox(width: r.dp(10)),
                         Expanded(
@@ -1801,13 +1921,11 @@ class _ShimmerBoxState extends State<_ShimmerBox>
 
 class _OccasionTile {
   final String imageAsset;
-  final String line1;
-  final String line2;
+  final String? imageUrl;
   final String handle;
   const _OccasionTile({
     required this.imageAsset,
-    required this.line1,
-    required this.line2,
+    this.imageUrl,
     required this.handle,
   });
 }
@@ -1816,20 +1934,39 @@ class _ShopTheLookProduct {
   final String title;
   final String price;
   final String imageAsset;
+  final String? imageUrl;
   const _ShopTheLookProduct({
     required this.title,
     required this.price,
     required this.imageAsset,
+    this.imageUrl,
   });
 }
 
 class _InstagramPost {
   final String imageAsset;
+  final String? imageUrl;
   final String postUrl;
   final String username;
   const _InstagramPost({
     required this.imageAsset,
+    this.imageUrl,
     required this.postUrl,
     required this.username,
+  });
+}
+
+class _PromoBlockData {
+  final String? assetPath;
+  final String? imageUrl;
+  final String label;
+  final String buttonLabel;
+  final String collectionHandle;
+  const _PromoBlockData({
+    this.assetPath,
+    this.imageUrl,
+    required this.label,
+    required this.buttonLabel,
+    required this.collectionHandle,
   });
 }

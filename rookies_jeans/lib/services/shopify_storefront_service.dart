@@ -5,6 +5,7 @@ import 'package:rookies_jeans/models/product_detail_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/models/banner_model.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
+import 'package:rookies_jeans/models/home_content_models.dart';
 
 class PaginatedProductsResponse {
   final List<ShopifyProduct> products;
@@ -93,6 +94,10 @@ class ShopifyStorefrontService {
       getBalloonBanner(),
       getLatestDropCollections(),
       getOurCollectionTiles(),
+      getPromoBlocks(),
+      getShopTheLookEntries(),
+      getOccasionTilesContent(),
+      getInstagramPostsContent(),
     ]);
   }
 
@@ -757,6 +762,173 @@ for (final e in rawVariantEdges) {
           ctaLabel: 'SHOP NOW',
         ),
       ];
+
+  Future<List<PromoBlockContent>> getPromoBlocks() =>
+      _cachedFetch('promoBlocks', _fetchPromoBlocks);
+
+  Future<List<PromoBlockContent>> _fetchPromoBlocks() async {
+    const String query = r'''
+      query getPromoBlocks {
+        metaobjects(type: "promo_block", first: 20) {
+          edges {
+            node {
+              id
+              image: field(key: "image") { reference { ... on MediaImage { image { url } } } }
+              label: field(key: "label") { value }
+              button_label: field(key: "button_label") { value }
+              collection_handle: field(key: "collection_handle") { value }
+              sort_order: field(key: "sort_order") { value }
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final res = await ShopifyGraphQL.post(query);
+      _log('getPromoBlocks → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) return [];
+
+      final edges = (res.data!['metaobjects']['edges'] as List?) ?? [];
+      final blocks = edges
+          .map((e) =>
+              PromoBlockContent.fromMetaobjectJson(e['node'] as Map<String, dynamic>))
+          .toList();
+      blocks.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      return blocks;
+    } catch (e) {
+      _log('getPromoBlocks EXCEPTION: $e');
+      return [];
+    }
+  }
+
+  Future<List<ShopTheLookEntry>> getShopTheLookEntries() =>
+      _cachedFetch('shopTheLookEntries', _fetchShopTheLookEntries);
+
+  Future<List<ShopTheLookEntry>> _fetchShopTheLookEntries() async {
+    const String query = r'''
+      query getShopTheLook {
+        metaobjects(type: "shop_the_look", first: 20) {
+          edges {
+            node {
+              id
+              image: field(key: "image") { reference { ... on MediaImage { image { url } } } }
+              sort_order: field(key: "sort_order") { value }
+              products: field(key: "products") {
+                references(first: 6) {
+                  edges {
+                    node {
+                      ... on Product {
+                        id
+                        title
+                        featuredImage { url }
+                        priceRange {
+                          minVariantPrice { amount currencyCode }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final res = await ShopifyGraphQL.post(query);
+      _log('getShopTheLookEntries → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) return [];
+
+      final edges = (res.data!['metaobjects']['edges'] as List?) ?? [];
+      final entries = edges
+          .map((e) =>
+              ShopTheLookEntry.fromMetaobjectJson(e['node'] as Map<String, dynamic>))
+          .toList();
+      entries.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      return entries;
+    } catch (e) {
+      _log('getShopTheLookEntries EXCEPTION: $e');
+      return [];
+    }
+  }
+
+  Future<List<OccasionTileContent>> getOccasionTilesContent() =>
+      _cachedFetch('occasionTiles', _fetchOccasionTiles);
+
+  Future<List<OccasionTileContent>> _fetchOccasionTiles() async {
+    const String query = r'''
+      query getOccasionTiles {
+        metaobjects(type: "occasion_tile", first: 20) {
+          edges {
+            node {
+              id
+              image: field(key: "image") { reference { ... on MediaImage { image { url } } } }
+              label: field(key: "label") { value }
+              collection_handle: field(key: "collection_handle") { value }
+              sort_order: field(key: "sort_order") { value }
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final res = await ShopifyGraphQL.post(query);
+      _log('getOccasionTilesContent → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) return [];
+
+      final edges = (res.data!['metaobjects']['edges'] as List?) ?? [];
+      final tiles = edges
+          .map((e) => OccasionTileContent.fromMetaobjectJson(
+              e['node'] as Map<String, dynamic>))
+          .toList();
+      tiles.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      return tiles;
+    } catch (e) {
+      _log('getOccasionTilesContent EXCEPTION: $e');
+      return [];
+    }
+  }
+
+  Future<List<InstagramPostContent>> getInstagramPostsContent() =>
+      _cachedFetch('instagramPosts', _fetchInstagramPosts);
+
+  Future<List<InstagramPostContent>> _fetchInstagramPosts() async {
+    const String query = r'''
+      query getInstagramPosts {
+        metaobjects(type: "instagram_post", first: 20) {
+          edges {
+            node {
+              id
+              image: field(key: "image") { reference { ... on MediaImage { image { url } } } }
+              post_url: field(key: "post_url") { value }
+              username: field(key: "username") { value }
+              sort_order: field(key: "sort_order") { value }
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final res = await ShopifyGraphQL.post(query);
+      _log('getInstagramPostsContent → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) return [];
+
+      final edges = (res.data!['metaobjects']['edges'] as List?) ?? [];
+      final posts = edges
+          .map((e) => InstagramPostContent.fromMetaobjectJson(
+              e['node'] as Map<String, dynamic>))
+          .toList();
+      posts.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      return posts;
+    } catch (e) {
+      _log('getInstagramPostsContent EXCEPTION: $e');
+      return [];
+    }
+  }
 
   Future<List<ShopifyProduct>> getHotDeals({
     int first = ShopifyConstants.hotDealsCount,
