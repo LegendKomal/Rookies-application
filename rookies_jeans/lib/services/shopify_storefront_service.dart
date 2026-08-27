@@ -486,6 +486,120 @@ for (final e in rawVariantEdges) {
     }
   }
 
+  /// Fetches the sibling products in the same Variant King / SA Variants
+  /// color group as [handle] (metafield `vkcl.group_data` on the Product).
+  /// Returns an empty list if the product has no group, or the metafield
+  /// isn't present. The current product's own handle is excluded from the
+  /// result — this is *other* colors only.
+  Future<List<ShopifyProduct>> getColorGroupSiblings(String handle) =>
+      _cachedFetch(
+        'colorSiblings:$handle',
+        () => _fetchColorGroupSiblings(handle),
+      );
+
+  Future<List<ShopifyProduct>> _fetchColorGroupSiblings(String handle) async {
+    const String groupQuery = r'''
+    query getGroupData($handle: String!) {
+      productByHandle(handle: $handle) {
+        groupData: metafield(namespace: "vkcl", key: "group_data") {
+          value
+        }
+      }
+    }
+    ''';
+
+    try {
+      final res = await ShopifyGraphQL.post(
+        groupQuery,
+        variables: {'handle': handle},
+      );
+      _log('getColorGroupSiblings [$handle] → ${res.statusCode}');
+      final decoded = res.body;
+
+      if (decoded['errors'] != null || decoded['data'] == null) {
+        _log('getColorGroupSiblings errors: ${decoded['errors']}');
+        return [];
+      }
+
+      final rawValue =
+          decoded['data']['productByHandle']?['groupData']?['value']
+              as String?;
+      if (rawValue == null || rawValue.isEmpty) {
+        // No color group on this product — perfectly normal.
+        return [];
+      }
+
+      final parsed = jsonDecode(rawValue);
+      if (parsed is! List || parsed.isEmpty) return [];
+
+      // The app writes one group per product; take the first entry.
+      final group = ColorGroup.fromJson(parsed.first as Map<String, dynamic>);
+
+      final siblingHandles = group.products
+          .map((p) => p.handle)
+          .where((h) => h.isNotEmpty && h != handle)
+          .toSet()
+          .toList();
+
+      if (siblingHandles.isEmpty) return [];
+
+      return _fetchProductsByHandles(siblingHandles);
+    } catch (e) {
+      _log('_fetchColorGroupSiblings EXCEPTION: $e');
+      return [];
+    }
+  }
+
+  /// Batches a lightweight fetch (title, image, price, options/variants)
+  /// for several products by handle in a single aliased GraphQL request —
+  /// same pattern as [_fetchCollectionTiles] below.
+  Future<List<ShopifyProduct>> _fetchProductsByHandles(
+    List<String> handles,
+  ) async {
+    final buffer = StringBuffer('query getProductsByHandles {\n');
+    for (int i = 0; i < handles.length; i++) {
+      final safeHandle = handles[i].replaceAll('"', r'\"');
+      buffer.write('  p$i: productByHandle(handle: "$safeHandle") {\n');
+      buffer.write('    id title handle\n');
+      buffer.write(
+          '    priceRange { minVariantPrice { amount currencyCode } }\n');
+      buffer.write(
+          '    compareAtPriceRange { minVariantPrice { amount currencyCode } }\n');
+      buffer.write('    images(first: 1) { edges { node { url altText } } }\n');
+      buffer.write(
+          '    options { name values optionValues { name swatch { color } } }\n');
+      buffer.write('    variants(first: 10) {\n');
+      buffer.write(
+          '      edges { node { id title availableForSale selectedOptions { name value } } }\n');
+      buffer.write('    }\n');
+      buffer.write('  }\n');
+    }
+    buffer.write('}');
+
+    try {
+      final res = await ShopifyGraphQL.post(buffer.toString());
+      _log('_fetchProductsByHandles [$handles] → ${res.statusCode}');
+      final decoded = res.body;
+      if (decoded['errors'] != null || decoded['data'] == null) {
+        _log('_fetchProductsByHandles errors: ${decoded['errors']}');
+        return [];
+      }
+
+      final data = decoded['data'] as Map<String, dynamic>;
+      final products = <ShopifyProduct>[];
+      for (int i = 0; i < handles.length; i++) {
+        final node = data['p$i'];
+        if (node != null) {
+          products.add(ShopifyProduct.fromJson(node as Map<String, dynamic>));
+        }
+      }
+      return products;
+    } catch (e) {
+      _log('_fetchProductsByHandles EXCEPTION: $e');
+      return [];
+    }
+  }
+
   Future<List<ShopifyCollection>> getLatestDropCollections() => _cachedFetch(
         'latestDropCollections',
         () => _fetchCollectionTiles(

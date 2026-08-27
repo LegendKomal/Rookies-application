@@ -204,3 +204,52 @@ class OptionValue {
     );
   }
 }
+
+/// A single product reference inside a Variant King (`vkcl.group_data`)
+/// color group — just enough to identify and fetch the sibling product.
+class ColorGroupProductRef {
+  final String id; // numeric Shopify product id, as a string
+  final String handle;
+
+  const ColorGroupProductRef({required this.id, required this.handle});
+
+  factory ColorGroupProductRef.fromJson(Map<String, dynamic> json) {
+    return ColorGroupProductRef(
+      id: json['id']?.toString() ?? '',
+      handle: json['handle'] as String? ?? '',
+    );
+  }
+}
+
+/// One color-family grouping as written by the Variant King / SA Variants
+/// app into the `vkcl.group_data` product metafield (namespace `vkcl`,
+/// key `group_data`, type JSON). The raw metafield value is a JSON string
+/// containing a list of these, e.g.:
+/// ```json
+/// [
+///   {
+///     "group_name": "RJS3147A , RJS3147B",
+///     "products": [
+///       { "id": 10230091645223, "handle": "white-..." },
+///       { "id": 10230091677991, "handle": "black-..." }
+///     ]
+///   }
+/// ]
+/// ```
+class ColorGroup {
+  final String groupName;
+  final List<ColorGroupProductRef> products;
+
+  const ColorGroup({required this.groupName, required this.products});
+
+  factory ColorGroup.fromJson(Map<String, dynamic> json) {
+    final list = (json['products'] as List?) ?? [];
+    return ColorGroup(
+      groupName: json['group_name'] as String? ?? '',
+      products: list
+          .whereType<Map<String, dynamic>>()
+          .map(ColorGroupProductRef.fromJson)
+          .toList(),
+    );
+  }
+}

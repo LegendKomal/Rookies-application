@@ -52,14 +52,23 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   bool _isWishlistLoading = false;
   bool _isAddingToCart = false;
 
+  // Mirrors widget.handle/title/heroImageUrl but is mutable, so tapping a
+  // color swatch can swap the product shown on THIS page instead of
+  // pushing a new route (the usual ecommerce "select a color" pattern).
+  late String _currentHandle;
+  late String _currentTitle;
+  String? _currentHeroImageUrl;
+
   int _currentImageIndex = 0;
   final PageController _pageController = PageController();
+  final ScrollController _scrollController = ScrollController();
 
   Map<String, String> _selectedOptions = {};
   ProductDetailVariant? _selectedVariant;
 
   List<ShopifyProduct> _goesWellWith = [];
   List<ShopifyProduct> _youMayAlsoLike = [];
+  List<ShopifyProduct> _colorSiblings = [];
   bool _isLoadingRelated = false;
   int? _expandedTileIndex;
 
@@ -120,17 +129,21 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   @override
   void initState() {
     super.initState();
+    _currentHandle = widget.handle;
+    _currentTitle = widget.title;
+    _currentHeroImageUrl = widget.heroImageUrl;
     _fetchProduct();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   String _detectCategory() {
-    final combined = '${widget.handle} ${widget.title}'.toLowerCase();
+    final combined = '$_currentHandle $_currentTitle'.toLowerCase();
     if (combined.contains('shirt')) return 'shirt';
     if (combined.contains('tshirt') || combined.contains('t-shirt') || combined.contains('tee')) return 'tshirt';
     if (combined.contains('jean') || combined.contains('denim')) return 'jeans';
@@ -149,7 +162,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
     try {
       final product = await ShopifyStorefrontService.instance
-          .getProductByHandle(widget.handle);
+          .getProductByHandle(_currentHandle);
 
       if (!mounted) return;
 
@@ -189,6 +202,7 @@ debugPrint('==========================================');
 
       _updateVariant();
       _fetchRelatedProducts();
+      _fetchColorSiblings();
     } catch (e, st) {
       debugPrint('ProductDetailPage _fetchProduct error: $e');
       debugPrintStack(stackTrace: st);
@@ -197,6 +211,21 @@ debugPrint('==========================================');
         _error = 'Failed to load product: $e';
         _isLoading = false;
       });
+    }
+  }
+
+  /// Loads the other colors in this product's Variant King (`vkcl.group_data`)
+  /// color family, if any, so they can be shown as swatches that jump to the
+  /// sibling product's own page.
+  Future<void> _fetchColorSiblings() async {
+    if (_product == null) return;
+    try {
+      final siblings = await ShopifyStorefrontService.instance
+          .getColorGroupSiblings(_product!.handle);
+      if (!mounted) return;
+      setState(() => _colorSiblings = siblings);
+    } catch (e) {
+      debugPrint('Color siblings fetch error: $e');
     }
   }
 
@@ -214,7 +243,7 @@ debugPrint('==========================================');
             .getProductsByCollection(handle, first: 6);
         if (mounted) {
           setState(() => _goesWellWith = products
-              .where((p) => p.handle != widget.handle)
+              .where((p) => p.handle != _currentHandle)
               .take(4)
               .toList());
         }
@@ -224,7 +253,7 @@ debugPrint('==========================================');
           .getProductsByCollection(_sameCollectionHandle(), first: 8);
       if (mounted) {
         final filtered = similar
-            .where((p) => p.handle != widget.handle)
+            .where((p) => p.handle != _currentHandle)
             .toList()
           ..shuffle();
         setState(() => _youMayAlsoLike = filtered.take(6).toList());
@@ -240,13 +269,13 @@ debugPrint('==========================================');
     final category = _detectCategory();
     switch (category) {
       case 'shirt':
-        return widget.handle.contains('oversized')
+        return _currentHandle.contains('oversized')
             ? 'oversized-shirts'
             : 'ss26-linens';
       case 'tshirt':
         return 'ss26-tshirts-oversize-fit-half-sleeve';
       case 'jeans':
-        return widget.handle.contains('loose')
+        return _currentHandle.contains('loose')
             ? 'ss26-loose-fit-jeans'
             : 'ss26-bootcutjeans';
       case 'pants':
@@ -347,6 +376,38 @@ debugPrint('==========================================');
     );
   }
 
+  /// Swaps in [product] as the one shown on THIS page — used when picking a
+  /// different color from the same Variant King group — instead of pushing
+  /// a new route. This is the familiar "tap a color swatch, the page
+  /// updates in place" pattern most ecommerce apps use.
+  Future<void> _switchProduct(ShopifyProduct product) async {
+    if (product.handle == _currentHandle) return;
+
+    setState(() {
+      _currentHandle = product.handle;
+      _currentTitle = product.title;
+      _currentHeroImageUrl = product.primaryImageUrl;
+      _currentImageIndex = 0;
+      // Clear stale data from the previous product so nothing mismatched
+      // flashes once loading finishes but before these re-fetch.
+      _goesWellWith = [];
+      _youMayAlsoLike = [];
+      _colorSiblings = [];
+      _selectedOptions = {};
+      _selectedVariant = null;
+      _expandedTileIndex = null;
+    });
+
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+
+    await _fetchProduct();
+  }
+
   void _openImageViewer(List<String> images) async {
     final returnedIndex = await Navigator.push<int>(
       context,
@@ -378,6 +439,7 @@ debugPrint('==========================================');
   Widget _buildDetail() {
     final p = _product!;
     return CustomScrollView(
+      controller: _scrollController,
       slivers: [
         SliverToBoxAdapter(
           child: Center(
@@ -559,6 +621,223 @@ debugPrint('==========================================');
     );
   }
 
+  /// Maps common apparel color words to a display hex code. Keys are
+  /// lowercase; two-word compounds (e.g. "light brown") are matched first,
+  /// falling back to the base hue word alone. Extend this as new color
+  /// names show up in your catalog.
+  static const Map<String, String> _namedColorHex = {
+    // compounds — checked before single words
+    'light brown': 'B08968',
+    'dark brown': '4A2C17',
+    'light blue': 'A9C6E8',
+    'dark blue': '1B3A6B',
+    'light green': '9CC69B',
+    'dark green': '234D35',
+    'light grey': 'C9C9C9',
+    'light gray': 'C9C9C9',
+    'dark grey': '4B4B4B',
+    'dark gray': '4B4B4B',
+    'off white': 'F5F1E8',
+    'navy blue': '000080',
+    'sky blue': '87CEEB',
+    'royal blue': '2551A6',
+    'baby pink': 'F7C9D6',
+    'hot pink': 'F0508A',
+    'dark red': '8B1E1E',
+    // single words
+    'white': 'FFFFFF',
+    'black': '000000',
+    'grey': '808080',
+    'gray': '808080',
+    'charcoal': '36454F',
+    'navy': '000080',
+    'blue': '2A4B7C',
+    'skyblue': '87CEEB',
+    'red': 'C1272D',
+    'maroon': '800000',
+    'wine': '722F37',
+    'burgundy': '800020',
+    'green': '2E5339',
+    'olive': '708238',
+    'khaki': 'C3B091',
+    'beige': 'D8C4A0',
+    'cream': 'FFFDD0',
+    'ivory': 'FFFFF0',
+    'brown': '5B3A29',
+    'tan': 'D2B48C',
+    'mustard': 'E1AD01',
+    'yellow': 'F2D51D',
+    'orange': 'E2711D',
+    'rust': 'B7410E',
+    'pink': 'F6A6C1',
+    'purple': '6A3FA0',
+    'lavender': 'B497D6',
+    'teal': '2F6D6D',
+    'mint': 'A8E0C5',
+    'coral': 'FF6F5E',
+    'turquoise': '30D5C8',
+    'gold': 'D4AF37',
+    'silver': 'C0C0C0',
+    'denim': '4A6D8C',
+    'indigo': '3F3B6C',
+  };
+
+  /// Resolves a display color from free-text like an option value
+  /// ("Light Brown") or a handle segment. Tries the full normalized string,
+  /// then each word from the end backwards (the last word is usually the
+  /// base hue, e.g. "dusty rose" -> "rose"). Returns null if nothing in
+  /// [_namedColorHex] matches.
+  Color? _colorFromName(String name) {
+    final normalized =
+        name.toLowerCase().trim().replaceAll(RegExp(r'[_\-]+'), ' ');
+    if (_namedColorHex.containsKey(normalized)) {
+      return _hexToColor(_namedColorHex[normalized]!);
+    }
+    final words = normalized.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    for (final w in words.reversed) {
+      if (_namedColorHex.containsKey(w)) {
+        return _hexToColor(_namedColorHex[w]!);
+      }
+    }
+    return null;
+  }
+
+  /// Pulls a display color out of a Variant King child product's handle
+  /// (e.g. "light-brown-extra-loose-fit-jeans-2233") by trying the first
+  /// two hyphen-separated tokens as a compound color name, then the first
+  /// token alone, against [_namedColorHex].
+  Color? _colorFromHandle(String handle) {
+    final tokens = handle.split('-');
+    if (tokens.length >= 2) {
+      final twoWord = '${tokens[0]} ${tokens[1]}'.toLowerCase();
+      if (_namedColorHex.containsKey(twoWord)) {
+        return _hexToColor(_namedColorHex[twoWord]!);
+      }
+    }
+    if (tokens.isNotEmpty) {
+      final hex = _namedColorHex[tokens.first.toLowerCase()];
+      if (hex != null) return _hexToColor(hex);
+    }
+    return null;
+  }
+
+
+  /// Row of color swatches for the sibling products in this item's Variant
+  /// King color group (see `_fetchColorSiblings`). Tapping a swatch that
+  /// isn't the currently-open product swaps this same page over to that
+  /// sibling (see `_switchProduct`) rather than pushing a new page.
+  /// Each swatch shows the product's own photo; if a product has no image
+  /// yet, it falls back to a guessed color code, then a plain letter.
+  Widget _colorSiblingsSection() {
+    if (_colorSiblings.isEmpty) return const SizedBox.shrink();
+    final currentImageUrl = (_product?.imageUrls.isNotEmpty ?? false)
+        ? _product!.imageUrls.first
+        : _currentHeroImageUrl;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'AVAILABLE COLORS',
+            style: TextStyle(
+              fontFamily: _fBold,
+              fontSize: _s(11),
+              color: primary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _colorSiblingChip(
+                title: _product?.title ?? _currentTitle,
+                imageUrl: currentImageUrl,
+                fallbackColor: _colorFromHandle(_currentHandle),
+                isCurrent: true,
+                onTap: null,
+              ),
+              for (final sibling in _colorSiblings)
+                _colorSiblingChip(
+                  title: sibling.title,
+                  imageUrl: sibling.primaryImageUrl,
+                  fallbackColor: sibling.colorHexCodes.isNotEmpty
+                      ? _hexToColor(sibling.colorHexCodes.first)
+                      : _colorFromHandle(sibling.handle),
+                  isCurrent: false,
+                  onTap: () => _switchProduct(sibling),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _colorSiblingChip({
+    required String title,
+    String? imageUrl,
+    Color? fallbackColor,
+    required bool isCurrent,
+    VoidCallback? onTap,
+  }) {
+    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 48,
+        child: Column(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: hasImage ? null : (fallbackColor ?? const Color(0xFFEEEEEE)),
+                image: hasImage
+                    ? DecorationImage(
+                        image: CachedNetworkImageProvider(imageUrl),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+                border: Border.all(
+                  color: isCurrent ? primary : borderColor,
+                  width: isCurrent ? 2 : 1,
+                ),
+              ),
+              child: (!hasImage && fallbackColor == null)
+                  ? Center(
+                      child: Text(
+                        title.isNotEmpty ? title[0].toUpperCase() : '?',
+                        style: const TextStyle(
+                          fontFamily: _fBody,
+                          fontSize: 10,
+                          color: primary,
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: _fBody,
+                fontSize: _s(9),
+                color: primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
   Widget _infoSection(ShopifyProductDetail p) {
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -577,8 +856,11 @@ debugPrint('==========================================');
           const SizedBox(height: 8),
           _priceBlock(p),
           const SizedBox(height: 16),
+          _colorSiblingsSection(),
 
-          ...p.options.map((opt) => _optionSelector(opt)),
+          ...p.options
+              .where((opt) => !opt.isColorOption)
+              .map((opt) => _optionSelector(opt)),
 _variantMetafieldsSection(),
           const SizedBox(height: 20),
           _availabilityChip(),
@@ -1106,8 +1388,18 @@ const Divider(height: 1),
 
   Widget _colorSwatchChip(ProductDetailOption opt, String val, bool isSelected) {
     final swatch = opt.swatchFor(val);
-    final color = _hexToColor(swatch?.swatchColorHex);
-    final imageUrl = swatch?.swatchImageUrl;
+    // Prefer a real photo: Shopify's configured swatch image first, then
+    // this product's own photo (each Variant King color is its own
+    // product, so this genuinely is a picture of "val"). Only fall back to
+    // a guessed color code, then a letter, if no photo exists at all.
+    final swatchImageUrl = swatch?.swatchImageUrl;
+    final ownPhotoUrl = (_product?.imageUrls.isNotEmpty ?? false)
+        ? _product!.imageUrls.first
+        : null;
+    final imageUrl = swatchImageUrl ?? ownPhotoUrl;
+    final color = imageUrl == null
+        ? (_hexToColor(swatch?.swatchColorHex) ?? _colorFromName(val))
+        : null;
 
     return GestureDetector(
       onTap: () {
@@ -1255,7 +1547,7 @@ const Divider(height: 1),
                     ),
                     Expanded(
                       child: Text(
-                        widget.title.toUpperCase(),
+                        _currentTitle.toUpperCase(),
                         style: TextStyle(
                           fontFamily: _fBold,
                           fontSize: _s(12),
@@ -1267,11 +1559,11 @@ const Divider(height: 1),
                   ],
                 ),
               ),
-              if (widget.heroImageUrl != null)
+              if (_currentHeroImageUrl != null)
                 AspectRatio(
                   aspectRatio: 3 / 4,
                   child: CachedNetworkImage(
-                    imageUrl: widget.heroImageUrl!,
+                    imageUrl: _currentHeroImageUrl!,
                     fit: BoxFit.cover,
                     placeholder: (_, __) =>
                         Container(color: const Color(0xFFEEEEEE)),
@@ -1305,7 +1597,7 @@ const Divider(height: 1),
             onPressed: () => Navigator.pop(context),
           ),
           title: Text(
-            widget.title.toUpperCase(),
+            _currentTitle.toUpperCase(),
             style: TextStyle(
               fontFamily: _fBold,
               fontSize: _s(12),

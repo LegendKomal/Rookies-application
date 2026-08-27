@@ -389,11 +389,86 @@ class _ProductsPageState extends State<ProductsPage> {
     return success;
   }
 
+  Color? _hexToColor(String? hex) {
+    if (hex == null || hex.isEmpty) return null;
+    var h = hex.replaceAll('#', '');
+    if (h.length == 6) h = 'FF$h';
+    final value = int.tryParse(h, radix: 16);
+    return value != null ? Color(value) : null;
+  }
+
+  /// Compact circular swatch used inside the size-selector sheet's
+  /// "AVAILABLE COLORS" row. Mirrors the styling used on the product detail
+  /// page: a real photo first, a Shopify swatch hex as fallback, then a
+  /// plain initial letter.
+  Widget _sheetColorChip({
+    required String title,
+    String? imageUrl,
+    String? hexFallback,
+    required bool isCurrent,
+    VoidCallback? onTap,
+  }) {
+    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
+    final fallbackColor = hasImage ? null : _hexToColor(hexFallback);
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 46,
+        child: Column(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: hasImage ? null : (fallbackColor ?? const Color(0xFFEEEEEE)),
+                image: hasImage
+                    ? DecorationImage(
+                        image: CachedNetworkImageProvider(imageUrl),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+                border: Border.all(
+                  color: isCurrent ? primary : borderColor,
+                  width: isCurrent ? 2 : 1,
+                ),
+              ),
+              child: (!hasImage && fallbackColor == null)
+                  ? Center(
+                      child: Text(
+                        title.isNotEmpty ? title[0].toUpperCase() : '?',
+                        style: const TextStyle(fontSize: 10, color: primary),
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 9, color: primary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showSizeSelector(ShopifyProduct product) {
     if (product.variants.isEmpty) return;
 
     String? selectedVariantId;
     bool isAdding = false;
+
+    // Color-group state for the "AVAILABLE COLORS" row. `product` itself is
+    // reassigned (it's a plain, non-final parameter) when the user taps a
+    // different color, so the whole sheet — title, price, sizes, add button
+    // — swaps to that sibling in place instead of closing this sheet.
+    List<ShopifyProduct> colorSiblings = [];
+    bool isLoadingSiblings = true;
+    String? siblingsLoadedForHandle;
 
     showModalBottomSheet(
       context: context,
@@ -406,10 +481,40 @@ class _ProductsPageState extends State<ProductsPage> {
         final r = _Responsive(sheetContext);
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
+            // Kick off (or re-kick off, after a color switch) the sibling
+            // fetch exactly once per handle currently shown in the sheet.
+            if (siblingsLoadedForHandle != product.handle) {
+              siblingsLoadedForHandle = product.handle;
+              isLoadingSiblings = true;
+              final requestedHandle = product.handle;
+              ShopifyStorefrontService.instance
+                  .getColorGroupSiblings(requestedHandle)
+                  .then((siblings) {
+                if (!sheetContext.mounted) return;
+                // Ignore stale results from a handle we've since switched away from.
+                if (siblingsLoadedForHandle != requestedHandle) return;
+                setSheetState(() {
+                  colorSiblings = siblings;
+                  isLoadingSiblings = false;
+                });
+              });
+            }
+
             final selectedVariant = selectedVariantId == null
                 ? null
                 : product.variants
                     .firstWhere((v) => v.id == selectedVariantId);
+
+            void switchColor(ShopifyProduct sibling) {
+              if (sibling.handle == product.handle) return;
+              if (sibling.variants.isEmpty) return;
+              setSheetState(() {
+                product = sibling;
+                selectedVariantId = null;
+                colorSiblings = [];
+                isLoadingSiblings = true;
+              });
+            }
 
             return SafeArea(
               top: false,
@@ -442,6 +547,51 @@ class _ProductsPageState extends State<ProductsPage> {
                       ),
                       const SizedBox(height: 4),
                       _priceBlock(product),
+                      if (isLoadingSiblings || colorSiblings.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          'AVAILABLE COLORS',
+                          style: TextStyle(
+                            fontFamily: _fBold,
+                            fontSize: r.sp(12),
+                            letterSpacing: 1.2,
+                            color: secondaryTxt,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        if (isLoadingSiblings)
+                          const SizedBox(
+                            height: 32,
+                            width: 32,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: [
+                              _sheetColorChip(
+                                title: product.title,
+                                imageUrl: product.primaryImageUrl,
+                                hexFallback: product.colorHexCodes.isNotEmpty
+                                    ? product.colorHexCodes.first
+                                    : null,
+                                isCurrent: true,
+                                onTap: null,
+                              ),
+                              for (final sibling in colorSiblings)
+                                _sheetColorChip(
+                                  title: sibling.title,
+                                  imageUrl: sibling.primaryImageUrl,
+                                  hexFallback: sibling.colorHexCodes.isNotEmpty
+                                      ? sibling.colorHexCodes.first
+                                      : null,
+                                  isCurrent: false,
+                                  onTap: () => switchColor(sibling),
+                                ),
+                            ],
+                          ),
+                      ],
                       const SizedBox(height: 16),
                       Text(
                         'SELECT SIZE',
