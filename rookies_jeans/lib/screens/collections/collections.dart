@@ -53,13 +53,17 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
           child: Row(
             children: [
               GestureDetector(
-                onTap: () => Navigator.of(context).maybePop(),
-                child: const Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 22,
-                  color: AppColors.primary,
-                ),
-              ),
+  onTap: () {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(0);
+    }
+  },
+  child: const Icon(
+    Icons.arrow_back_ios_new,
+    size: 22,
+    color: AppColors.primary,
+  ),
+),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(

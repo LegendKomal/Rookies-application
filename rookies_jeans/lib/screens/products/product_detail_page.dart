@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
+import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/product_detail_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/products/size_chart_view.dart';
@@ -333,6 +335,18 @@ debugPrint('==========================================');
     }
   }
 
+  Future<void> _shareProduct() async {
+    final p = _product;
+    if (p == null) return;
+    final link = '${ShopifyConstants.storeUrl}/products/${p.handle}';
+    await SharePlus.instance.share(
+      ShareParams(
+        text: 'Check out ${p.title} on Rookies Jeans\n$link',
+        subject: p.title,
+      ),
+    );
+  }
+
   void _goToCart() => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const CartScreen()),
@@ -482,6 +496,7 @@ debugPrint('==========================================');
           ),
           _backButton(),
           _wishlistButton(),
+          _shareButton(),
         ]),
       );
     }
@@ -514,6 +529,7 @@ debugPrint('==========================================');
             ),
             _backButton(),
             _wishlistButton(),
+            _shareButton(),
           ]),
         ),
         if (images.length > 1) ...[
@@ -583,6 +599,23 @@ debugPrint('==========================================');
                       color: _isWishlisted ? Colors.red : primary,
                     ),
                   ),
+          ),
+        ),
+      );
+
+  Widget _shareButton() => Positioned(
+        top: 54,
+        right: 12,
+        child: GestureDetector(
+          onTap: _shareProduct,
+          child: const SizedBox(
+            width: 38,
+            height: 38,
+            child: Icon(
+              Icons.share_outlined,
+              size: 20,
+              color: primary,
+            ),
           ),
         ),
       );

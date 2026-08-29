@@ -233,46 +233,46 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
     _OccasionTile(
       imageAsset: 'assets/jeans_lennon.jpeg',
-      handle: 'jeans-jamie',
+      handle: 'jeans-lennon',
     ),
     _OccasionTile(
       imageAsset: 'assets/jeans_mojo.jpeg',
-      handle: 'jeans-jude',
+      handle: 'jeans-mojo',
     ),
     _OccasionTile(
       imageAsset: 'assets/jeans_nikki.jpeg',
-      handle: 'jeans-jax',
+      handle: 'jeans-nikki',
     ),
     _OccasionTile(
       imageAsset: 'assets/jeans_springsteen.jpeg',
-      handle: 'jeans-joel',
+      handle: 'jeans-springsteen',
     ),
   ];
 
   final List<_InstagramPost> _defaultInstagramPosts = const [
     _InstagramPost(
       imageAsset: 'assets/instagram_1.jpg',
-      postUrl: 'https://www.instagram.com/p/REPLACE_ME_1/',
-      username: 'softlayers',
+      postUrl: 'https://www.instagram.com/rookiesjeans/p/Dcd6aaiBeAo/',
+      username: 'rookiesjeans',
     ),
     _InstagramPost(
       imageAsset: 'assets/instagram_2.jpg',
-      postUrl: 'https://www.instagram.com/p/REPLACE_ME_2/',
+      postUrl: 'https://www.instagram.com/rookiesjeans/p/DcbUohJhPWG/',
       username: 'rookiesjeans',
     ),
     _InstagramPost(
       imageAsset: 'assets/instagram_3.jpg',
-      postUrl: 'https://www.instagram.com/p/REPLACE_ME_3/',
+      postUrl: 'https://www.instagram.com/rookiesjeans/p/DcGW_51ibkB/',
       username: 'rookiesjeans',
     ),
     _InstagramPost(
       imageAsset: 'assets/instagram_4.jpg',
-      postUrl: 'https://www.instagram.com/p/REPLACE_ME_4/',
+      postUrl: 'https://www.instagram.com/rookiesjeans/p/DcOSq1EFKPf/',
       username: 'rookiesjeans',
     ),
     _InstagramPost(
       imageAsset: 'assets/instagram_5.jpg',
-      postUrl: 'https://www.instagram.com/p/REPLACE_ME_5/',
+      postUrl: 'https://www.instagram.com/rookiesjeans/p/DcTf3nQEcMS/',
       username: 'rookiesjeans',
     ),
   ];
@@ -1181,52 +1181,53 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _shopByOccasionsSection() {
-    final r = R.of(context);
-    final double cardWidth = MediaQuery.of(context).size.width * 0.44;
-    final double cardHeight = (cardWidth * 1.3).clamp(220.0, 380.0);
+  final r = R.of(context);
+  final double cardWidth = MediaQuery.of(context).size.width * 0.44;
+  final double cardHeight = (cardWidth * 1.3).clamp(220.0, 380.0);
+  final double gap = r.dp(10);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(r.dp(16), r.dp(28), r.dp(16), 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'SHOP BY OCCASIONS',
-                style: TextStyle(
-                  fontFamily: _fHead,
-                  fontSize: r.sp(22),
-                  fontWeight: FontWeight.w600,
-                  color: primary,
-                ),
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Padding(
+        padding: EdgeInsets.fromLTRB(r.dp(16), r.dp(28), r.dp(16), 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'SHOP BY OCCASIONS',
+              style: TextStyle(
+                fontFamily: _fHead,
+                fontSize: r.sp(22),
+                fontWeight: FontWeight.w600,
+                color: primary,
               ),
-            ],
-          ),
-        ),
-        SizedBox(height: r.dp(16)),
-        Builder(builder: (context) {
-          final tiles = _occasionTilesToDisplay;
-          return SizedBox(
-            height: cardHeight,
-            child: ListView.separated(
-              padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: tiles.length,
-              separatorBuilder: (_, __) => SizedBox(width: r.dp(10)),
-              itemBuilder: (_, i) =>
-                  _occasionCard(tiles[i], cardWidth, cardHeight, r),
             ),
-          );
-        }),
-        SizedBox(height: r.dp(20)),
-      ],
-    );
-  }
+          ],
+        ),
+      ),
+      SizedBox(height: r.dp(16)),
+      Builder(builder: (context) {
+        final tiles = _occasionTilesToDisplay;
+        return SizedBox(
+          height: cardHeight,
+          child: _AutoScrollHorizontalList(
+            itemCount: tiles.length,
+            itemExtent: cardWidth + gap,
+            padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+            itemBuilder: (_, i) => Padding(
+              padding: EdgeInsets.only(right: i == tiles.length - 1 ? 0 : gap),
+              child: _occasionCard(tiles[i], cardWidth, cardHeight, r),
+            ),
+          ),
+        );
+      }),
+      SizedBox(height: r.dp(20)),
+    ],
+  );
+}
 
   Widget _occasionCard(_OccasionTile tile, double width, double height, R r) {
     return GestureDetector(
@@ -1273,26 +1274,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _instagramList() {
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final posts = _instagramPostsToDisplay;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (int i = 0; i < posts.length; i++) ...[
-          if (i > 0) const SizedBox(height: 2),
-          _instagramBlock(posts[i], screenWidth),
-        ],
-      ],
-    );
-  }
+  final r = R.of(context);
+  final posts = _instagramPostsToDisplay;
+  final double cardSize =
+      (MediaQuery.of(context).size.width * 0.6).clamp(120.0, 168.0);
+  final double gap = r.dp(10);
 
-  Widget _instagramBlock(_InstagramPost post, double width) {
-    final r = R.of(context);
-    return GestureDetector(
-      onTap: () => _openInstagramPost(post.postUrl),
+  return SizedBox(
+    height: cardSize,
+    child: _AutoScrollHorizontalList(
+      itemCount: posts.length,
+      itemExtent: cardSize + gap,
+      padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+      itemBuilder: (_, i) => Padding(
+        padding: EdgeInsets.only(right: i == posts.length - 1 ? 0 : gap),
+        child: _instagramBlock(posts[i], cardSize, r),
+      ),
+    ),
+  );
+}
+
+Widget _instagramBlock(_InstagramPost post, double size, R r) {
+  return GestureDetector(
+    onTap: () => _openInstagramPost(post.postUrl),
+    child: ClipRRect(
       child: SizedBox(
-        width: width,
-        height: width,
+        width: size,
+        height: size,
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -1311,38 +1319,42 @@ class _HomeScreenState extends State<HomeScreen> {
                     errorBuilder: (_, __, ___) =>
                         Container(color: const Color(0xFFE0E0E0)),
                   ),
-            Positioned(
-              left: r.dp(12),
-              top: r.dp(12),
-              child: Text(
-                'ROOKIES',
-                style: TextStyle(
-                  fontFamily: _fHead,
-                  color: Colors.white,
-                  fontSize: r.sp(14),
-                  fontWeight: FontWeight.w600,
-                  shadows: const [Shadow(color: Colors.black45, blurRadius: 4)],
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.0),
+                    Colors.black.withOpacity(0.55),
+                  ],
+                  stops: const [0.5, 1.0],
                 ),
               ),
             ),
             Positioned(
-              left: r.dp(12),
-              bottom: r.dp(12),
+              left: r.dp(8),
+              right: r.dp(8),
+              bottom: r.dp(8),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.camera_alt_outlined,
-                      color: Colors.white, size: r.dp(16)),
-                  SizedBox(width: r.dp(6)),
-                  Text(
-                    post.username,
-                    style: TextStyle(
-                      fontFamily: _fBody,
-                      color: Colors.white,
-                      fontSize: r.sp(12),
-                      shadows: const [
-                        Shadow(color: Colors.black45, blurRadius: 4)
-                      ],
+                      color: Colors.white, size: r.dp(12)),
+                  SizedBox(width: r.dp(4)),
+                  Expanded(
+                    child: Text(
+                      post.username,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: _fBody,
+                        color: Colors.white,
+                        fontSize: r.sp(10.5),
+                        shadows: const [
+                          Shadow(color: Colors.black45, blurRadius: 4),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -1351,8 +1363,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _shimmer() {
     final r = R.of(context);
@@ -1969,4 +1982,86 @@ class _PromoBlockData {
     required this.buttonLabel,
     required this.collectionHandle,
   });
+}
+
+class _AutoScrollHorizontalList extends StatefulWidget {
+  final int itemCount;
+  final double itemExtent; // width of one item including its trailing gap
+  final EdgeInsetsGeometry padding;
+  final IndexedWidgetBuilder itemBuilder;
+  final Duration interval;
+  final Duration animationDuration;
+
+  const _AutoScrollHorizontalList({
+    required this.itemCount,
+    required this.itemExtent,
+    required this.itemBuilder,
+    this.padding = EdgeInsets.zero,
+    this.interval = const Duration(seconds: 5),
+    this.animationDuration = const Duration(milliseconds: 600),
+  });
+
+  @override
+  State<_AutoScrollHorizontalList> createState() =>
+      _AutoScrollHorizontalListState();
+}
+
+class _AutoScrollHorizontalListState extends State<_AutoScrollHorizontalList> {
+  final ScrollController _controller = ScrollController();
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.itemCount > 1) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _startAutoScroll());
+    }
+  }
+
+  void _startAutoScroll() {
+    _timer = Timer.periodic(widget.interval, (_) {
+      if (!mounted || !_controller.hasClients) return;
+      final double max = _controller.position.maxScrollExtent;
+      if (max <= 0) return;
+
+      final double next = _controller.offset + widget.itemExtent;
+      if (next >= max) {
+        _controller
+            .animateTo(max,
+                duration: widget.animationDuration, curve: Curves.easeInOut)
+            .then((_) {
+          if (!mounted) return;
+          Future.delayed(const Duration(milliseconds: 400), () {
+            if (mounted && _controller.hasClients) {
+              _controller.animateTo(0,
+                  duration: widget.animationDuration,
+                  curve: Curves.easeInOut);
+            }
+          });
+        });
+      } else {
+        _controller.animateTo(next,
+            duration: widget.animationDuration, curve: Curves.easeInOut);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      controller: _controller,
+      padding: widget.padding,
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      itemCount: widget.itemCount,
+      itemBuilder: widget.itemBuilder,
+    );
+  }
 }
