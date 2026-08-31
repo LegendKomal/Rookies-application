@@ -11,6 +11,7 @@ import 'package:rookies_jeans/screens/cart/cart.dart';
 import 'package:rookies_jeans/screens/profile/address_book.dart';
 import 'package:rookies_jeans/screens/profile/change_password_screen.dart';
 import 'package:rookies_jeans/screens/profile/profile.dart';
+import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/screens/splashscreen/splashscreen.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 
@@ -77,6 +78,18 @@ final GoRouter _appRouter = GoRouter(
       path: '/track-order',
       builder: (context, state) =>
           const Scaffold(body: Center(child: Text('Track Your Order'))),
+    ),
+    // Matches the /products/:handle path of shared product links
+    // (https://rookiesjeans.com/products/<handle>) so tapping one when the
+    // app is installed opens this page instead of falling through to the
+    // browser. Title is unknown until ProductDetailPage fetches the
+    // product, so the handle is shown as a placeholder while loading.
+    GoRoute(
+      path: '/products/:handle',
+      builder: (context, state) => ProductDetailPage(
+        handle: state.pathParameters['handle']!,
+        title: state.pathParameters['handle']!,
+      ),
     ),
 
     StatefulShellRoute.indexedStack(

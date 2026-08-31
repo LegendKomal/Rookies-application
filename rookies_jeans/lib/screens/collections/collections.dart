@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/screens/products/products.dart';
@@ -42,44 +43,42 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
-        backgroundColor: AppColors.bg,
+        backgroundColor: AppColors.card,
         elevation: 0,
-        scrolledUnderElevation: 0,
+        centerTitle: false,
         automaticallyImplyLeading: false,
-        toolbarHeight: toolbarHeight,
         titleSpacing: 0,
-        title: Padding(
-          padding: const EdgeInsets.only(left: 12, right: 16),
-          child: Row(
-            children: [
-              GestureDetector(
-  onTap: () {
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop(0);
-    }
-  },
-  child: const Icon(
-    Icons.arrow_back_ios_new,
-    size: 22,
-    color: AppColors.primary,
-  ),
-),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'EXPLORE CATEGORIES',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: titleSize,
-                    height: 1,
-                    fontFamily: _fHead,
-                    color: AppColors.primary,
-                  ),
+        title: Row(
+          children: [
+            IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/home');
+                }
+              },
+            ),
+            Expanded(
+              child: Text(
+                'EXPLORE CATEGORIES',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: titleSize,
+                  height: 1,
+                  fontFamily: _fHead,
+                  color: AppColors.primary,
+                  // letterSpacing: 1.4,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
       body: SafeArea(

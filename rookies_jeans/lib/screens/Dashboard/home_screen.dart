@@ -472,12 +472,27 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openInstagramPost(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (url.isEmpty) return;
+  final Uri uri = Uri.parse(url);
+  try {
+    final bool launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open Instagram link')),
+      );
+    }
+  } catch (e) {
+    debugPrint('Failed to launch $url: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open Instagram link')),
+      );
     }
   }
-
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
