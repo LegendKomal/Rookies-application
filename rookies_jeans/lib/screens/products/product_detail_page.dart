@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/product_detail_model.dart';
@@ -74,24 +75,69 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   bool _isLoadingRelated = false;
   int? _expandedTileIndex;
 
+  // Kept alive across taps (and across re-fetches for the same product) so
+  // that tapping "Size Chart" doesn't pay WebView cold-start + network cost
+  // in the critical path — see `_prewarmSizeChart`.
+  WebViewController? _sizeChartController;
+  final ValueNotifier<bool> _sizeChartLoading = ValueNotifier<bool>(true);
+  String? _sizeChartWarmedForHandle;
+
+  // Never let a size-chart failure (e.g. no WebView platform implementation
+  // on the current run target) bubble up and take down product loading —
+  // this is a background optimization, not a page-critical operation.
+  void _prewarmSizeChart() {
+    if (_product == null) return;
+    if (_sizeChartWarmedForHandle == _product!.handle &&
+        _sizeChartController != null) {
+      return;
+    }
+    try {
+      _sizeChartWarmedForHandle = _product!.handle;
+      _sizeChartLoading.value = true;
+
+      final uri = Uri.https('app.kiwisizing.com', '/size', {
+        'shop': ShopifyConstants.shopDomain,
+        'product': _numericProductId(_product!.id),
+        'source': 'testing_only', // Kiwi-issued source id (per Kiwi support)
+      });
+
+      _sizeChartController = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onPageFinished: (_) => _sizeChartLoading.value = false,
+          ),
+        )
+        ..loadRequest(uri);
+    } catch (e) {
+      debugPrint('_prewarmSizeChart failed: $e');
+      _sizeChartController = null;
+      _sizeChartWarmedForHandle = null;
+    }
+  }
+
   void _openSizeChart() {
-  if (_product == null) return;
-  showModalBottomSheet( 
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
-    builder: (_) => SizeChartView(
-      shop: 'rookiesjeans.myshopify.com', // your actual .myshopify.com domain
-      productId: _numericProductId(_product!.id),
-      source: 'YOUR_KIWI_SOURCE_ID', // ask Kiwi support for this
-      // vendor: _product!.vendor,  // if your model has these
-      // type: _product!.productType,
-      // tags: _product!.tags.join(','),
-    ),
-  );
-}
+    if (_product == null) return;
+    _prewarmSizeChart(); // no-op if already warmed for this product
+    final controller = _sizeChartController;
+    if (controller == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Size chart is unavailable right now.')),
+      );
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SizeChartView(
+        controller: controller,
+        loading: _sizeChartLoading,
+      ),
+    );
+  }
 
   static const List<String> _descLabels = [
     'STYLE NO & COLOR', 'STYLE NO', 'COLLAR/NECK', 'COLLAR / NECK',
@@ -141,6 +187,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   void dispose() {
     _pageController.dispose();
     _scrollController.dispose();
+    _sizeChartLoading.dispose();
     super.dispose();
   }
 
@@ -205,6 +252,7 @@ debugPrint('==========================================');
       _updateVariant();
       _fetchRelatedProducts();
       _fetchColorSiblings();
+      _prewarmSizeChart();
     } catch (e, st) {
       debugPrint('ProductDetailPage _fetchProduct error: $e');
       debugPrintStack(stackTrace: st);
@@ -573,7 +621,7 @@ debugPrint('==========================================');
       );
 
   Widget _wishlistButton() => Positioned(
-        top: 12,
+        top: 48,
         right: 12,
         child: GestureDetector(
           onTap: _toggleWishlist,
@@ -604,7 +652,7 @@ debugPrint('==========================================');
       );
 
   Widget _shareButton() => Positioned(
-        top: 54,
+        top: 90,
         right: 12,
         child: GestureDetector(
           onTap: _shareProduct,
