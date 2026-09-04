@@ -15,7 +15,7 @@ class AddressBookScreen extends StatefulWidget {
 }
 
 class _AddressBookScreenState extends State<AddressBookScreen> {
-  static const _primary     = AppColors.primary;
+  static Color get _primary     => AppColors.primary;
   static const _bg          = Color(0xFFF5F5F3);
   static const _cardColor   = Colors.white;
   static const _border      = Color(0xFFEEEEEE);
@@ -225,7 +225,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
           final addresses = svc.addresses;
 
           if (svc.isLoading) {
-            return const Center(
+            return Center(
               child: CircularProgressIndicator(color: _primary),
             );
           }
@@ -262,9 +262,9 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 ),
               ),
               if (_isSettingDefault)
-                const Positioned.fill(
+                Positioned.fill(
                   child: ColoredBox(
-                    color: Color(0x33FFFFFF),
+                    color: const Color(0x33FFFFFF),
                     child: Center(
                       child: CircularProgressIndicator(color: _primary),
                     ),

@@ -15,10 +15,10 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage>
     with SingleTickerProviderStateMixin {
-  static const Color primary      = AppColors.primary;
-  static const Color bgColor      = AppColors.bg;
-  static const Color cardColor    = AppColors.card;
-  static const Color secondaryTxt = AppColors.secondaryText;
+  static Color get primary      => AppColors.primary;
+  static Color get bgColor      => AppColors.bg;
+  static Color get cardColor    => AppColors.card;
+  static Color get secondaryTxt => AppColors.secondaryText;
 
   static const String _fHead = AppFonts.heading;
   static const String _fBody = AppFonts.body;

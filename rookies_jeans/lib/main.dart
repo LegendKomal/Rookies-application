@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/screens/Navigation/bottom_navigation.dart';
 import 'package:rookies_jeans/screens/Dashboard/home_screen.dart';
 import 'package:rookies_jeans/screens/authentication/login.dart';
@@ -21,6 +22,7 @@ void main() async {
   CartService.instance.initialize();
 
   await AuthService.instance.initialize();
+  await ThemeService.instance.initialize();
 
   runApp(const MyApp());
 }
@@ -168,31 +170,60 @@ class MyApp extends StatelessWidget {
     const background = Color(0xFFF5F5F3);
     const primary    = Color(0xFF111111);
 
-    return MaterialApp.router(
-      debugShowCheckedModeBanner: false,
-      title: 'Rookies',
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: background,
-        colorScheme: const ColorScheme.light(
-          primary: primary,
-          secondary: primary,
-          surface: Colors.white,
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: primary,
-          elevation: 0,
-          surfaceTintColor: Colors.transparent,
-          centerTitle: true,
-        ),
-        progressIndicatorTheme:
-            const ProgressIndicatorThemeData(color: primary),
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        dividerColor: const Color(0xFFE7E7E7),
-      ),
-      routerConfig: _appRouter,
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) {
+        return MaterialApp.router(
+          debugShowCheckedModeBanner: false,
+          title: 'Rookies',
+          themeMode: ThemeService.instance.themeMode,
+          theme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.light,
+            scaffoldBackgroundColor: background,
+            colorScheme: const ColorScheme.light(
+              primary: primary,
+              secondary: primary,
+              surface: Colors.white,
+            ),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Colors.white,
+              foregroundColor: primary,
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+              centerTitle: true,
+            ),
+            progressIndicatorTheme:
+                const ProgressIndicatorThemeData(color: primary),
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            dividerColor: const Color(0xFFE7E7E7),
+          ),
+          darkTheme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.dark,
+            scaffoldBackgroundColor: const Color(0xFF121212),
+            colorScheme: const ColorScheme.dark(
+              primary: Colors.white,
+              secondary: Colors.white,
+              surface: Color(0xFF1E1E1E),
+            ),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF1E1E1E),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+              centerTitle: true,
+            ),
+            progressIndicatorTheme:
+                const ProgressIndicatorThemeData(color: Colors.white),
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            dividerColor: const Color(0xFF2C2C2C),
+          ),
+          routerConfig: _appRouter,
+        );
+      },
     );
   }
 }

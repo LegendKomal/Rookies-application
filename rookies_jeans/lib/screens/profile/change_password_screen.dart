@@ -11,7 +11,7 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  static const Color primary = AppColors.primary;
+  static Color get primary => AppColors.primary;
   static const Color secondaryText = Color(0xFF666666);
 
   static const String _fHead = AppFonts.heading;
@@ -167,7 +167,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                               ),
                               border: const OutlineInputBorder(),
                               enabledBorder: const OutlineInputBorder(),
-                              focusedBorder: const OutlineInputBorder(
+                              focusedBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: primary,
                                   width: 1.5,

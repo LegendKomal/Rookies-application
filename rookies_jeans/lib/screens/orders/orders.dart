@@ -30,7 +30,7 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
-  static const _primary = AppColors.primary;
+  static Color get _primary => AppColors.primary;
   static const _bg      = Color(0xFFF5F5F3);
 
   final _svc = ShopifyOrderService.instance;
@@ -331,7 +331,7 @@ class OrderDetailScreen extends StatefulWidget {
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
-  static const _primary = AppColors.primary;
+  static Color get _primary => AppColors.primary;
   final _svc = ShopifyOrderService.instance;
 
   void _openCancelPage() {

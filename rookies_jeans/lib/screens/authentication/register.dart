@@ -29,9 +29,9 @@ class _RegisterState extends State<Register> {
 
   static const Color bgColor       = Color(0xfff5f5f3);
   static const Color cardColor     = Colors.white;
-  static const Color primary       = AppColors.primary;
-  static const Color secondaryText = AppColors.secondaryText;
-  static const Color borderColor   = AppColors.border;
+  static Color get primary       => AppColors.primary;
+  static Color get secondaryText => AppColors.secondaryText;
+  static Color get borderColor   => AppColors.border;
   static const Color fieldFill     = Color(0xfffafafa);
 
   static const String _fHead = AppFonts.heading;

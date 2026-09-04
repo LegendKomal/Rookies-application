@@ -8,6 +8,8 @@
 // i.e. `{ id, image: {...}, label: {...}, sort_order: {...}, ... }` rather
 // than the raw `fields: [...]` array shape.
 
+import 'package:rookies_jeans/models/product_model.dart';
+
 int? _asInt(dynamic value) {
   if (value == null) return null;
   if (value is int) return value;
@@ -49,31 +51,33 @@ class PromoBlockContent {
   }
 }
 
-class TaggedProduct {
+class ExploreCategoryContent {
   final String id;
-  final String title;
-  final double? price;
-  final String? currency;
   final String? imageUrl;
+  final String label;
+  final String collectionHandle;
+  final String section;
+  final int sortOrder;
 
-  const TaggedProduct({
+  const ExploreCategoryContent({
     required this.id,
-    required this.title,
-    this.price,
-    this.currency,
     this.imageUrl,
+    required this.label,
+    required this.collectionHandle,
+    required this.section,
+    this.sortOrder = 0,
   });
 
-  factory TaggedProduct.fromJson(Map<String, dynamic> json) {
-    return TaggedProduct(
+  bool get isBottomwear => section.trim().toLowerCase() == 'bottom';
+
+  factory ExploreCategoryContent.fromMetaobjectJson(Map<String, dynamic> json) {
+    return ExploreCategoryContent(
       id: json['id'] as String,
-      title: json['title'] as String? ?? '',
-      price: double.tryParse(
-        json['priceRange']?['minVariantPrice']?['amount']?.toString() ?? '',
-      ),
-      currency:
-          json['priceRange']?['minVariantPrice']?['currencyCode'] as String?,
-      imageUrl: json['featuredImage']?['url'] as String?,
+      imageUrl: _imageUrlFrom(json['image']),
+      label: _textFrom(json['label']) ?? '',
+      collectionHandle: _textFrom(json['collection_handle']) ?? '',
+      section: _textFrom(json['section']) ?? 'top',
+      sortOrder: _asInt(_textFrom(json['sort_order'])) ?? 0,
     );
   }
 }
@@ -82,7 +86,7 @@ class ShopTheLookEntry {
   final String id;
   final String? imageUrl;
   final int sortOrder;
-  final List<TaggedProduct> products;
+  final List<ShopifyProduct> products;
 
   const ShopTheLookEntry({
     required this.id,
@@ -98,7 +102,7 @@ class ShopTheLookEntry {
       imageUrl: _imageUrlFrom(json['image']),
       sortOrder: _asInt(_textFrom(json['sort_order'])) ?? 0,
       products: edges
-          .map((e) => TaggedProduct.fromJson(e['node'] as Map<String, dynamic>))
+          .map((e) => ShopifyProduct.fromJson(e['node'] as Map<String, dynamic>))
           .toList(),
     );
   }

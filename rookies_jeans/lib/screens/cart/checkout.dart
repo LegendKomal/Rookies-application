@@ -13,8 +13,8 @@ class CheckoutWebView extends StatefulWidget {
 }
 
 class _CheckoutWebViewState extends State<CheckoutWebView> {
-  static const Color primary = AppColors.primary;
-  static const Color bgColor = AppColors.bg;
+  static Color get primary => AppColors.primary;
+  static Color get bgColor => AppColors.bg;
 
   static const String _fBold = AppFonts.bold;
   static const String _fBody = AppFonts.body;

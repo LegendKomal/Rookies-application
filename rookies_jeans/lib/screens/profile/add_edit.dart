@@ -15,9 +15,9 @@ class AddEditAddressScreen extends StatefulWidget {
 }
 
 class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
-  static const _primary = AppColors.primary;
+  static Color get _primary => AppColors.primary;
   static const _bg      = Color(0xFFF5F5F3);
-  static const _border  = AppColors.border;
+  static Color get _border  => AppColors.border;
   static const _hint    = Color(0xFFAAAAAA);
   static const _label   = Color(0xFF888888);
   static const _text    = Color(0xFF111111);
@@ -386,11 +386,11 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
               const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.zero,
-            borderSide: const BorderSide(color: _border),
+            borderSide: BorderSide(color: _border),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.zero,
-            borderSide: const BorderSide(color: _border),
+            borderSide: BorderSide(color: _border),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.zero,

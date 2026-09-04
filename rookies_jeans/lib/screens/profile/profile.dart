@@ -25,7 +25,7 @@ class WebViewScreen extends StatefulWidget {
 }
 
 class _WebViewScreenState extends State<WebViewScreen> {
-  static const _primary = AppColors.primary;
+  static Color get _primary => AppColors.primary;
 
   late final WebViewController _controller;
   bool _isLoading = true;
@@ -118,7 +118,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
           else
             WebViewWidget(controller: _controller),
           if (_isLoading && !_hasError)
-            const LinearProgressIndicator(
+            LinearProgressIndicator(
               minHeight: 2,
               backgroundColor: Colors.transparent,
               color: _primary,
@@ -190,11 +190,11 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: AuthService.instance,
+      animation: Listenable.merge([AuthService.instance, ThemeService.instance]),
       builder: (context, _) {
         return AuthService.instance.isLoggedIn
-            ? const _LoggedInProfile()
-            : const _LoggedOutProfile();
+            ? _LoggedInProfile()
+            : _LoggedOutProfile();
       },
     );
   }
@@ -203,7 +203,7 @@ class ProfileScreen extends StatelessWidget {
 class _LoggedOutProfile extends StatelessWidget {
   const _LoggedOutProfile();
 
-  static const _primary = AppColors.primary;
+  static Color get _primary => AppColors.primary;
   static const _bg      = Color(0xFFF5F5F3);
 
   static const String _fHead = AppFonts.heading;
@@ -331,7 +331,7 @@ class _LoggedOutProfile extends StatelessWidget {
 class _LoggedInProfile extends StatelessWidget {
   const _LoggedInProfile();
 
-  static const _primary = AppColors.primary;
+  static Color get _primary => AppColors.primary;
   static const _bg      = Color(0xFFFFFFFF);
 
   static const String _fHead = AppFonts.heading;
@@ -459,87 +459,182 @@ class _MoreSection extends StatelessWidget {
     );
   }
 
+  void _showThemeSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return AnimatedBuilder(
+          animation: ThemeService.instance,
+          builder: (context, _) {
+            final current = ThemeService.instance.mode;
+
+            Widget option(AppThemeMode mode, String label, IconData icon) {
+              final selected = current == mode;
+              return ListTile(
+                leading: Icon(
+                  icon,
+                  color: selected ? AppColors.primary : const Color(0xFF888888),
+                ),
+                title: Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: AppFonts.body,
+                    fontSize: _s(context, 15).clamp(13.0, 18.0),
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    color: selected ? AppColors.primary : const Color(0xFF333333),
+                  ),
+                ),
+                trailing: selected
+                    ? Icon(Icons.check_rounded, color: AppColors.primary)
+                    : null,
+                onTap: () {
+                  ThemeService.instance.setMode(mode);
+                  Navigator.of(sheetContext).pop();
+                },
+              );
+            }
+
+            return SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(height: _s(context, 12)),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDDDDDD),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                        _s(context, 20), _s(context, 16), _s(context, 20), _s(context, 4)),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Theme Appearance',
+                        style: TextStyle(
+                          fontFamily: AppFonts.heading,
+                          fontSize: _s(context, 18).clamp(16.0, 24.0),
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF111111),
+                        ),
+                      ),
+                    ),
+                  ),
+                  option(AppThemeMode.light, 'Light', Icons.light_mode_outlined),
+                  option(AppThemeMode.dark, 'Dark', Icons.dark_mode_outlined),
+                  option(AppThemeMode.system, 'System', Icons.settings_suggest_outlined),
+                  SizedBox(height: _s(context, 8)),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-                _s(context, 20), _s(context, 20), _s(context, 20), _s(context, 6)),
-            child: Text(
-              'More',
-              style: TextStyle(
-                fontFamily: _fHead,
-                fontSize: _s(context, 22).clamp(18.0, 30.0),
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF111111),
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) => Container(
+        color: Colors.white,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                  _s(context, 20), _s(context, 20), _s(context, 20), _s(context, 6)),
+              child: Text(
+                'More',
+                style: TextStyle(
+                  fontFamily: _fHead,
+                  fontSize: _s(context, 22).clamp(18.0, 30.0),
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF111111),
+                ),
               ),
             ),
-          ),
-          _MoreTile(
-            label: 'Data & Privacy',
-            onTap: () => _openWebView(
-              context,
-              title: 'Data & Privacy',
-              url: 'https://rookiesjeans.com/policies/privacy-policy',
-            ),
-          ),
-          _MoreTile(
-            label: 'Return & Refund Policy',
-            onTap: () => _openWebView(
-              context,
-              title: 'Return & Refund Policy',
-              url: 'https://rookiesjeans.com/policies/refund-policy',
-            ),
-          ),
-          _MoreTile(
-            label: 'Shipping Policy',
-            onTap: () => _openWebView(
-              context,
-              title: 'Shipping Policy',
-              url: 'https://rookiesjeans.com/policies/shipping-policy',
-            ),
-          ),
-          _MoreTile(
-            label: 'Store Locator',
-            onTap: () => _openWebView(
-              context,
-              title: 'Store Locator',
-              url: 'https://rookiesjeans.com/pages/store-locator',
-            ),
-          ),
-          _MoreTile(
-            label: 'Track Your Order',
-            onTap: () => _openWebView(
-              context,
-              title: 'Track Your Order',
-              url: 'https://rookiesjeans.shiprocket.co/',
-            ),
-          ),
-          if (showSignOut)
             _MoreTile(
-              label: 'Sign Out',
-              icon: Icons.logout_rounded,
-              onTap: () async {
-                await AuthService.instance.signOut();
-                if (context.mounted) context.go('/home');
-              },
+              label: 'Theme Appearance',
+              trailingText: ThemeService.instance.label,
+              onTap: () => _showThemeSheet(context),
             ),
-          SizedBox(height: _s(context, 8)),
-        ],
+            _MoreTile(
+              label: 'Data & Privacy',
+              onTap: () => _openWebView(
+                context,
+                title: 'Data & Privacy',
+                url: 'https://rookiesjeans.com/policies/privacy-policy',
+              ),
+            ),
+            _MoreTile(
+              label: 'Return & Refund Policy',
+              onTap: () => _openWebView(
+                context,
+                title: 'Return & Refund Policy',
+                url: 'https://rookiesjeans.com/policies/refund-policy',
+              ),
+            ),
+            _MoreTile(
+              label: 'Shipping Policy',
+              onTap: () => _openWebView(
+                context,
+                title: 'Shipping Policy',
+                url: 'https://rookiesjeans.com/policies/shipping-policy',
+              ),
+            ),
+            _MoreTile(
+              label: 'Store Locator',
+              onTap: () => _openWebView(
+                context,
+                title: 'Store Locator',
+                url: 'https://rookiesjeans.com/pages/store-locator',
+              ),
+            ),
+            _MoreTile(
+              label: 'Track Your Order',
+              onTap: () => _openWebView(
+                context,
+                title: 'Track Your Order',
+                url: 'https://rookiesjeans.shiprocket.co/',
+              ),
+            ),
+            if (showSignOut)
+              _MoreTile(
+                label: 'Sign Out',
+                icon: Icons.logout_rounded,
+                onTap: () async {
+                  await AuthService.instance.signOut();
+                  if (context.mounted) context.go('/home');
+                },
+              ),
+            SizedBox(height: _s(context, 8)),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _MoreTile extends StatelessWidget {
-  const _MoreTile({required this.label, required this.onTap, this.icon});
+  const _MoreTile({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.trailingText,
+  });
   final String       label;
   final VoidCallback onTap;
   final IconData?    icon;
+  final String?      trailingText;
 
   static const String _fBody = AppFonts.body;
 
@@ -571,6 +666,17 @@ class _MoreTile extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (trailingText != null) ...[
+                  Text(
+                    trailingText!,
+                    style: TextStyle(
+                      fontFamily: _fBody,
+                      fontSize: _s(context, 13).clamp(12.0, 16.0),
+                      color: const Color(0xFF999999),
+                    ),
+                  ),
+                  SizedBox(width: _s(context, 6)),
+                ],
                 Icon(Icons.chevron_right_rounded,
                     size: _s(context, 18).clamp(16.0, 24.0),
                     color: const Color(0xFFBBBBBB)),

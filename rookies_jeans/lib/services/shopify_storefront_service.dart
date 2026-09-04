@@ -94,6 +94,7 @@ class ShopifyStorefrontService {
       getBalloonBanner(),
       getLatestDropCollections(),
       getOurCollectionTiles(),
+      getExploreCategoriesContent(),
       getPromoBlocks(),
       getShopTheLookEntries(),
       getOccasionTilesContent(),
@@ -935,9 +936,13 @@ for (final e in rawVariantEdges) {
                       ... on Product {
                         id
                         title
-                        featuredImage { url }
-                        priceRange {
-                          minVariantPrice { amount currencyCode }
+                        handle
+                        priceRange { minVariantPrice { amount currencyCode } }
+                        compareAtPriceRange { minVariantPrice { amount currencyCode } }
+                        images(first: 4) { edges { node { url altText } } }
+                        options { name values optionValues { name swatch { color } } }
+                        variants(first: 10) {
+                          edges { node { id title availableForSale selectedOptions { name value } } }
                         }
                       }
                     }
@@ -1002,6 +1007,45 @@ for (final e in rawVariantEdges) {
       return tiles;
     } catch (e) {
       _log('getOccasionTilesContent EXCEPTION: $e');
+      return [];
+    }
+  }
+
+  Future<List<ExploreCategoryContent>> getExploreCategoriesContent() =>
+      _cachedFetch('exploreCategoriesContent', _fetchExploreCategoriesContent);
+
+  Future<List<ExploreCategoryContent>> _fetchExploreCategoriesContent() async {
+    const String query = r'''
+      query getExploreCategories {
+        metaobjects(type: "explore_category", first: 30) {
+          edges {
+            node {
+              id
+              image: field(key: "image") { reference { ... on MediaImage { image { url } } } }
+              label: field(key: "label") { value }
+              collection_handle: field(key: "collection_handle") { value }
+              section: field(key: "section") { value }
+              sort_order: field(key: "sort_order") { value }
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final res = await ShopifyGraphQL.post(query);
+      _log('getExploreCategoriesContent → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) return [];
+
+      final edges = (res.data!['metaobjects']['edges'] as List?) ?? [];
+      final categories = edges
+          .map((e) => ExploreCategoryContent.fromMetaobjectJson(
+              e['node'] as Map<String, dynamic>))
+          .toList();
+      categories.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      return categories;
+    } catch (e) {
+      _log('getExploreCategoriesContent EXCEPTION: $e');
       return [];
     }
   }

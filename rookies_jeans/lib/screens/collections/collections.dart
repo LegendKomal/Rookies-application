@@ -40,7 +40,9 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
             ? 240.0
             : 220.0;
 
-    return Scaffold(
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) => Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         backgroundColor: AppColors.card,
@@ -128,6 +130,7 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
             },
           ),
         ),
+      ),
       ),
     );
   }

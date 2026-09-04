@@ -16,11 +16,11 @@ class WishlistPage extends StatefulWidget {
 }
 
 class _WishlistPageState extends State<WishlistPage> {
-  static const Color primary      = AppColors.primary;
-  static const Color bgColor      = AppColors.bg;
-  static const Color cardColor    = AppColors.card;
-  static const Color secondaryTxt = AppColors.secondaryText;
-  static const Color borderColor  = AppColors.border;
+  static Color get primary      => AppColors.primary;
+  static Color get bgColor      => AppColors.bg;
+  static Color get cardColor    => AppColors.card;
+  static Color get secondaryTxt => AppColors.secondaryText;
+  static Color get borderColor  => AppColors.border;
 
   static const String _fHead = AppFonts.heading;
   static const String _fBody = AppFonts.body;
@@ -40,7 +40,9 @@ class _WishlistPageState extends State<WishlistPage> {
     final width = MediaQuery.of(context).size.width;
     final titleSize = (width * 0.09).clamp(22.0, 40.0);
 
-    return Scaffold(
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) => Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: cardColor,
@@ -110,6 +112,7 @@ class _WishlistPageState extends State<WishlistPage> {
             ),
           );
         },
+      ),
       ),
     );
   }
