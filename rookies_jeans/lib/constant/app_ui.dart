@@ -89,12 +89,26 @@ class AppColors {
 
   static Color get primary =>
       _dark ? Colors.white : const Color(ShopifyConstants.primaryColorHex);
+
+  /// Color for text/icons drawn on TOP of a [primary]-colored surface
+  /// (solid buttons, snackbars, badges). Always the inverse of [primary] so
+  /// it stays readable in both themes — [primary] itself flips from
+  /// near-black to white between light and dark, so content sitting on it
+  /// must flip the other way.
+  static Color get onPrimary => _dark ? const Color(0xFF121212) : Colors.white;
   static Color get accentOrange => const Color(ShopifyConstants.accentOrangeHex);
   static Color get bg => _dark ? const Color(0xFF121212) : const Color(ShopifyConstants.bgColorHex);
   static Color get card => _dark ? const Color(0xFF1E1E1E) : const Color(ShopifyConstants.cardColorHex);
   static Color get secondaryText =>
       _dark ? const Color(0xFFB0B0B0) : const Color(ShopifyConstants.secondaryTextHex);
   static Color get border => _dark ? const Color(0xFF2C2C2C) : const Color(ShopifyConstants.borderColorHex);
+
+  /// Background for text fields / filled inputs. Distinct from [card] so
+  /// inputs still read as "sunken" against a card in both themes.
+  static Color get fieldFill => _dark ? const Color(0xFF2A2A2A) : const Color(0xfffafafa);
+
+  /// Placeholder/hint text inside inputs and disabled-looking icons.
+  static Color get hint => _dark ? const Color(0xFF8A8A8A) : const Color(0xff9a9a9a);
 
   static const Color danger  = Color(0xFFD32F2F);
   static const Color success = Color(0xFF2E7D32);
@@ -181,15 +195,24 @@ class Responsive {
 class AppToast {
   AppToast._();
 
+  static String _toHex(Color color) =>
+      '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
+
   static void show(String message, {bool isError = false}) {
+    final bgColor = isError ? AppColors.danger : AppColors.primary;
+    final textColor = isError ? Colors.white : AppColors.onPrimary;
     Fluttertoast.showToast(
       msg: message,
       toastLength: Toast.LENGTH_SHORT,
       gravity: ToastGravity.BOTTOM,
-      backgroundColor: isError ? AppColors.danger : AppColors.primary,
-      textColor: Colors.white,
+      backgroundColor: bgColor,
+      textColor: textColor,
       fontSize: 13,
-      webBgColor: isError ? '#D32F2F' : '#1A1A1A',
+      // Web renders its own toast markup using webBgColor rather than
+      // `backgroundColor`, so it must track the same theme-aware color or
+      // `textColor` above can end up unreadable against it (e.g. near-black
+      // text on a hardcoded dark background in dark mode).
+      webBgColor: _toHex(bgColor),
       webPosition: 'center',
       timeInSecForIosWeb: 2,
     );

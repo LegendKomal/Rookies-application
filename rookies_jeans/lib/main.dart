@@ -198,6 +198,12 @@ class MyApp extends StatelessWidget {
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
             dividerColor: const Color(0xFFE7E7E7),
+            snackBarTheme: const SnackBarThemeData(
+              backgroundColor: primary,
+              contentTextStyle: TextStyle(color: Colors.white),
+              actionTextColor: Colors.white,
+              behavior: SnackBarBehavior.floating,
+            ),
           ),
           darkTheme: ThemeData(
             useMaterial3: true,
@@ -220,6 +226,12 @@ class MyApp extends StatelessWidget {
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
             dividerColor: const Color(0xFF2C2C2C),
+            snackBarTheme: const SnackBarThemeData(
+              backgroundColor: Colors.white,
+              contentTextStyle: TextStyle(color: Color(0xFF121212)),
+              actionTextColor: Color(0xFF121212),
+              behavior: SnackBarBehavior.floating,
+            ),
           ),
           routerConfig: _appRouter,
         );

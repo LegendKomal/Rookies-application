@@ -5,6 +5,7 @@ import 'package:rookies_jeans/models/product_model.dart';
 class ProductPeekDialog extends StatefulWidget {
   final ShopifyProduct product;
   final Color primary;
+  final Color onPrimary;
   final Color cardColor;
   final Color bgColor;
   final Color borderColor;
@@ -19,6 +20,7 @@ class ProductPeekDialog extends StatefulWidget {
     super.key,
     required this.product,
     required this.primary,
+    required this.onPrimary,
     required this.cardColor,
     required this.bgColor,
     required this.borderColor,
@@ -244,15 +246,15 @@ class ProductPeekDialogState extends State<ProductPeekDialog> {
                           onPageChanged: (i) => setState(() => _currentPage = i),
                           itemBuilder: (_, i) {
                             if (images.isEmpty) {
-                              return Container(color: const Color(0xFFEEEEEE));
+                              return Container(color: widget.bgColor);
                             }
                             return CachedNetworkImage(
                               imageUrl: images[i],
                               fit: BoxFit.cover,
                               placeholder: (_, __) =>
-                                  Container(color: const Color(0xFFEEEEEE)),
+                                  Container(color: widget.bgColor),
                               errorWidget: (_, __, ___) =>
-                                  Container(color: const Color(0xFFEEEEEE)),
+                                  Container(color: widget.bgColor),
                             );
                           },
                         ),
@@ -373,22 +375,23 @@ class ProductPeekDialogState extends State<ProductPeekDialog> {
                                         },
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: widget.primary,
+                                    foregroundColor: widget.onPrimary,
                                     shape: const RoundedRectangleBorder(),
                                     elevation: 0,
                                   ),
                                   child: _isAddingToCart
-                                      ? const SizedBox(
+                                      ? SizedBox(
                                           width: 18,
                                           height: 18,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            color: Colors.white,
+                                            color: widget.onPrimary,
                                           ),
                                         )
-                                      : const Text(
+                                      : Text(
                                           'ADD TO CART',
                                           style: TextStyle(
-                                            color: Colors.white,
+                                            color: widget.onPrimary,
                                             fontWeight: FontWeight.w800,
                                             fontSize: 13,
                                           ),
@@ -437,9 +440,9 @@ class ProductPeekDialogState extends State<ProductPeekDialog> {
               currencyCode: product.currencyCode,
               fontSize: 12,
               fontWeight: FontWeight.normal,
-              color: const Color(0xFF9A9A9A),
+              color: widget.secondaryTxt,
               decoration: TextDecoration.lineThrough,
-              decorationColor: const Color(0xFF9A9A9A),
+              decorationColor: widget.secondaryTxt,
             ),
           ),
         ),
@@ -522,7 +525,7 @@ class ProductPeekDialogState extends State<ProductPeekDialog> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : widget.primary,
+                    color: isSelected ? widget.onPrimary : widget.primary,
                   ),
                 ),
               ),

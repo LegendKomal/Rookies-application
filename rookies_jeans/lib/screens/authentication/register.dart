@@ -27,12 +27,14 @@ class _RegisterState extends State<Register> {
   bool acceptsMarketing        = true;
   bool isLoading               = false;
 
-  static const Color bgColor       = Color(0xfff5f5f3);
-  static const Color cardColor     = Colors.white;
+  static Color get bgColor       => AppColors.bg;
+  static Color get cardColor     => AppColors.card;
   static Color get primary       => AppColors.primary;
+  static Color get onPrimary     => AppColors.onPrimary;
   static Color get secondaryText => AppColors.secondaryText;
   static Color get borderColor   => AppColors.border;
-  static const Color fieldFill     = Color(0xfffafafa);
+  static Color get fieldFill     => AppColors.fieldFill;
+  static Color get hintColor     => AppColors.hint;
 
   static const String _fHead = AppFonts.heading;
   static const String _fBody = AppFonts.body;
@@ -63,23 +65,23 @@ class _RegisterState extends State<Register> {
       hintText: hintText,
       hintStyle: TextStyle(
         fontFamily: _fBody,
-        color: const Color(0xff9a9a9a),
+        color: hintColor,
         fontSize: _s(14.5),
         fontWeight: FontWeight.w400,
       ),
-      prefixIcon: Icon(icon, color: const Color(0xff444444), size: _s(20)),
+      prefixIcon: Icon(icon, color: secondaryText, size: _s(20)),
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: fieldFill,
       contentPadding:
           EdgeInsets.symmetric(vertical: _s(18), horizontal: _s(16)),
-      border: const OutlineInputBorder(
+      border: OutlineInputBorder(
         borderSide: BorderSide(color: borderColor),
       ),
-      enabledBorder: const OutlineInputBorder(
+      enabledBorder: OutlineInputBorder(
         borderSide: BorderSide(color: borderColor, width: 1),
       ),
-      focusedBorder: const OutlineInputBorder(
+      focusedBorder: OutlineInputBorder(
         borderSide: BorderSide(color: primary, width: 1.2),
       ),
       errorBorder: const OutlineInputBorder(
@@ -202,7 +204,7 @@ class _RegisterState extends State<Register> {
         behavior: SnackBarBehavior.floating,
         content: Text(
           message,
-          style: TextStyle(fontFamily: _fBody, color: Colors.white),
+          style: TextStyle(fontFamily: _fBody, color: onPrimary),
         ),
       ),
     );
@@ -356,7 +358,7 @@ class _RegisterState extends State<Register> {
                             isPasswordHidden
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: const Color(0xff555555),
+                            color: secondaryText,
                             size: _s(22),
                           ),
                         ),
@@ -382,7 +384,7 @@ class _RegisterState extends State<Register> {
                             isConfirmPasswordHidden
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: const Color(0xff555555),
+                            color: secondaryText,
                             size: _s(22),
                           ),
                         ),
@@ -403,7 +405,8 @@ class _RegisterState extends State<Register> {
                             child: Checkbox(
                               value: acceptsMarketing,
                               activeColor: primary,
-                              side: const BorderSide(color: borderColor),
+                              checkColor: onPrimary,
+                              side: BorderSide(color: borderColor),
                               onChanged: (v) => setState(
                                   () => acceptsMarketing = v ?? false),
                             ),
@@ -433,16 +436,16 @@ class _RegisterState extends State<Register> {
                         onPressed: isLoading ? null : _handleRegister,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primary,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: const Color(0xff2d2d2d),
+                          foregroundColor: onPrimary,
+                          disabledBackgroundColor: borderColor,
                           elevation: 0,
                         ),
                         child: isLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 22,
                                 height: 22,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2.2, color: Colors.white),
+                                    strokeWidth: 2.2, color: onPrimary),
                               )
                             : Text(
                                 "Create Account",

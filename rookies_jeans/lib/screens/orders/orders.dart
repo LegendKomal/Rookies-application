@@ -31,7 +31,7 @@ class OrdersScreen extends StatefulWidget {
 
 class _OrdersScreenState extends State<OrdersScreen> {
   static Color get _primary => AppColors.primary;
-  static const _bg      = Color(0xFFF5F5F3);
+  static Color get _bg => AppColors.bg;
 
   final _svc = ShopifyOrderService.instance;
 
@@ -60,14 +60,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final r = _R(context);
-    return Scaffold(
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) => Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.card,
         elevation: 0.5,
-        shadowColor: const Color(0xFFEEEEEE),
+        shadowColor: AppColors.border,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Color(0xFF333333)),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: _primary),
           onPressed: () => context.pop(),
         ),
         title: Text(
@@ -76,13 +78,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
             fontFamily: ShopifyConstants.fontHeading,
             fontSize: r.s(17),
             fontWeight: FontWeight.w500,
-            color: const Color(0xFF111111),
+            color: _primary,
           ),
         ),
         centerTitle: true,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: _primary, strokeWidth: 2))
+          ? Center(child: CircularProgressIndicator(color: _primary, strokeWidth: 2))
           : _errorMessage != null
               ? _ErrorState(message: _errorMessage!, onRetry: _load)
               : _orders.isEmpty
@@ -107,6 +109,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         ),
                       ),
                     ),
+      ),
     );
   }
 }
@@ -135,7 +138,7 @@ class _OrderTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.all(16),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,7 +161,7 @@ class _OrderTile extends StatelessWidget {
                       fontFamily: ShopifyConstants.fontBodyBold,
                       fontSize: r.s(14),
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF111111),
+                      color: AppColors.primary,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -167,7 +170,7 @@ class _OrderTile extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: ShopifyConstants.fontBody,
                       fontSize: r.s(12),
-                      color: const Color(0xFF888888),
+                      color: AppColors.secondaryText,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -176,7 +179,7 @@ class _OrderTile extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: ShopifyConstants.fontBody,
                       fontSize: r.s(13),
-                      color: const Color(0xFF333333),
+                      color: AppColors.primary,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -184,7 +187,7 @@ class _OrderTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFFBBBBBB), size: 20),
+            Icon(Icons.chevron_right_rounded, color: AppColors.hint, size: 20),
           ],
         ),
       ),
@@ -194,8 +197,8 @@ class _OrderTile extends StatelessWidget {
 
 Widget _imgPlaceholder(double size) => Container(
   width: size, height: size,
-  color: const Color(0xFFF0F0F0),
-  child: const Icon(Icons.image_outlined, size: 24, color: Color(0xFFBBBBBB)),
+  color: AppColors.fieldFill,
+  child: Icon(Icons.image_outlined, size: 24, color: AppColors.hint),
 );
 
 class _OrderStateBadge extends StatelessWidget {
@@ -268,23 +271,23 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 48, color: Color(0xFFBBBBBB)),
+            Icon(Icons.error_outline_rounded, size: 48, color: AppColors.hint),
             const SizedBox(height: 12),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: ShopifyConstants.fontBody,
                 fontSize: 14,
-                color: Color(0xFF666666),
+                color: AppColors.secondaryText,
               ),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: onRetry,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(ShopifyConstants.primaryColorHex),
-                foregroundColor: Colors.white,
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
                 elevation: 0,
               ),
               child: const Text('Retry', style: TextStyle(fontFamily: ShopifyConstants.fontBodyBold)),
@@ -301,20 +304,20 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.inventory_2_outlined, size: 56, color: Color(0xFFBBBBBB)),
-          SizedBox(height: 12),
+          Icon(Icons.inventory_2_outlined, size: 56, color: AppColors.hint),
+          const SizedBox(height: 12),
           Text(
             'No orders yet',
-            style: TextStyle(fontFamily: ShopifyConstants.fontHeading, fontSize: 16, color: Color(0xFF666666)),
+            style: TextStyle(fontFamily: ShopifyConstants.fontHeading, fontSize: 16, color: AppColors.secondaryText),
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Text(
             'Your order history will appear here.',
-            style: TextStyle(fontFamily: ShopifyConstants.fontBody, fontSize: 13, color: Color(0xFF999999)),
+            style: TextStyle(fontFamily: ShopifyConstants.fontBody, fontSize: 13, color: AppColors.hint),
           ),
         ],
       ),
@@ -332,6 +335,7 @@ class OrderDetailScreen extends StatefulWidget {
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   static Color get _primary => AppColors.primary;
+  static Color get _onPrimary => AppColors.onPrimary;
   final _svc = ShopifyOrderService.instance;
 
   void _openCancelPage() {
@@ -361,14 +365,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final btnHeight  = r.s(50).clamp(46.0, 60.0);
     final itemImg    = r.s(64).clamp(56.0, 88.0);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F3),
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) => Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.card,
         elevation: 0.5,
-        shadowColor: const Color(0xFFEEEEEE),
+        shadowColor: AppColors.border,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Color(0xFF333333)),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: _primary),
           onPressed: () => context.pop(),
         ),
         title: Text(
@@ -377,7 +383,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             fontFamily: ShopifyConstants.fontHeading,
             fontSize: r.s(17),
             fontWeight: FontWeight.w500,
-            color: const Color(0xFF111111),
+            color: _primary,
           ),
         ),
         centerTitle: true,
@@ -398,7 +404,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         fontFamily: ShopifyConstants.fontHeading,
                         fontSize: r.s(15),
                         fontWeight: FontWeight.w500,
-                        color: const Color(0xFF111111),
+                        color: AppColors.primary,
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -423,7 +429,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         fontFamily: ShopifyConstants.fontHeading,
                         fontSize: r.s(15),
                         fontWeight: FontWeight.w500,
-                        color: const Color(0xFF111111),
+                        color: AppColors.primary,
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -438,7 +444,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       return Column(
                         children: [
                           if (entry.key > 0)
-                            const Divider(height: 20, thickness: 1, color: Color(0xFFEEEEEE)),
+                            Divider(height: 20, thickness: 1, color: AppColors.border),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -460,7 +466,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                         fontFamily: ShopifyConstants.fontBodyBold,
                                         fontSize: r.s(13),
                                         fontWeight: FontWeight.w600,
-                                        color: const Color(0xFF222222),
+                                        color: AppColors.primary,
                                       ),
                                     ),
                                     if (optText.isNotEmpty) ...[
@@ -470,7 +476,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                         style: TextStyle(
                                           fontFamily: ShopifyConstants.fontBody,
                                           fontSize: r.s(12),
-                                          color: const Color(0xFF888888),
+                                          color: AppColors.secondaryText,
                                         ),
                                       ),
                                     ],
@@ -483,7 +489,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                           style: TextStyle(
                                             fontFamily: ShopifyConstants.fontBody,
                                             fontSize: r.s(12),
-                                            color: const Color(0xFF666666),
+                                            color: AppColors.secondaryText,
                                           ),
                                         ),
                                         if (price != null)
@@ -540,7 +546,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _primary,
-                      foregroundColor: Colors.white,
+                      foregroundColor: _onPrimary,
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
@@ -575,6 +581,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -628,7 +635,7 @@ class _SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
       ),
       padding: const EdgeInsets.all(18),
@@ -655,7 +662,7 @@ class _DetailRow extends StatelessWidget {
             style: TextStyle(
               fontFamily: ShopifyConstants.fontBody,
               fontSize: r.s(13),
-              color: const Color(0xFF888888),
+              color: AppColors.secondaryText,
             ),
           ),
           Expanded(
@@ -665,7 +672,7 @@ class _DetailRow extends StatelessWidget {
                 fontFamily: ShopifyConstants.fontBodyBold,
                 fontSize: r.s(13),
                 fontWeight: FontWeight.w600,
-                color: const Color(0xFF222222),
+                color: AppColors.primary,
               ),
             ),
           ),

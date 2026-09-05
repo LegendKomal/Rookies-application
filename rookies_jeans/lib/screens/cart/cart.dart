@@ -20,10 +20,13 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   static Color get primary      => AppColors.primary;
+  static Color get onPrimary    => AppColors.onPrimary;
   static Color get bgColor      => AppColors.bg;
   static Color get cardColor    => AppColors.card;
   static Color get secondaryTxt => AppColors.secondaryText;
   static Color get borderColor  => AppColors.border;
+  static Color get fieldFill    => AppColors.fieldFill;
+  static Color get hintColor    => AppColors.hint;
 
   static const String _fHead = AppFonts.heading;
   static const String _fBody = AppFonts.body;
@@ -252,7 +255,7 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _loadingState() => const Center(
+  Widget _loadingState() => Center(
         child: CircularProgressIndicator(color: primary),
       );
 
@@ -270,7 +273,7 @@ class _CartScreenState extends State<CartScreen> {
                     Icon(
                       Icons.shopping_bag_outlined,
                       size: _s(52),
-                      color: Colors.grey.shade300,
+                      color: hintColor,
                     ),
                     SizedBox(height: _s(14)),
                     Text(
@@ -340,19 +343,18 @@ class _CartScreenState extends State<CartScreen> {
                       ? CachedNetworkImage(
                           imageUrl: line.imageUrl!,
                           fit: BoxFit.cover,
-                          placeholder: (_, __) =>
-                              Container(color: const Color(0xFFEEEEEE)),
+                          placeholder: (_, __) => Container(color: fieldFill),
                           errorWidget: (_, __, ___) => Container(
-                            color: const Color(0xFFEEEEEE),
+                            color: fieldFill,
                             alignment: Alignment.center,
-                            child: const Icon(
+                            child: Icon(
                               Icons.image_not_supported_outlined,
                               size: 24,
-                              color: Color(0xFFBBBBBB),
+                              color: hintColor,
                             ),
                           ),
                         )
-                      : Container(color: const Color(0xFFEEEEEE)),
+                      : Container(color: fieldFill),
                 ),
               ),
             ),
@@ -404,7 +406,7 @@ class _CartScreenState extends State<CartScreen> {
                       fontFamily: _fBold,
                       fontSize: _s(11),
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFFD32F2F),
+                      color: AppColors.danger,
                     ),
                   ),
                 ],
@@ -485,7 +487,7 @@ class _CartScreenState extends State<CartScreen> {
       );
 
   Widget _checkoutBar(ShopifyCart cart) => Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: cardColor,
           border: Border(top: BorderSide(color: borderColor)),
         ),
@@ -534,6 +536,7 @@ class _CartScreenState extends State<CartScreen> {
                         : _checkout,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primary,
+                      foregroundColor: onPrimary,
                       shape: const RoundedRectangleBorder(
                           // borderRadius: BorderRadius.circular(8),
                           ),
@@ -544,12 +547,12 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                     ),
                     child: _isCheckingOut
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: onPrimary,
                             ),
                           )
                         : Text(
@@ -558,7 +561,7 @@ class _CartScreenState extends State<CartScreen> {
                               fontFamily: _fBold,
                               fontSize: _s(13),
                               fontWeight: FontWeight.w800,
-                              color: Colors.white,
+                              color: onPrimary,
                               // letterSpacing: 1.5,
                             ),
                           ),

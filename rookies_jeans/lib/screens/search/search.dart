@@ -144,7 +144,9 @@ class _SearchPageState extends State<SearchPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) => Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
         child: Center(
@@ -158,6 +160,7 @@ class _SearchPageState extends State<SearchPage>
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -557,9 +560,9 @@ class _SearchPageState extends State<SearchPage>
           style: TextStyle(
             fontFamily: _fBody,
             fontSize: _s(11).clamp(10.0, 15.0),
-            color: const Color(0xFF9A9A9A),
+            color: secondaryTxt,
             decoration: TextDecoration.lineThrough,
-            decorationColor: const Color(0xFF9A9A9A),
+            decorationColor: secondaryTxt,
           ),
         ),
       ],
@@ -575,7 +578,7 @@ class _SearchPageState extends State<SearchPage>
           final cleaned = hex.replaceAll('#', '');
           color = Color(int.parse('FF$cleaned', radix: 16));
         } catch (_) {
-          color = const Color(0xFFCCCCCC);
+          color = AppColors.border;
         }
         return Container(
           margin: EdgeInsets.only(right: _s(5)),
@@ -584,7 +587,7 @@ class _SearchPageState extends State<SearchPage>
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFFDDDDDD), width: 0.8),
+            border: Border.all(color: AppColors.border, width: 0.8),
           ),
         );
       }).toList(),

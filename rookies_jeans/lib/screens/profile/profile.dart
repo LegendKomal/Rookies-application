@@ -26,6 +26,11 @@ class WebViewScreen extends StatefulWidget {
 
 class _WebViewScreenState extends State<WebViewScreen> {
   static Color get _primary => AppColors.primary;
+  static Color get _onPrimary => AppColors.onPrimary;
+  static Color get _bg => AppColors.bg;
+  static Color get _card => AppColors.card;
+  static Color get _secondaryText => AppColors.secondaryText;
+  static Color get _border => AppColors.border;
 
   late final WebViewController _controller;
   bool _isLoading = true;
@@ -55,15 +60,15 @@ class _WebViewScreenState extends State<WebViewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: _card,
         elevation: 0.5,
-        shadowColor: const Color(0xFFEEEEEE),
+        shadowColor: _border,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded,
               size: _s(context, 18).clamp(16.0, 26.0),
-              color: const Color(0xFF333333)),
+              color: _primary),
           onPressed: () => context.pop(),
         ),
         title: Text(
@@ -73,7 +78,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
             fontFamily: ShopifyConstants.fontHeading,
             fontSize: _s(context, 17).clamp(15.0, 22.0),
             fontWeight: FontWeight.w500,
-            color: const Color(0xFF111111),
+            color: _primary,
           ),
         ),
         centerTitle: true,
@@ -89,7 +94,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   children: [
                     Icon(Icons.wifi_off_rounded,
                         size: _s(context, 48).clamp(40.0, 66.0),
-                        color: const Color(0xFFBBBBBB)),
+                        color: _secondaryText),
                     SizedBox(height: _s(context, 12)),
                     Text(
                       'Failed to load page',
@@ -97,7 +102,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       style: TextStyle(
                         fontFamily: ShopifyConstants.fontBody,
                         fontSize: _s(context, 14).clamp(13.0, 18.0),
-                        color: const Color(0xFF666666),
+                        color: _secondaryText,
                       ),
                     ),
                     SizedBox(height: _s(context, 16)),
@@ -105,7 +110,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       onPressed: () => _controller.reload(),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _primary,
-                        foregroundColor: Colors.white,
+                        foregroundColor: _onPrimary,
                         elevation: 0,
                         shape: const RoundedRectangleBorder(),
                       ),
@@ -204,7 +209,11 @@ class _LoggedOutProfile extends StatelessWidget {
   const _LoggedOutProfile();
 
   static Color get _primary => AppColors.primary;
-  static const _bg      = Color(0xFFF5F5F3);
+  static Color get _onPrimary => AppColors.onPrimary;
+  static Color get _bg => AppColors.bg;
+  static Color get _card => AppColors.card;
+  static Color get _secondaryText => AppColors.secondaryText;
+  static Color get _fieldFill => AppColors.fieldFill;
 
   static const String _fHead = AppFonts.heading;
   static const String _fBody = AppFonts.body;
@@ -236,15 +245,15 @@ class _LoggedOutProfile extends StatelessWidget {
                         fit: BoxFit.cover,
                         alignment: Alignment.topCenter,
                         errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFFE0E0E0),
+                          color: _fieldFill,
                           child: Icon(Icons.person,
                               size: _s(context, 96).clamp(72.0, 140.0),
-                              color: const Color(0xFFBBBBBB)),
+                              color: _secondaryText),
                         ),
                       ),
                     ),
                     Container(
-                      color: Colors.white,
+                      color: _card,
                       padding: EdgeInsets.fromLTRB(
                           _s(context, 24), _s(context, 28), _s(context, 24), _s(context, 28)),
                       child: Column(
@@ -267,7 +276,7 @@ class _LoggedOutProfile extends StatelessWidget {
                               onPressed: () => context.push('/login'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _primary,
-                                foregroundColor: Colors.white,
+                                foregroundColor: _onPrimary,
                                 elevation: 0,
                               ),
                               child: Text(
@@ -288,7 +297,7 @@ class _LoggedOutProfile extends StatelessWidget {
                                 style: TextStyle(
                                   fontFamily: _fBody,
                                   fontSize: _s(context, 13).clamp(12.0, 17.0),
-                                  color: const Color(0xFF666666),
+                                  color: _secondaryText,
                                 ),
                                 children: [
                                   const TextSpan(text: "Don't have an account? "),
@@ -332,7 +341,10 @@ class _LoggedInProfile extends StatelessWidget {
   const _LoggedInProfile();
 
   static Color get _primary => AppColors.primary;
-  static const _bg      = Color(0xFFFFFFFF);
+  static Color get _bg => AppColors.bg;
+  static Color get _card => AppColors.card;
+  static Color get _border => AppColors.border;
+  static Color get _fieldFill => AppColors.fieldFill;
 
   static const String _fHead = AppFonts.heading;
   static const String _fBold = AppFonts.bold;
@@ -351,7 +363,7 @@ class _LoggedInProfile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
-                    color: Colors.white,
+                    color: _card,
                     padding: EdgeInsets.fromLTRB(
                         _s(context, 24), _s(context, 40), _s(context, 24), _s(context, 32)),
                     child: Column(
@@ -360,10 +372,10 @@ class _LoggedInProfile extends StatelessWidget {
                           width: _s(context, 72).clamp(64.0, 96.0),
                           height: _s(context, 72).clamp(64.0, 96.0),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF0F0F0),
+                            color: _fieldFill,
                             shape: BoxShape.circle,
                             border: Border.all(
-                                color: const Color(0xFFE0E0E0), width: 1.5),
+                                color: _border, width: 1.5),
                           ),
                           alignment: Alignment.center,
                           child: Text(
@@ -462,7 +474,7 @@ class _MoreSection extends StatelessWidget {
   void _showThemeSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -477,7 +489,7 @@ class _MoreSection extends StatelessWidget {
               return ListTile(
                 leading: Icon(
                   icon,
-                  color: selected ? AppColors.primary : const Color(0xFF888888),
+                  color: selected ? AppColors.primary : AppColors.secondaryText,
                 ),
                 title: Text(
                   label,
@@ -485,7 +497,7 @@ class _MoreSection extends StatelessWidget {
                     fontFamily: AppFonts.body,
                     fontSize: _s(context, 15).clamp(13.0, 18.0),
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                    color: selected ? AppColors.primary : const Color(0xFF333333),
+                    color: selected ? AppColors.primary : AppColors.secondaryText,
                   ),
                 ),
                 trailing: selected
@@ -507,7 +519,7 @@ class _MoreSection extends StatelessWidget {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDDDDDD),
+                      color: AppColors.border,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -522,7 +534,7 @@ class _MoreSection extends StatelessWidget {
                           fontFamily: AppFonts.heading,
                           fontSize: _s(context, 18).clamp(16.0, 24.0),
                           fontWeight: FontWeight.w500,
-                          color: const Color(0xFF111111),
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
@@ -545,7 +557,7 @@ class _MoreSection extends StatelessWidget {
     return AnimatedBuilder(
       animation: ThemeService.instance,
       builder: (context, _) => Container(
-        color: Colors.white,
+        color: AppColors.card,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -558,7 +570,7 @@ class _MoreSection extends StatelessWidget {
                   fontFamily: _fHead,
                   fontSize: _s(context, 22).clamp(18.0, 30.0),
                   fontWeight: FontWeight.w500,
-                  color: const Color(0xFF111111),
+                  color: AppColors.primary,
                 ),
               ),
             ),
@@ -652,7 +664,7 @@ class _MoreTile extends StatelessWidget {
                 if (icon != null) ...[
                   Icon(icon,
                       size: _s(context, 18).clamp(16.0, 24.0),
-                      color: const Color(0xFF555555)),
+                      color: AppColors.secondaryText),
                   SizedBox(width: _s(context, 10)),
                 ],
                 Expanded(
@@ -661,7 +673,7 @@ class _MoreTile extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: _fBody,
                       fontSize: _s(context, 14).clamp(13.0, 18.0),
-                      color: const Color(0xFF333333),
+                      color: AppColors.primary,
                       fontWeight: FontWeight.w400,
                     ),
                   ),
@@ -672,19 +684,19 @@ class _MoreTile extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: _fBody,
                       fontSize: _s(context, 13).clamp(12.0, 16.0),
-                      color: const Color(0xFF999999),
+                      color: AppColors.hint,
                     ),
                   ),
                   SizedBox(width: _s(context, 6)),
                 ],
                 Icon(Icons.chevron_right_rounded,
                     size: _s(context, 18).clamp(16.0, 24.0),
-                    color: const Color(0xFFBBBBBB)),
+                    color: AppColors.hint),
               ],
             ),
           ),
         ),
-        const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+        Divider(height: 1, thickness: 1, color: AppColors.border),
       ],
     );
   }
@@ -733,10 +745,10 @@ class _QuickAction extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle( 
+              style: TextStyle(
                 fontFamily: _fBody,
                 fontSize: _s(context, 11).clamp(10.0, 14.0),
-                color: const Color(0xFF555555),
+                color: AppColors.secondaryText,
                 height: 1.35,
               ),
             ),

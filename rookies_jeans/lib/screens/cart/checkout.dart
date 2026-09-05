@@ -14,7 +14,9 @@ class CheckoutWebView extends StatefulWidget {
 
 class _CheckoutWebViewState extends State<CheckoutWebView> {
   static Color get primary => AppColors.primary;
+  static Color get onPrimary => AppColors.onPrimary;
   static Color get bgColor => AppColors.bg;
+  static Color get cardColor => AppColors.card;
 
   static const String _fBold = AppFonts.bold;
   static const String _fBody = AppFonts.body;
@@ -74,14 +76,14 @@ class _CheckoutWebViewState extends State<CheckoutWebView> {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           backgroundColor: primary,
           behavior: SnackBarBehavior.floating,
           content: Text(
             'Could not open payment app for this method.',
             style: TextStyle(
               fontFamily: _fBody,
-              color: Colors.white,
+              color: onPrimary,
             ),
           ),
         ),
@@ -105,7 +107,7 @@ class _CheckoutWebViewState extends State<CheckoutWebView> {
       child: Scaffold(
         backgroundColor: bgColor,
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: cardColor,
           elevation: 0,
           surfaceTintColor: Colors.transparent,
           leading: IconButton(
@@ -132,7 +134,7 @@ class _CheckoutWebViewState extends State<CheckoutWebView> {
           centerTitle: true,
           actions: [
             IconButton(
-              icon: const Icon(Icons.close_rounded, color: primary),
+              icon: Icon(Icons.close_rounded, color: primary),
               onPressed: () => Navigator.of(context).pop(false),
             ),
           ],
@@ -141,9 +143,9 @@ class _CheckoutWebViewState extends State<CheckoutWebView> {
           children: [
             WebViewWidget(controller: _controller),
             if (_isLoading)
-              const Positioned.fill(
+              Positioned.fill(
                 child: ColoredBox(
-                  color: Colors.white,
+                  color: bgColor,
                   child: Center(
                     child: CircularProgressIndicator(color: primary),
                   ),

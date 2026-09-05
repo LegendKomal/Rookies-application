@@ -12,7 +12,9 @@ class ChangePasswordScreen extends StatefulWidget {
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   static Color get primary => AppColors.primary;
-  static const Color secondaryText = Color(0xFF666666);
+  static Color get onPrimary => AppColors.onPrimary;
+  static Color get bgColor => AppColors.bg;
+  static Color get secondaryText => AppColors.secondaryText;
 
   static const String _fHead = AppFonts.heading;
   static const String _fBody = AppFonts.body;
@@ -46,9 +48,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         backgroundColor: result.success ? primary : Colors.red,
         content: Text(
           result.message ?? '',
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: _fBody,
-            color: Colors.white,
+            color: result.success ? onPrimary : Colors.white,
             fontSize: 13,
           ),
         ),
@@ -72,8 +74,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final toolbarHeight =
         (_s(context, 64)).clamp(56.0, 96.0) * media.textScaler.scale(1).clamp(1.0, 1.3);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) => Scaffold(
+      backgroundColor: bgColor,
 
       appBar: AppBar(
         elevation: 0,
@@ -157,7 +161,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             style: TextStyle(
                               fontFamily: _fBody,
                               fontSize: _s(context, 14).clamp(13.0, 18.0),
-                              color: Colors.black,
+                              color: primary,
                             ),
                             decoration: InputDecoration(
                               labelText: "Email",
@@ -200,16 +204,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                               onPressed: _loading ? null : _sendResetLink,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: primary,
-                                foregroundColor: Colors.white,
+                                foregroundColor: onPrimary,
                                 elevation: 0,
                               ),
                               child: _loading
-                                  ? const SizedBox(
+                                  ? SizedBox(
                                       width: 22,
                                       height: 22,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.white,
+                                        color: onPrimary,
                                       ),
                                     )
                                   : Text(
@@ -218,7 +222,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                         fontFamily: _fBold,
                                         fontSize: _s(context, 13).clamp(12.0, 17.0),
                                         fontWeight: FontWeight.w800,
-                                        color: Colors.white,
+                                        color: onPrimary,
                                       ),
                                     ),
                             ),
@@ -232,6 +236,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             );
           },
         ),
+      ),
       ),
     );
   }

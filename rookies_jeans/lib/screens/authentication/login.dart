@@ -22,12 +22,14 @@ class _LoginState extends State<Login> {
   bool isPasswordHidden = true;
   bool isLoading        = false;
 
-  static const Color bgColor      = Color(0xfff5f5f3);
-  static const Color cardColor    = Colors.white;
+  static Color get bgColor      => AppColors.bg;
+  static Color get cardColor    => AppColors.card;
   static Color get primary      => AppColors.primary;
+  static Color get onPrimary    => AppColors.onPrimary;
   static Color get secondaryText => AppColors.secondaryText;
   static Color get borderColor  => AppColors.border;
-  static const Color fieldFill    = Color(0xfffafafa);
+  static Color get fieldFill    => AppColors.fieldFill;
+  static Color get hintColor    => AppColors.hint;
 
   double _s(double base) =>
       Responsive.of(context, baseW: 400, maxScale: 1.3).s(base);
@@ -49,25 +51,25 @@ class _LoginState extends State<Login> {
     return InputDecoration(
       hintText: hintText,
       hintStyle: TextStyle(
-        color: const Color(0xff9a9a9a),
+        color: hintColor,
         fontSize: _s(14.5),
         fontWeight: FontWeight.w400,
       ),
-      prefixIcon: Icon(icon, color: const Color(0xff444444), size: _s(20)),
+      prefixIcon: Icon(icon, color: secondaryText, size: _s(20)),
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: fieldFill,
       contentPadding:
           EdgeInsets.symmetric(vertical: _s(18), horizontal: _s(16)),
-      border: const OutlineInputBorder(
+      border: OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: borderColor),
       ),
-      enabledBorder: const OutlineInputBorder(
+      enabledBorder: OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: borderColor, width: 1),
       ),
-      focusedBorder: const OutlineInputBorder(
+      focusedBorder: OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: primary, width: 1.2),
       ),
@@ -143,7 +145,7 @@ class _LoginState extends State<Login> {
       SnackBar(
         backgroundColor: primary,
         behavior: SnackBarBehavior.floating,
-        content: Text(message, style: const TextStyle(color: Colors.white)),
+        content: Text(message, style: TextStyle(color: onPrimary)),
       ),
     );
   }
@@ -249,7 +251,7 @@ class _LoginState extends State<Login> {
                             isPasswordHidden
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: const Color(0xff555555),
+                            color: secondaryText,
                             size: _s(22),
                           ),
                         ),
@@ -278,18 +280,18 @@ class _LoginState extends State<Login> {
                         onPressed: isLoading ? null : _handleLogin,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primary,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: const Color(0xff2d2d2d),
+                          foregroundColor: onPrimary,
+                          disabledBackgroundColor: borderColor,
                           elevation: 0,
                           // shape: RoundedRectangleBorder(
                           //     borderRadius: BorderRadius.circular(14)),
                         ),
                         child: isLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 22,
                                 height: 22,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2.2, color: Colors.white),
+                                    strokeWidth: 2.2, color: onPrimary),
                               )
                             : Text("Sign In",
                                 style: TextStyle(

@@ -21,6 +21,8 @@ class _WishlistPageState extends State<WishlistPage> {
   static Color get cardColor    => AppColors.card;
   static Color get secondaryTxt => AppColors.secondaryText;
   static Color get borderColor  => AppColors.border;
+  static Color get fieldFill    => AppColors.fieldFill;
+  static Color get hintColor    => AppColors.hint;
 
   static const String _fHead = AppFonts.heading;
   static const String _fBody = AppFonts.body;
@@ -53,7 +55,7 @@ class _WishlistPageState extends State<WishlistPage> {
         title: Row(
           children: [
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.arrow_back_ios_new_rounded,
                 size: 18,
                 color: primary,
@@ -127,7 +129,7 @@ class _WishlistPageState extends State<WishlistPage> {
             Icon(
               Icons.favorite_border_rounded,
               size: _s(70),
-              color: const Color(0xFFBDBDBD),
+              color: hintColor,
             ),
             const SizedBox(height: 16),
             Text(
@@ -160,7 +162,7 @@ class _WishlistPageState extends State<WishlistPage> {
                 style: OutlinedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   foregroundColor: primary,
-                  side: const BorderSide(color: primary, width: 1.1),
+                  side: BorderSide(color: primary, width: 1.1),
                   shape: const RoundedRectangleBorder(
                       // borderRadius: BorderRadius.circular(6),
                       ),
@@ -229,24 +231,24 @@ class _WishlistPageState extends State<WishlistPage> {
                               imageUrl: imageUrl,
                               fit: BoxFit.cover,
                               placeholder: (_, __) =>
-                                  Container(color: const Color(0xFFEEEEEE)),
+                                  Container(color: fieldFill),
                               errorWidget: (_, __, ___) => Container(
-                                color: const Color(0xFFEEEEEE),
+                                color: fieldFill,
                                 alignment: Alignment.center,
-                                child: const Icon(
+                                child: Icon(
                                   Icons.image_not_supported_outlined,
                                   size: 32,
-                                  color: Color(0xFFBBBBBB),
+                                  color: hintColor,
                                 ),
                               ),
                             )
                           : Container(
-                              color: const Color(0xFFEEEEEE),
+                              color: fieldFill,
                               alignment: Alignment.center,
-                              child: const Icon(
+                              child: Icon(
                                 Icons.image_not_supported_outlined,
                                 size: 32,
-                                color: Color(0xFFBBBBBB),
+                                color: hintColor,
                               ),
                             ),
                     ),
@@ -258,8 +260,8 @@ class _WishlistPageState extends State<WishlistPage> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 7, vertical: 3),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFD32F2F),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger,
                           // borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -342,12 +344,12 @@ class _WishlistPageState extends State<WishlistPage> {
           crossAxisAlignment: WrapCrossAlignment.center,
           spacing: 6,
           children: [
-            PriceText(_formattedCompareAtPrice(product), currencyCode: product.currencyCode, fontSize: _s(10), color: const Color(0xFF9A9A9A), amountFontFamily: _fBody, decoration: TextDecoration.lineThrough),
+            PriceText(_formattedCompareAtPrice(product), currencyCode: product.currencyCode, fontSize: _s(10), color: secondaryTxt, amountFontFamily: _fBody, decoration: TextDecoration.lineThrough),
             PriceText(_formattedPrice(product), currencyCode: product.currencyCode, fontSize: _s(12), fontWeight: FontWeight.w800, amountFontFamily: _fBold, color: primary),
           ],
         ),
         const SizedBox(height: 4),
-        SavedAmountText(saved.toString(), currencyCode: product.currencyCode, fontSize: _s(9), fontWeight: FontWeight.w600, color: const Color(0xFF2E7D32), fontFamily: _fBold),
+        SavedAmountText(saved.toString(), currencyCode: product.currencyCode, fontSize: _s(9), fontWeight: FontWeight.w600, color: AppColors.success, fontFamily: _fBold),
       ],
     );
   }

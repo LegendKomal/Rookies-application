@@ -31,10 +31,13 @@ class ProductDetailPage extends StatefulWidget {
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
   static Color get primary      => AppColors.primary;
+  static Color get onPrimary    => AppColors.onPrimary;
   static Color get bgColor      => AppColors.bg;
   static Color get cardColor    => AppColors.card;
   static Color get secondaryTxt => AppColors.secondaryText;
   static Color get borderColor  => AppColors.border;
+  static Color get fieldFill    => AppColors.fieldFill;
+  static Color get hintColor    => AppColors.hint;
 
   static const String _fHead = AppFonts.heading;
   static const String _fBody = AppFonts.body;
@@ -488,13 +491,16 @@ debugPrint('==========================================');
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) => Scaffold(
       backgroundColor: bgColor,
       body: _isLoading
           ? _loadingState()
           : _error != null
               ? _errorState()
               : _buildDetail(),
+      ),
     );
   }
 
@@ -537,10 +543,10 @@ debugPrint('==========================================');
         aspectRatio: 3 / 4,
         child: Stack(children: [
           Container(
-            color: const Color(0xFFEEEEEE),
+            color: fieldFill,
             alignment: Alignment.center,
-            child: const Icon(Icons.image_not_supported_outlined,
-                size: 52, color: Color(0xFFBBBBBB)),
+            child: Icon(Icons.image_not_supported_outlined,
+                size: 52, color: hintColor),
           ),
           _backButton(),
           _wishlistButton(),
@@ -564,12 +570,12 @@ debugPrint('==========================================');
                     imageUrl: images[i],
                     fit: BoxFit.cover,
                     placeholder: (_, __) =>
-                        Container(color: const Color(0xFFEEEEEE)),
+                        Container(color: fieldFill),
                     errorWidget: (_, __, ___) => Container(
-                      color: const Color(0xFFEEEEEE),
+                      color: fieldFill,
                       alignment: Alignment.center,
-                      child: const Icon(Icons.image_not_supported_outlined,
-                          size: 52, color: Color(0xFFBBBBBB)),
+                      child: Icon(Icons.image_not_supported_outlined,
+                          size: 52, color: hintColor),
                     ),
                   ),
                 ),
@@ -594,7 +600,7 @@ debugPrint('==========================================');
                 decoration: BoxDecoration(
                   color: _currentImageIndex == i
                       ? primary
-                      : const Color(0xFFCCCCCC),
+                      : borderColor,
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
@@ -611,7 +617,7 @@ debugPrint('==========================================');
         left: 12,
         child: GestureDetector(
           onTap: () => Navigator.pop(context),
-          child: const SizedBox(
+          child: SizedBox(
             width: 34,
             height: 34,
             child: Icon(Icons.arrow_back_ios_new_rounded,
@@ -629,8 +635,8 @@ debugPrint('==========================================');
             width: 38,
             height: 38,
             child: _isWishlistLoading
-                ? const Padding(
-                    padding: EdgeInsets.all(10),
+                ? Padding(
+                    padding: const EdgeInsets.all(10),
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: primary),
                   )
@@ -656,7 +662,7 @@ debugPrint('==========================================');
         right: 12,
         child: GestureDetector(
           onTap: _shareProduct,
-          child: const SizedBox(
+          child: SizedBox(
             width: 38,
             height: 38,
             child: Icon(
@@ -690,7 +696,7 @@ debugPrint('==========================================');
                 children: [
                   TextSpan(
                     text: '${m.label}: ',
-                    style: const TextStyle(fontFamily: _fBold, color: primary),
+                    style: TextStyle(fontFamily: _fBold, color: primary),
                   ),
                   TextSpan(text: m.formattedValue),
                 ],
@@ -875,7 +881,7 @@ debugPrint('==========================================');
               height: 34,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: hasImage ? null : (fallbackColor ?? const Color(0xFFEEEEEE)),
+                color: hasImage ? null : (fallbackColor ?? fieldFill),
                 image: hasImage
                     ? DecorationImage(
                         image: CachedNetworkImageProvider(imageUrl),
@@ -891,7 +897,7 @@ debugPrint('==========================================');
                   ? Center(
                       child: Text(
                         title.isNotEmpty ? title[0].toUpperCase() : '?',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: _fBody,
                           fontSize: 10,
                           color: primary,
@@ -981,7 +987,7 @@ _variantMetafieldsSection(),
           'Size Chart',
           style: TextStyle(fontFamily: _fBold, fontSize: _s(14), color: primary),
         ),
-        const Icon(Icons.straighten_rounded, size: 18, color: primary),
+        Icon(Icons.straighten_rounded, size: 18, color: primary),
       ],
     ),
   ),
@@ -1032,8 +1038,8 @@ const Divider(height: 1),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
-                padding: EdgeInsets.only(top: 6, right: 8),
+              Padding(
+                padding: const EdgeInsets.only(top: 6, right: 8),
                 child: Icon(Icons.circle, size: 5, color: secondaryTxt),
               ),
               Expanded(
@@ -1048,7 +1054,7 @@ const Divider(height: 1),
                     children: [
                       TextSpan(
                         text: '$label ',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: _fBold,
                           color: primary,
                         ),
@@ -1204,11 +1210,11 @@ const Divider(height: 1),
                         imageUrl: product.primaryImageUrl!,
                         fit: BoxFit.cover,
                         placeholder: (_, __) =>
-                            Container(color: const Color(0xFFEEEEEE)),
+                            Container(color: fieldFill),
                         errorWidget: (_, __, ___) =>
-                            Container(color: const Color(0xFFEEEEEE)),
+                            Container(color: fieldFill),
                       )
-                    : Container(color: const Color(0xFFEEEEEE)),
+                    : Container(color: fieldFill),
               ),
             ),
             const SizedBox(height: 7),
@@ -1242,7 +1248,7 @@ const Divider(height: 1),
         ),
         const SizedBox(width: 5),
         Flexible(
-          child: PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: _s(15), color: const Color(0xFF9A9A9A), decoration: TextDecoration.lineThrough),
+          child: PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: _s(15), color: secondaryTxt, decoration: TextDecoration.lineThrough),
         ),
       ],
     );
@@ -1298,11 +1304,11 @@ const Divider(height: 1),
                           imageUrl: product.primaryImageUrl!,
                           fit: BoxFit.cover,
                           placeholder: (_, __) =>
-                              Container(color: const Color(0xFFEEEEEE)),
+                              Container(color: fieldFill),
                           errorWidget: (_, __, ___) =>
-                              Container(color: const Color(0xFFEEEEEE)),
+                              Container(color: fieldFill),
                         )
-                      : Container(color: const Color(0xFFEEEEEE)),
+                      : Container(color: fieldFill),
                 ),
                 Positioned(
                   top: 8,
@@ -1360,7 +1366,7 @@ const Divider(height: 1),
         ),
         const SizedBox(width: 5),
         Flexible(
-          child: PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: _s(11), color: const Color(0xFF9A9A9A), amountFontFamily: _fBold, decoration: TextDecoration.lineThrough),
+          child: PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: _s(11), color: secondaryTxt, amountFontFamily: _fBold, decoration: TextDecoration.lineThrough),
         ),
       ],
     );
@@ -1379,7 +1385,7 @@ const Divider(height: 1),
           spacing: 10,
           children: [
             PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: _s(20), color: primary, amountFontFamily: _fNumber),
-            PriceText(p.formattedCompareAtPrice, currencyCode: p.currencyCode, fontSize: _s(14), color: const Color(0xFF9A9A9A), amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
+            PriceText(p.formattedCompareAtPrice, currencyCode: p.currencyCode, fontSize: _s(14), color: secondaryTxt, amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
           ],
         ),
         const SizedBox(height: 4),
@@ -1407,7 +1413,7 @@ const Divider(height: 1),
               TextSpan(text: opt.name.toUpperCase()),
               TextSpan(
                 text: ' ${_selectedOptions[opt.name] ?? ''}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: _fBody,
                   color: secondaryTxt,
                 ),
@@ -1452,7 +1458,7 @@ const Divider(height: 1),
           style: TextStyle(
             fontFamily: _fBody,
             fontSize: _s(12),
-            color: isSelected ? Colors.white : primary,
+            color: isSelected ? onPrimary : primary,
           ),
         ),
       ),
@@ -1495,7 +1501,7 @@ const Divider(height: 1),
             height: 34,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: color ?? const Color(0xFFEEEEEE),
+              color: color ?? fieldFill,
               image: imageUrl != null
                   ? DecorationImage(
                       image: CachedNetworkImageProvider(imageUrl),
@@ -1511,7 +1517,7 @@ const Divider(height: 1),
                 ? Center(
                     child: Text(
                       val.isNotEmpty ? val[0].toUpperCase() : '?',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: _fBody,
                         fontSize: 10,
                         color: primary,
@@ -1581,15 +1587,16 @@ const Divider(height: 1),
                     : _handleAddToCart,
             style: ElevatedButton.styleFrom(
               backgroundColor: primary,
-              disabledBackgroundColor: const Color(0xFFCCCCCC),
+              foregroundColor: onPrimary,
+              disabledBackgroundColor: borderColor,
               elevation: 0,
             ),
             child: _isAddingToCart
-                ? const SizedBox(
+                ? SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2, color: onPrimary),
                   )
                 : Text(
                     !inStock
@@ -1600,7 +1607,7 @@ const Divider(height: 1),
                     style: TextStyle(
                       fontFamily: _fBold,
                       fontSize: _s(13),
-                      color: Colors.white,
+                      color: onPrimary,
                     ),
                   ),
           ),
@@ -1647,17 +1654,17 @@ const Divider(height: 1),
                     imageUrl: _currentHeroImageUrl!,
                     fit: BoxFit.cover,
                     placeholder: (_, __) =>
-                        Container(color: const Color(0xFFEEEEEE)),
+                        Container(color: fieldFill),
                     errorWidget: (_, __, ___) =>
-                        Container(color: const Color(0xFFEEEEEE)),
+                        Container(color: fieldFill),
                   ),
                 )
               else
                 AspectRatio(
                   aspectRatio: 3 / 4,
-                  child: Container(color: const Color(0xFFEEEEEE)),
+                  child: Container(color: fieldFill),
                 ),
-              const Expanded(
+              Expanded(
                 child: Center(
                   child: CircularProgressIndicator(color: primary),
                 ),
@@ -1693,7 +1700,7 @@ const Divider(height: 1),
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.wifi_off_rounded,
-                    size: 52, color: Colors.grey.shade300),
+                    size: 52, color: hintColor),
                 const SizedBox(height: 14),
                 Text(
                   _error ?? 'Something went wrong.',
@@ -1714,7 +1721,7 @@ const Divider(height: 1),
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: primary,
-                    side: const BorderSide(color: primary),
+                    side: BorderSide(color: primary),
                   ),
                 ),
               ],

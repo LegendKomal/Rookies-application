@@ -51,6 +51,7 @@ class ProductsPage extends StatefulWidget {
 
 class _ProductsPageState extends State<ProductsPage> {
   static Color get primary => AppColors.primary;
+  static Color get onPrimary => AppColors.onPrimary;
   static Color get bgColor => AppColors.bg;
   static Color get cardColor => AppColors.card;
   static Color get secondaryTxt => AppColors.secondaryText;
@@ -449,7 +450,7 @@ class _ProductsPageState extends State<ProductsPage> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 9, color: primary),
+              style: TextStyle(fontSize: 9, color: primary),
             ),
           ],
         ),
@@ -473,7 +474,7 @@ class _ProductsPageState extends State<ProductsPage> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: cardColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -627,7 +628,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                 border: Border.all(
                                   color: available
                                       ? primary
-                                      : const Color(0xFFCCCCCC),
+                                      : borderColor,
                                   width: 1.2,
                                 ),
                               ),
@@ -637,10 +638,10 @@ class _ProductsPageState extends State<ProductsPage> {
                                   fontFamily: _fBold,
                                   fontSize: r.sp(13),
                                   color: selected
-                                      ? Colors.white
+                                      ? onPrimary
                                       : available
                                           ? primary
-                                          : const Color(0xFFBBBBBB),
+                                          : AppColors.hint,
                                   decoration: available
                                       ? TextDecoration.none
                                       : TextDecoration.lineThrough,
@@ -683,21 +684,21 @@ class _ProductsPageState extends State<ProductsPage> {
                                 },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primary,
-                            foregroundColor: Colors.white,
+                            foregroundColor: onPrimary,
                             disabledBackgroundColor: primary.withOpacity(0.4),
                             shape: const RoundedRectangleBorder(),
                             elevation: 0,
                           ),
                           child: isAdding
-                              ? const SizedBox(
+                              ? SizedBox(
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: Colors.white,
+                                    color: onPrimary,
                                   ),
                                 )
-                              : const Text(
+                              : Text(
                                   'ADD TO CART',
                                   style: TextStyle(
                                     fontFamily: _fBold,
@@ -720,8 +721,10 @@ class _ProductsPageState extends State<ProductsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) => Scaffold(
+      backgroundColor: bgColor,
       floatingActionButtonLocation: const _CenterFloatAboveBottomNav(),
       floatingActionButton: _floatingFilterButton(context),
       body: SafeArea(
@@ -743,6 +746,7 @@ class _ProductsPageState extends State<ProductsPage> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -773,14 +777,14 @@ class _ProductsPageState extends State<ProductsPage> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.tune_rounded, color: Colors.white, size: 16),
+                Icon(Icons.tune_rounded, color: onPrimary, size: 16),
                 const SizedBox(width: 8),
                 Text(
                   _activeFilterCount > 0
                       ? 'FILTERS ($_activeFilterCount)'
                       : 'FILTERS',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: onPrimary,
                     fontFamily: _fBody,
                     fontSize: 10,
                   ),
@@ -833,13 +837,13 @@ class _ProductsPageState extends State<ProductsPage> {
         child: InkWell(
           borderRadius: BorderRadius.circular(6),
           onTap: () => _openSortSheet(context),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.swap_vert_rounded, size: 17, color: primary),
-                SizedBox(width: 4),
+                const SizedBox(width: 4),
                 Text(
                   'SORT',
                   style: TextStyle(
@@ -904,8 +908,8 @@ class _ProductsPageState extends State<ProductsPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -918,7 +922,7 @@ class _ProductsPageState extends State<ProductsPage> {
                     ),
                   ),
                 ),
-                const Divider(height: 1, color: borderColor),
+                Divider(height: 1, color: borderColor),
                 Flexible(
                   child: ListView(
                     shrinkWrap: true,
@@ -936,7 +940,7 @@ class _ProductsPageState extends State<ProductsPage> {
                           ),
                         ),
                         trailing: isSelected
-                            ? const Icon(Icons.check_rounded, color: primary)
+                            ? Icon(Icons.check_rounded, color: primary)
                             : null,
                         onTap: () {
                           Navigator.pop(sheetContext);
@@ -978,7 +982,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 draft.values.fold<int>(0, (sum, s) => sum + s.length);
 
             if (_visibleFilters.isEmpty) {
-              return const SafeArea(
+              return SafeArea(
                 child: SizedBox(
                   height: 320,
                   child: Center(
@@ -1021,7 +1025,7 @@ class _ProductsPageState extends State<ProductsPage> {
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                         child: Row(
                           children: [
-                            const Text(
+                            Text(
                               'Filters',
                               style: TextStyle(
                                 fontFamily: _fBody,
@@ -1038,7 +1042,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                         draft.clear();
                                       });
                                     },
-                              child: const Text(
+                              child: Text(
                                 'Clear All',
                                 style: TextStyle(
                                   fontSize: 12,
@@ -1050,7 +1054,7 @@ class _ProductsPageState extends State<ProductsPage> {
                           ],
                         ),
                       ),
-                      const Divider(height: 1, color: borderColor),
+                      Divider(height: 1, color: borderColor),
                       Expanded(
                         child: Row(
                           children: [
@@ -1123,8 +1127,8 @@ class _ProductsPageState extends State<ProductsPage> {
                                               ),
                                               child: Text(
                                                 '$count',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
+                                                style: TextStyle(
+                                                  color: onPrimary,
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.w700,
                                                 ),
@@ -1147,7 +1151,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                   children: [
                                     Text(
                                       activeFilter.label,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w700,
                                         color: primary,
@@ -1165,9 +1169,9 @@ class _ProductsPageState extends State<ProductsPage> {
                                               itemCount: visibleValues.length +
                                                   (canShowMore ? 1 : 0),
                                               separatorBuilder: (_, __) =>
-                                                  const Divider(
+                                                  Divider(
                                                 height: 1,
-                                                color: Color(0xFFF1F1F1),
+                                                color: borderColor,
                                               ),
                                               itemBuilder: (context, index) {
                                                 if (canShowMore &&
@@ -1191,7 +1195,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                                         isExpanded
                                                             ? 'Show less'
                                                             : 'Show more',
-                                                        style: const TextStyle(
+                                                        style: TextStyle(
                                                           fontSize: 12,
                                                           fontWeight:
                                                               FontWeight.w700,
@@ -1250,14 +1254,15 @@ class _ProductsPageState extends State<ProductsPage> {
                                                                         4),
                                                             color: isSelected
                                                                 ? primary
-                                                                : Colors.white,
+                                                                : Colors
+                                                                    .transparent,
                                                           ),
                                                           child: isSelected
-                                                              ? const Icon(
+                                                              ? Icon(
                                                                   Icons.check,
                                                                   size: 13,
-                                                                  color: Colors
-                                                                      .white,
+                                                                  color:
+                                                                      onPrimary,
                                                                 )
                                                               : null,
                                                         ),
@@ -1266,8 +1271,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                                         Expanded(
                                                           child: Text(
                                                             value.label,
-                                                            style:
-                                                                const TextStyle(
+                                                            style: TextStyle(
                                                               fontSize: 12,
                                                               color: primary,
                                                               fontWeight:
@@ -1279,8 +1283,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                                         if (value.count > 0)
                                                           Text(
                                                             '${value.count}',
-                                                            style:
-                                                                const TextStyle(
+                                                            style: TextStyle(
                                                               fontSize: 11,
                                                               color:
                                                                   secondaryTxt,
@@ -1302,7 +1305,7 @@ class _ProductsPageState extends State<ProductsPage> {
                       ),
                       Container(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           color: cardColor,
                           border: Border(
                             top: BorderSide(color: borderColor),
@@ -1318,13 +1321,13 @@ class _ProductsPageState extends State<ProductsPage> {
                                   });
                                 },
                                 style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: primary),
+                                  side: BorderSide(color: primary),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   minimumSize: const Size.fromHeight(46),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'Clear',
                                   style: TextStyle(
                                     color: primary,
@@ -1343,6 +1346,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: primary,
+                                  foregroundColor: onPrimary,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(6),
                                   ),
@@ -1352,8 +1356,8 @@ class _ProductsPageState extends State<ProductsPage> {
                                   draftActiveCount > 0
                                       ? 'Apply ($draftActiveCount)'
                                       : 'Apply',
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: onPrimary,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -1382,9 +1386,9 @@ class _ProductsPageState extends State<ProductsPage> {
 
     return ListView.separated(
       itemCount: _priceOptions.length,
-      separatorBuilder: (_, __) => const Divider(
+      separatorBuilder: (_, __) => Divider(
         height: 1,
-        color: Color(0xFFF1F1F1),
+        color: borderColor,
       ),
       itemBuilder: (context, index) {
         final option = _priceOptions[index];
@@ -1413,13 +1417,13 @@ class _ProductsPageState extends State<ProductsPage> {
                       color: isSelected ? primary : borderColor,
                     ),
                     borderRadius: BorderRadius.circular(4),
-                    color: isSelected ? primary : Colors.white,
+                    color: isSelected ? primary : cardColor,
                   ),
                   child: isSelected
-                      ? const Icon(
+                      ? Icon(
                           Icons.check,
                           size: 13,
-                          color: Colors.white,
+                          color: onPrimary,
                         )
                       : null,
                 ),
@@ -1590,16 +1594,13 @@ class _ProductsPageState extends State<ProductsPage> {
                         itemCount: images.length,
                         itemBuilder: (_, idx) {
                           final url = images[idx];
-                          return url != null
-                              ? CachedNetworkImage(
-                                  imageUrl: url,
-                                  fit: BoxFit.cover,
-                                  placeholder: (_, __) =>
-                                      Container(color: const Color(0xFFEEEEEE)),
-                                  errorWidget: (_, __, ___) =>
-                                      _imagePlaceholder(),
-                                )
-                              : _imagePlaceholder();
+                          return CachedNetworkImage(
+                            imageUrl: url,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) =>
+                                Container(color: const Color(0xFFEEEEEE)),
+                            errorWidget: (_, __, ___) => _imagePlaceholder(),
+                          );
                         },
                       )
                     else
@@ -1608,7 +1609,7 @@ class _ProductsPageState extends State<ProductsPage> {
                               imageUrl: product.primaryImageUrl!,
                               fit: BoxFit.cover,
                               placeholder: (_, __) =>
-                                  Container(color: const Color(0xFFEEEEEE)),
+                                  Container(color: AppColors.fieldFill),
                               errorWidget: (_, __, ___) => _imagePlaceholder(),
                             )
                           : _imagePlaceholder()),
@@ -1660,7 +1661,7 @@ class _ProductsPageState extends State<ProductsPage> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     softWrap: false,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: _fBodyBold,
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
@@ -1701,6 +1702,7 @@ class _ProductsPageState extends State<ProductsPage> {
             child: ProductPeekDialog(
               product: product,
               primary: primary,
+              onPrimary: AppColors.onPrimary,
               cardColor: cardColor,
               bgColor: bgColor,
               borderColor: borderColor,
@@ -1833,9 +1835,9 @@ class _ProductsPageState extends State<ProductsPage> {
                         shape: const RoundedRectangleBorder(),
                         padding: EdgeInsets.zero,
                         backgroundColor: Colors.transparent,
-                        foregroundColor: isFilling ? Colors.white : primary,
+                        foregroundColor: isFilling ? onPrimary : primary,
                         disabledForegroundColor:
-                            isFilling ? Colors.white : primary,
+                            isFilling ? onPrimary : primary,
                       ),
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
@@ -1845,7 +1847,7 @@ class _ProductsPageState extends State<ProductsPage> {
                             fontFamily: _fBodyBold,
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
-                            color: isFilling ? Colors.white : primary,
+                            color: isFilling ? onPrimary : primary,
                           ),
                         ),
                       ),
@@ -1861,11 +1863,11 @@ class _ProductsPageState extends State<ProductsPage> {
   }
 
   Widget _imagePlaceholder() => Container(
-        color: const Color(0xFFEEEEEE),
+        color: AppColors.fieldFill,
         alignment: Alignment.center,
-        child: const Icon(
+        child: Icon(
           Icons.image_not_supported_outlined,
-          color: Color(0xFFBBBBBB),
+          color: AppColors.hint,
           size: 32,
         ),
       );
@@ -1983,7 +1985,7 @@ class _ProductsPageState extends State<ProductsPage> {
             Icon(
               Icons.inventory_2_outlined,
               size: 52,
-              color: Colors.grey.shade300,
+              color: AppColors.hint,
             ),
             const SizedBox(height: 14),
             Text(
@@ -2053,7 +2055,7 @@ class _ProductsPageState extends State<ProductsPage> {
       ),
       itemBuilder: (_, __) => Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFE0E0E0),
+          color: AppColors.fieldFill,
         ),
       ),
     );

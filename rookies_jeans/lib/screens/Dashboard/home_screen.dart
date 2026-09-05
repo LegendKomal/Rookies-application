@@ -25,7 +25,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   static Color get primary      => AppColors.primary;
+  static Color get onPrimary    => AppColors.onPrimary;
   static Color get bgColor      => AppColors.bg;
+  static Color get cardColor    => AppColors.card;
+  static Color get borderColor  => AppColors.border;
   static Color get secondaryTxt => AppColors.secondaryText;
   static const String _fHead   = AppFonts.heading;
   static const String _fBody   = AppFonts.body;
@@ -534,14 +537,14 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                                   _primaryHeroBanner?.ctaLabel ?? 'Shop now',
                                   style: TextStyle(
                                     fontFamily: _fBold,
-                                    color: primary,
+                                    color: Colors.black,
                                     fontSize: r.sp(13),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 SizedBox(width: r.dp(6)),
                                 Icon(Icons.arrow_forward_rounded,
-                                    size: r.dp(16), color: primary),
+                                    size: r.dp(16), color: Colors.black),
                               ],
                             ),
                           ),
@@ -818,8 +821,9 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: products.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
+              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent:
+                    r.isDesktop ? 260 : (r.isTablet ? 240 : 200),
                 mainAxisSpacing: r.dp(16),
                 crossAxisSpacing: r.dp(12),
                 childAspectRatio: 0.62,
@@ -836,7 +840,7 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                 width: double.infinity,
                 padding: EdgeInsets.symmetric(vertical: r.dp(14)),
                 decoration: BoxDecoration(
-                  color: Colors.black,
+                  color: primary,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 alignment: Alignment.center,
@@ -844,16 +848,16 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                     ? SizedBox(
                         width: r.dp(18),
                         height: r.dp(18),
-                        child: const CircularProgressIndicator(
+                        child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: onPrimary,
                         ),
                       )
                     : Text(
                         'Show More',
                         style: TextStyle(
                           fontFamily: _fBold,
-                          color: Colors.white,
+                          color: onPrimary,
                           fontSize: r.sp(13),
                           fontWeight: FontWeight.w600,
                         ),
@@ -879,8 +883,8 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: r.dp(14), vertical: r.dp(9)),
         decoration: BoxDecoration(
-          color: selected ? Colors.black : Colors.white,
-          border: Border.all(color: Colors.black, width: 1),
+          color: selected ? primary : cardColor,
+          border: Border.all(color: primary, width: 1),
           borderRadius: BorderRadius.circular(30),
         ),
         child: Text(
@@ -889,7 +893,7 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
             fontFamily: _fBold,
             fontSize: r.sp(11),
             fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : Colors.black,
+            color: selected ? onPrimary : primary,
           ),
         ),
       ),
@@ -905,7 +909,7 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
             fit: StackFit.expand,
             children: [
               Container(
-                color: const Color(0xFFECECEC),
+                color: AppColors.fieldFill,
                 child: product.imageUrl != null
                     ? CachedNetworkImage(
                         imageUrl: product.imageUrl!,
@@ -1018,8 +1022,12 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
           final double remainingForRows = (usable - heroHeight).clamp(0.0, usable);
           double productRowHeight =
               maxProducts > 0 ? remainingForRows / maxProducts : 0.0;
-          if (maxProducts > 0 && productRowHeight < 108.0) {
-            productRowHeight = 108.0;
+          // Must stay >= the row's own content height (the r.dp(88) product
+          // image plus padding) or the row overflows on screens where
+          // widthScale pushes r.dp(88) past an unscaled minimum.
+          final double minRowHeight = r.dp(108);
+          if (maxProducts > 0 && productRowHeight < minRowHeight) {
+            productRowHeight = minRowHeight;
           }
 
           final double cardHeight =
@@ -1266,14 +1274,18 @@ Widget _instagramBlock(_InstagramPost post, double size, R r) {
           SizedBox(height: r.dp(16)),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-            child: GridView.count(
-              crossAxisCount: 2,
+            child: GridView.builder(
+              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent:
+                    r.isDesktop ? 260 : (r.isTablet ? 240 : 200),
+                crossAxisSpacing: r.dp(12),
+                mainAxisSpacing: r.dp(16),
+                childAspectRatio: 0.62,
+              ),
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: r.dp(12),
-              mainAxisSpacing: r.dp(16),
-              childAspectRatio: 0.62,
-              children: List.generate(4, (_) => _ShimmerBox(height: double.infinity)),
+              itemCount: r.isDesktop ? 10 : (r.isTablet ? 6 : 4),
+              itemBuilder: (_, __) => _ShimmerBox(height: double.infinity),
             ),
           ),
         ],
@@ -1590,6 +1602,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
             child: ProductPeekDialog(
               product: product,
               primary: AppColors.primary,
+              onPrimary: AppColors.onPrimary,
               cardColor: AppColors.card,
               bgColor: AppColors.bg,
               borderColor: AppColors.border,
@@ -1628,7 +1641,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
     final r = R.of(context);
 
     if (widget.outfits.isEmpty) {
-      return Container(color: const Color(0xFF555555));
+      return Container(color: AppColors.fieldFill);
     }
 
     return PageView.builder(
@@ -1639,7 +1652,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
         final outfit = widget.outfits[i];
         return Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.card,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.08),
@@ -1658,17 +1671,17 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                   fit: StackFit.expand,
                   children: [
                     ColoredBox(
-                      color: Colors.white,
+                      color: AppColors.card,
                       child: outfit.imageUrl != null
                           ? CachedNetworkImage(
                               imageUrl: outfit.imageUrl!,
                               fit: BoxFit.contain,
                               placeholder: (_, __) =>
-                                  Container(color: const Color(0xFF555555)),
+                                  Container(color: AppColors.fieldFill),
                               errorWidget: (_, __, ___) =>
-                                  Container(color: const Color(0xFF555555)),
+                                  Container(color: AppColors.fieldFill),
                             )
-                          : Container(color: const Color(0xFF555555)),
+                          : Container(color: AppColors.fieldFill),
                     ),
                     DecoratedBox(
                       decoration: BoxDecoration(
@@ -1719,7 +1732,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                       decoration: BoxDecoration(
                         border: Border(
                           top: BorderSide(
-                            color: const Color(0xFFEDEDED),
+                            color: AppColors.border,
                             width: 1,
                           ),
                         ),
@@ -1730,7 +1743,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                           Container(
                             width: r.dp(88),
                             height: r.dp(88),
-                            color: const Color(0xFFECECEC),
+                            color: AppColors.fieldFill,
                             child: item.imageUrl != null
                                 ? CachedNetworkImage(
                                     imageUrl: item.imageUrl!,
@@ -1837,21 +1850,19 @@ class _ShimmerBoxState extends State<_ShimmerBox>
         animation: _controller,
         builder: (context, _) {
           final double t = _controller.value;
+          final base = AppColors.fieldFill;
+          final highlight = Color.lerp(AppColors.fieldFill, AppColors.card, 0.6)!;
           return ShaderMask(
             shaderCallback: (rect) => LinearGradient(
               begin: Alignment(-1 - t * 2, 0),
               end: Alignment(1 - t * 2, 0),
-              colors: const [
-                Color(0xFFE7E7E7),
-                Color(0xFFF6F6F6),
-                Color(0xFFE7E7E7),
-              ],
+              colors: [base, highlight, base],
               stops: const [0.35, 0.5, 0.65],
             ).createShader(rect),
             child: Container(
               height: widget.height,
               width: widget.width,
-              color: const Color(0xFFE7E7E7),
+              color: base,
             ),
           );
         },

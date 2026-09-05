@@ -33,7 +33,6 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final titleSize = (width * 0.09).clamp(20.0, 40.0);
-    final toolbarHeight = (titleSize + 50).clamp(72.0, 104.0);
     final maxTileExtent = width >= 1024
         ? 260.0
         : width >= 600
@@ -53,7 +52,7 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
         title: Row(
           children: [
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.arrow_back_ios_new_rounded,
                 size: 18,
                 color: AppColors.primary,
@@ -237,7 +236,7 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 40, color: Colors.grey),
+            Icon(Icons.error_outline, size: 40, color: AppColors.secondaryText),
             const SizedBox(height: 12),
             const Text(
               'Something went wrong loading categories.',

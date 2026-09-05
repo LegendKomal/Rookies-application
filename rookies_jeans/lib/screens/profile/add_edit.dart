@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/address_model.dart';
 import 'package:rookies_jeans/services/address_service.dart';
@@ -15,12 +14,15 @@ class AddEditAddressScreen extends StatefulWidget {
 }
 
 class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
-  static Color get _primary => AppColors.primary;
-  static const _bg      = Color(0xFFF5F5F3);
-  static Color get _border  => AppColors.border;
-  static const _hint    = Color(0xFFAAAAAA);
-  static const _label   = Color(0xFF888888);
-  static const _text    = Color(0xFF111111);
+  static Color get _primary   => AppColors.primary;
+  static Color get _onPrimary => AppColors.onPrimary;
+  static Color get _bg        => AppColors.bg;
+  static Color get _card      => AppColors.card;
+  static Color get _fieldFill => AppColors.fieldFill;
+  static Color get _border    => AppColors.border;
+  static Color get _hint       => AppColors.hint;
+  static Color get _label      => AppColors.secondaryText;
+  static Color get _text       => AppColors.primary;
 
   static const _fHead = AppFonts.heading;
   static const _fBody = AppFonts.body;
@@ -106,8 +108,11 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error, style: const TextStyle(fontFamily: _fBody)),
-          backgroundColor: const Color(0xFFD32F2F),
+          content: Text(
+            error,
+            style: const TextStyle(fontFamily: _fBody, color: Colors.white),
+          ),
+          backgroundColor: AppColors.danger,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -118,10 +123,12 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) => Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: const Color(ShopifyConstants.bgColorHex),
+        backgroundColor: _bg,
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
@@ -133,20 +140,20 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
             children: [
               GestureDetector(
                 onTap: () => Navigator.of(context).pop(false),
-                child: const Icon(
+                child: Icon(
                   Icons.arrow_back_ios_new,
                   size: 22,
-                  color: Color(ShopifyConstants.primaryColorHex),
+                  color: _primary,
                 ),
               ),
               const SizedBox(width: 10),
               Text(
                 _isEditing ? 'EDIT ADDRESS' : 'ADD ADDRESS',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 34,
                   height: 1,
                   fontFamily: _fHead,
-                  color: Color(ShopifyConstants.primaryColorHex),
+                  color: _primary,
                 ),
               ),
             ],
@@ -255,7 +262,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
             ),
             const SizedBox(height: 24),
             Container(
-              color: Colors.white,
+              color: _card,
               child: InkWell(
                 onTap: () => setState(() => _setAsDefault = !_setAsDefault),
                 child: Padding(
@@ -265,7 +272,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             Text(
                               'Set as default address',
                               style: TextStyle(
@@ -275,7 +282,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                                 color: _text,
                               ),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
                               'This address will be pre-selected at checkout',
                               style: TextStyle(
@@ -302,9 +309,9 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
       ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+        decoration: BoxDecoration(
+          color: _card,
+          border: Border(top: BorderSide(color: _border)),
         ),
         child: SafeArea(
           top: false,
@@ -314,16 +321,16 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
               onPressed: _isSaving ? null : _save,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primary,
-                foregroundColor: Colors.white,
+                foregroundColor: _onPrimary,
                 elevation: 0,
                 shape: const RoundedRectangleBorder(),
               ),
               child: _isSaving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2, color: _onPrimary),
                     )
                   : Text(
                       _isEditing ? 'Save Changes' : 'Add Address',
@@ -337,6 +344,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -344,7 +352,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(
           label.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: _fBold,
             fontSize: 10,
             fontWeight: FontWeight.w700,
@@ -368,16 +376,16 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
         textCapitalization: textCapitalization,
         inputFormatters: inputFormatters,
         validator: validator,
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: _fBody,
           fontSize: 14,
           color: _text,
         ),
         decoration: InputDecoration(
           filled: true,
-          fillColor: Colors.white,
+          fillColor: _fieldFill,
           hintText: hint,
-          hintStyle: const TextStyle(
+          hintStyle: TextStyle(
             fontFamily: _fBody,
             fontSize: 14,
             color: _hint,

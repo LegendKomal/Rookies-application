@@ -16,12 +16,14 @@ class _ForgotPasswordState extends State<ForgotPassword> {
   bool isLoading = false;
   bool emailSent = false;
 
-  static const Color bgColor = Color(0xfff5f5f3);
-  static const Color cardColor = Colors.white;
+  static Color get bgColor => AppColors.bg;
+  static Color get cardColor => AppColors.card;
   static Color get primary => AppColors.primary;
+  static Color get onPrimary => AppColors.onPrimary;
   static Color get secondaryText => AppColors.secondaryText;
   static Color get borderColor => AppColors.border;
-  static const Color fieldFill = Color(0xfffafafa);
+  static Color get fieldFill => AppColors.fieldFill;
+  static Color get hintColor => AppColors.hint;
 
   double _s(double base) =>
       Responsive.of(context, baseW: 400, maxScale: 1.3).s(base);
@@ -41,28 +43,28 @@ class _ForgotPasswordState extends State<ForgotPassword> {
     return InputDecoration(
       hintText: hintText,
       hintStyle: TextStyle(
-        color: const Color(0xff9a9a9a),
+        color: hintColor,
         fontSize: _s(14.5),
         fontWeight: FontWeight.w400,
       ),
       prefixIcon: Icon(
         icon,
-        color: const Color(0xff444444),
+        color: secondaryText,
         size: _s(20),
       ),
       filled: true,
       fillColor: fieldFill,
       contentPadding:
           EdgeInsets.symmetric(vertical: _s(18), horizontal: _s(16)),
-      border: const OutlineInputBorder(
+      border: OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: borderColor),
       ),
-      enabledBorder: const OutlineInputBorder(
+      enabledBorder: OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: borderColor, width: 1),
       ),
-      focusedBorder: const OutlineInputBorder(
+      focusedBorder: OutlineInputBorder(
         // borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: primary, width: 1.2),
       ),
@@ -131,7 +133,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
         behavior: SnackBarBehavior.floating,
         content: Text(
           message,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: onPrimary),
         ),
       ),
     );
@@ -256,20 +258,20 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                           onPressed: isLoading ? null : _handleSendResetLink,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primary,
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor: const Color(0xff2d2d2d),
+                            foregroundColor: onPrimary,
+                            disabledBackgroundColor: borderColor,
                             elevation: 0,
                             shape: const RoundedRectangleBorder(
                                 // borderRadius: BorderRadius.circular(14),
                                 ),
                           ),
                           child: isLoading
-                              ? const SizedBox(
+                              ? SizedBox(
                                   width: 22,
                                   height: 22,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2.2,
-                                    color: Colors.white,
+                                    color: onPrimary,
                                   ),
                                 )
                               : Text(
@@ -292,7 +294,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                           },
                           style: OutlinedButton.styleFrom(
                             foregroundColor: primary,
-                            side: const BorderSide(color: borderColor),
+                            side: BorderSide(color: borderColor),
                             shape: const RoundedRectangleBorder(
                                 // borderRadius: BorderRadius.circular(14),
                                 ),
@@ -314,7 +316,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                           onPressed: () => Navigator.of(context).maybePop(),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primary,
-                            foregroundColor: Colors.white,
+                            foregroundColor: onPrimary,
                             elevation: 0,
                             shape: const RoundedRectangleBorder(
                                 // borderRadius: BorderRadius.circular(14),
