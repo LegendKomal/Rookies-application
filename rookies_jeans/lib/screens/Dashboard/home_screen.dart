@@ -24,12 +24,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static Color get primary      => AppColors.primary;
-  static Color get onPrimary    => AppColors.onPrimary;
-  static Color get bgColor      => AppColors.bg;
-  static Color get cardColor    => AppColors.card;
-  static Color get borderColor  => AppColors.border;
-  static Color get secondaryTxt => AppColors.secondaryText;
+  static final Color primary      = AppColors.primary;
+  static final Color bgColor      = AppColors.bg;
+  static final Color secondaryTxt = AppColors.secondaryText;
   static const String _fHead   = AppFonts.heading;
   static const String _fBody   = AppFonts.body;
   static const String _fBold   = AppFonts.bold;
@@ -72,6 +69,69 @@ class _HomeScreenState extends State<HomeScreen> {
     _CollectionTab.sale: true,
   };
   bool _isLoadingCollectionProducts = false;
+
+  final List<_ShopTheLookOutfit> _defaultShopTheLookOutfits = const [
+    _ShopTheLookOutfit(
+      imageAsset: 'assets/shop_the_look_outfit_1.jpg',
+      products: [
+        _ShopTheLookProduct(
+          title: 'Black 100% Cotton Full Sleeve Oversized Solid Shirt',
+          price: '₹ 1,899',
+          imageAsset: 'assets/shop_the_look_item_1.jpg',
+        ),
+        _ShopTheLookProduct(
+          title: 'White Balloon Fit Stretch Cargo Pants',
+          price: '₹ 2,199',
+          imageAsset: 'assets/shop_the_look_item_2.jpg',
+        ),
+      ],
+    ),
+    _ShopTheLookOutfit(
+      imageAsset: 'assets/shop_the_look_outfit_2.jpg',
+      products: [
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_1.jpg',
+        ),
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_2.jpg',
+        ),
+      ],
+    ),
+    _ShopTheLookOutfit(
+      imageAsset: 'assets/shop_the_look_outfit_3.jpg',
+      products: [
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_3.jpg',
+        ),
+      ],
+    ),
+    _ShopTheLookOutfit(
+      imageAsset: 'assets/shop_the_look_outfit_4.jpg',
+      products: [
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_1.jpg',
+        ),
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_2.jpg',
+        ),
+        _ShopTheLookProduct(
+          title: 'Product title',
+          price: '₹ 20',
+          imageAsset: 'assets/shop_the_look_item_3.jpg',
+        ),
+      ],
+    ),
+  ];
 
   Future<void> _loadMoreCollectionProducts(_CollectionTab tab) async {
     if (_isLoadingCollectionProducts) return;
@@ -165,6 +225,88 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  final List<_OccasionTile> _defaultOccasionTiles = const [
+    _OccasionTile(
+      imageAsset: 'assets/jeans_jann.jpeg',
+      handle: 'jeans-jann',
+    ),
+    _OccasionTile(
+      imageAsset: 'assets/jeans_jesse.jpeg',
+      handle: 'jeans-jesse',
+    ),
+    _OccasionTile(
+      imageAsset: 'assets/jeans_lennon.jpeg',
+      handle: 'jeans-lennon',
+    ),
+    _OccasionTile(
+      imageAsset: 'assets/jeans_mojo.jpeg',
+      handle: 'jeans-mojo',
+    ),
+    _OccasionTile(
+      imageAsset: 'assets/jeans_nikki.jpeg',
+      handle: 'jeans-nikki',
+    ),
+    _OccasionTile(
+      imageAsset: 'assets/jeans_springsteen.jpeg',
+      handle: 'jeans-springsteen',
+    ),
+  ];
+
+  final List<_InstagramPost> _defaultInstagramPosts = const [
+    _InstagramPost(
+      imageAsset: 'assets/instagram_1.jpg',
+      postUrl: 'https://www.instagram.com/rookiesjeans/p/Dcd6aaiBeAo/',
+      username: 'rookiesjeans',
+    ),
+    _InstagramPost(
+      imageAsset: 'assets/instagram_2.jpg',
+      postUrl: 'https://www.instagram.com/rookiesjeans/p/DcbUohJhPWG/',
+      username: 'rookiesjeans',
+    ),
+    _InstagramPost(
+      imageAsset: 'assets/instagram_3.jpg',
+      postUrl: 'https://www.instagram.com/rookiesjeans/p/DcGW_51ibkB/',
+      username: 'rookiesjeans',
+    ),
+    _InstagramPost(
+      imageAsset: 'assets/instagram_4.jpg',
+      postUrl: 'https://www.instagram.com/rookiesjeans/p/DcOSq1EFKPf/',
+      username: 'rookiesjeans',
+    ),
+    _InstagramPost(
+      imageAsset: 'assets/instagram_5.jpg',
+      postUrl: 'https://www.instagram.com/rookiesjeans/p/DcTf3nQEcMS/',
+      username: 'rookiesjeans',
+    ),
+  ];
+
+  final List<_PromoBlockData> _defaultPromoBlocks = const [
+    _PromoBlockData(
+      assetPath: 'assets/denim.png',
+      label: 'Denim',
+      buttonLabel: 'Shop Denim',
+      collectionHandle: 'JEANS',
+    ),
+    _PromoBlockData(
+      assetPath: 'assets/cargo.png',
+      label: 'Cargos',
+      buttonLabel: 'Shop Cargos',
+      collectionHandle: 'CARGOS',
+    ),
+    // _PromoBlockData(
+    //   assetPath: 'assets/shoes.jpg',
+    //   label: 'Shoes',
+    //   buttonLabel: 'Shop Shoes',
+    //   collectionHandle: 'shoes',P
+    // ),
+    // _PromoBlockData(
+    //   assetPath: 'assets/accessories.jpg',
+    //   label: 'Accessories',
+    //   buttonLabel: 'Shop Accessories',
+    //   collectionHandle: 'accessories',
+    // ),
+  ];
+
   String? get _heroBannerImageUrl {
     for (final banner in _heroBanners) {
       if (banner.imageUrl != null) return banner.imageUrl;
@@ -186,9 +328,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<_PromoBlockData> get _promoBlocksToDisplay {
-    if (_promoBlocksContent.isEmpty) return const [];
+    if (_promoBlocksContent.isEmpty) return _defaultPromoBlocks;
     return _promoBlocksContent
         .map((p) => _PromoBlockData(
+              assetPath: null,
               imageUrl: p.imageUrl,
               label: p.label,
               buttonLabel: p.buttonLabel ?? 'Shop ${p.label}',
@@ -198,15 +341,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<_ShopTheLookOutfit> get _shopTheLookOutfitsToDisplay {
-    if (_shopTheLookEntries.isEmpty) return const [];
+    if (_shopTheLookEntries.isEmpty) return _defaultShopTheLookOutfits;
     return _shopTheLookEntries
         .where((e) => e.imageUrl != null && e.products.isNotEmpty)
         .map((e) => _ShopTheLookOutfit(
+              imageAsset: 'assets/shop_the_look_outfit_1.jpg',
               imageUrl: e.imageUrl,
               products: e.products
                   .map((p) => _ShopTheLookProduct(
                         title: p.title,
                         price: '₹ ${_formatInr(p.price)}',
+                        imageAsset: 'assets/shop_the_look_item_1.jpg',
                         imageUrl: p.primaryImageUrl,
                         product: p,
                       ))
@@ -216,20 +361,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<_OccasionTile> get _occasionTilesToDisplay {
-    if (_occasionTilesContent.isEmpty) return const [];
+    if (_occasionTilesContent.isEmpty) return _defaultOccasionTiles;
     return _occasionTilesContent
         .map((t) => _OccasionTile(
+              imageAsset: 'assets/jeans_jann.jpeg',
               imageUrl: t.imageUrl,
               handle: t.collectionHandle,
-              label: t.label,
             ))
         .toList();
   }
 
   List<_InstagramPost> get _instagramPostsToDisplay {
-    if (_instagramPostsContent.isEmpty) return const [];
+    if (_instagramPostsContent.isEmpty) return _defaultInstagramPosts;
     return _instagramPostsContent
         .map((p) => _InstagramPost(
+              imageAsset: 'assets/instagram_1.jpg',
               imageUrl: p.imageUrl,
               postUrl: p.postUrl,
               username: p.username,
@@ -249,6 +395,7 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
     return blocks
         .map((block) => SliverToBoxAdapter(
               child: _PromoBlockCard(
+                assetPath: block.assetPath,
                 imageUrl: block.imageUrl,
                 label: block.label,
                 buttonLabel: block.buttonLabel,
@@ -354,9 +501,7 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
 }
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: ThemeService.instance,
-      builder: (context, _) => Scaffold(
+    return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
         bottom: false,
@@ -395,7 +540,6 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                   ),
                 ),
               ),
-      ),
       ),
     );
   }
@@ -537,14 +681,14 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                                   _primaryHeroBanner?.ctaLabel ?? 'Shop now',
                                   style: TextStyle(
                                     fontFamily: _fBold,
-                                    color: Colors.black,
+                                    color: primary,
                                     fontSize: r.sp(13),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 SizedBox(width: r.dp(6)),
                                 Icon(Icons.arrow_forward_rounded,
-                                    size: r.dp(16), color: Colors.black),
+                                    size: r.dp(16), color: primary),
                               ],
                             ),
                           ),
@@ -573,7 +717,12 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                   errorWidget: (_, __, ___) =>
                       Container(color: const Color(0xFF6B7A5E)),
                 )
-              : Container(color: const Color(0xFF6B7A5E)),
+              : Image.asset(
+                  'assets/banner.jpeg',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Container(color: const Color(0xFF6B7A5E)),
+                ),
           Positioned.fill(
             child: IgnorePointer(
               child: DecoratedBox(
@@ -821,9 +970,8 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: products.length,
-              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent:
-                    r.isDesktop ? 260 : (r.isTablet ? 240 : 200),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
                 mainAxisSpacing: r.dp(16),
                 crossAxisSpacing: r.dp(12),
                 childAspectRatio: 0.62,
@@ -840,7 +988,7 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                 width: double.infinity,
                 padding: EdgeInsets.symmetric(vertical: r.dp(14)),
                 decoration: BoxDecoration(
-                  color: primary,
+                  color: Colors.black,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 alignment: Alignment.center,
@@ -848,16 +996,16 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                     ? SizedBox(
                         width: r.dp(18),
                         height: r.dp(18),
-                        child: CircularProgressIndicator(
+                        child: const CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: onPrimary,
+                          color: Colors.white,
                         ),
                       )
                     : Text(
                         'Show More',
                         style: TextStyle(
                           fontFamily: _fBold,
-                          color: onPrimary,
+                          color: Colors.white,
                           fontSize: r.sp(13),
                           fontWeight: FontWeight.w600,
                         ),
@@ -883,8 +1031,8 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: r.dp(14), vertical: r.dp(9)),
         decoration: BoxDecoration(
-          color: selected ? primary : cardColor,
-          border: Border.all(color: primary, width: 1),
+          color: selected ? Colors.black : Colors.white,
+          border: Border.all(color: Colors.black, width: 1),
           borderRadius: BorderRadius.circular(30),
         ),
         child: Text(
@@ -893,7 +1041,7 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
             fontFamily: _fBold,
             fontSize: r.sp(11),
             fontWeight: FontWeight.w600,
-            color: selected ? onPrimary : primary,
+            color: selected ? Colors.white : Colors.black,
           ),
         ),
       ),
@@ -909,7 +1057,7 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
             fit: StackFit.expand,
             children: [
               Container(
-                color: AppColors.fieldFill,
+                color: const Color(0xFFECECEC),
                 child: product.imageUrl != null
                     ? CachedNetworkImage(
                         imageUrl: product.imageUrl!,
@@ -917,7 +1065,11 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                         placeholder: (_, __) => const SizedBox(),
                         errorWidget: (_, __, ___) => const SizedBox(),
                       )
-                    : const SizedBox(),
+                    : Image.asset(
+                        product.imageAssetFallback,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox(),
+                      ),
               ),
               if (product.discountLabel != null)
                 Positioned(
@@ -1022,12 +1174,8 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
           final double remainingForRows = (usable - heroHeight).clamp(0.0, usable);
           double productRowHeight =
               maxProducts > 0 ? remainingForRows / maxProducts : 0.0;
-          // Must stay >= the row's own content height (the r.dp(88) product
-          // image plus padding) or the row overflows on screens where
-          // widthScale pushes r.dp(88) past an unscaled minimum.
-          final double minRowHeight = r.dp(108);
-          if (maxProducts > 0 && productRowHeight < minRowHeight) {
-            productRowHeight = minRowHeight;
+          if (maxProducts > 0 && productRowHeight < 84.0) {
+            productRowHeight = 84.0;
           }
 
           final double cardHeight =
@@ -1101,7 +1249,6 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
 }
 
   Widget _occasionCard(_OccasionTile tile, double width, double height, R r) {
-    final bool hasLabel = tile.label != null && tile.label!.trim().isNotEmpty;
     return GestureDetector(
       onTap: () => _openCollectionByHandle(
         tile.handle,
@@ -1121,7 +1268,12 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                     errorWidget: (_, __, ___) =>
                         Container(color: const Color(0xFFE0E0E0)),
                   )
-                : Container(color: const Color(0xFFE0E0E0)),
+                : Image.asset(
+                    tile.imageAsset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(color: const Color(0xFFE0E0E0)),
+                  ),
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -1129,29 +1281,11 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.black.withOpacity(0.0),
-                    Colors.black.withOpacity(0.45),
+                    Colors.black.withOpacity(0.35),
                   ],
-                  stops: const [0.5, 1.0],
                 ),
               ),
             ),
-            if (hasLabel)
-              Positioned(
-                left: r.dp(12),
-                right: r.dp(12),
-                bottom: r.dp(12),
-                child: Text(
-                  tile.label!.toUpperCase(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: AppFonts.heading,
-                    color: Colors.white,
-                    fontSize: r.sp(16),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -1198,7 +1332,12 @@ Widget _instagramBlock(_InstagramPost post, double size, R r) {
                     errorWidget: (_, __, ___) =>
                         Container(color: const Color(0xFFE0E0E0)),
                   )
-                : Container(color: const Color(0xFFE0E0E0)),
+                : Image.asset(
+                    post.imageAsset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(color: const Color(0xFFE0E0E0)),
+                  ),
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -1274,18 +1413,14 @@ Widget _instagramBlock(_InstagramPost post, double size, R r) {
           SizedBox(height: r.dp(16)),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-            child: GridView.builder(
-              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent:
-                    r.isDesktop ? 260 : (r.isTablet ? 240 : 200),
-                crossAxisSpacing: r.dp(12),
-                mainAxisSpacing: r.dp(16),
-                childAspectRatio: 0.62,
-              ),
+            child: GridView.count(
+              crossAxisCount: 2,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: r.isDesktop ? 10 : (r.isTablet ? 6 : 4),
-              itemBuilder: (_, __) => _ShimmerBox(height: double.infinity),
+              crossAxisSpacing: r.dp(12),
+              mainAxisSpacing: r.dp(16),
+              childAspectRatio: 0.62,
+              children: List.generate(4, (_) => _ShimmerBox(height: double.infinity)),
             ),
           ),
         ],
@@ -1380,12 +1515,14 @@ class _HeroMarqueeTextState extends State<_HeroMarqueeText> {
 }
 
 class _PromoBlockCard extends StatefulWidget {
+  final String? assetPath;
   final String? imageUrl;
   final String label;
   final String buttonLabel;
   final double height;
   final VoidCallback onTap;
   const _PromoBlockCard({
+    this.assetPath,
     this.imageUrl,
     required this.label,
     required this.buttonLabel,
@@ -1426,7 +1563,12 @@ class _PromoBlockCardState extends State<_PromoBlockCard> {
                       errorWidget: (_, __, ___) =>
                           Container(color: const Color(0xFF555555)),
                     )
-                  : Container(color: const Color(0xFF555555)),
+                  : Image.asset(
+                      widget.assetPath ?? 'assets/denim.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          Container(color: const Color(0xFF555555)),
+                    ),
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -1491,6 +1633,7 @@ class _ShopifyProductItem {
   final String? compareAtPrice;
   final String? discountLabel;
   final String? imageUrl;
+  final String imageAssetFallback;
   const _ShopifyProductItem({
     required this.id,
     required this.title,
@@ -1498,6 +1641,7 @@ class _ShopifyProductItem {
     this.compareAtPrice,
     this.discountLabel,
     this.imageUrl,
+    this.imageAssetFallback = 'assets/collection_cargo_olive.jpg',
   });
 }
 
@@ -1513,9 +1657,11 @@ class _ProductsPage {
 }
 
 class _ShopTheLookOutfit {
+  final String imageAsset;
   final String? imageUrl;
   final List<_ShopTheLookProduct> products;
   const _ShopTheLookOutfit({
+    required this.imageAsset,
     this.imageUrl,
     required this.products,
   });
@@ -1539,6 +1685,12 @@ class _ShopTheLookAutoSlideCard extends StatefulWidget {
 }
 
 class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
+  // This card's background is always white by design (a catalog-style photo
+  // card), regardless of the app theme. Its text/icons must stay fixed dark
+  // instead of following AppColors.primary, which turns white in dark mode
+  // and would otherwise vanish against this card's white background.
+  static const Color _cardTextColor = Color(0xFF111111);
+
   late final PageController _controller;
   Timer? _timer;
   int _index = 0;
@@ -1641,7 +1793,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
     final r = R.of(context);
 
     if (widget.outfits.isEmpty) {
-      return Container(color: AppColors.fieldFill);
+      return Container(color: const Color(0xFF555555));
     }
 
     return PageView.builder(
@@ -1652,7 +1804,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
         final outfit = widget.outfits[i];
         return Container(
           decoration: BoxDecoration(
-            color: AppColors.card,
+            color: Colors.white,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.08),
@@ -1671,17 +1823,22 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                   fit: StackFit.expand,
                   children: [
                     ColoredBox(
-                      color: AppColors.card,
+                      color: Colors.white,
                       child: outfit.imageUrl != null
                           ? CachedNetworkImage(
                               imageUrl: outfit.imageUrl!,
                               fit: BoxFit.contain,
                               placeholder: (_, __) =>
-                                  Container(color: AppColors.fieldFill),
+                                  Container(color: const Color(0xFF555555)),
                               errorWidget: (_, __, ___) =>
-                                  Container(color: AppColors.fieldFill),
+                                  Container(color: const Color(0xFF555555)),
                             )
-                          : Container(color: AppColors.fieldFill),
+                          : Image.asset(
+                              outfit.imageAsset,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) =>
+                                  Container(color: const Color(0xFF555555)),
+                            ),
                     ),
                     DecoratedBox(
                       decoration: BoxDecoration(
@@ -1732,7 +1889,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                       decoration: BoxDecoration(
                         border: Border(
                           top: BorderSide(
-                            color: AppColors.border,
+                            color: const Color(0xFFEDEDED),
                             width: 1,
                           ),
                         ),
@@ -1741,9 +1898,9 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                       child: Row(
                         children: [
                           Container(
-                            width: r.dp(88),
-                            height: r.dp(88),
-                            color: AppColors.fieldFill,
+                            width: r.dp(100),
+                            height: r.dp(100),
+                            color: const Color(0xFFECECEC),
                             child: item.imageUrl != null
                                 ? CachedNetworkImage(
                                     imageUrl: item.imageUrl!,
@@ -1752,7 +1909,12 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                                     errorWidget: (_, __, ___) =>
                                         const SizedBox(),
                                   )
-                                : const SizedBox(),
+                                : Image.asset(
+                                    item.imageAsset,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        const SizedBox(),
+                                  ),
                           ),
                           SizedBox(width: r.dp(10)),
                           Expanded(
@@ -1767,7 +1929,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                                   style: TextStyle(
                                     fontFamily: AppFonts.bold,
                                     fontSize: r.sp(12),
-                                    color: AppColors.primary,
+                                    color: _cardTextColor,
                                   ),
                                 ),
                                 SizedBox(height: r.dp(2)),
@@ -1778,7 +1940,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                                   style: TextStyle(
                                     fontFamily: AppFonts.number,
                                     fontSize: r.sp(11),
-                                    color: AppColors.primary,
+                                    color: _cardTextColor,
                                   ),
                                 ),
                               ],
@@ -1791,11 +1953,11 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                             child: Container(
                               width: r.dp(26),
                               height: r.dp(26),
-                              color: AppColors.primary.withOpacity(0.08),
+                              color: _cardTextColor.withOpacity(0.08),
                               child: Icon(
                                 Icons.add_rounded,
                                 size: r.dp(15),
-                                color: AppColors.primary,
+                                color: _cardTextColor,
                               ),
                             ),
                           ),
@@ -1850,19 +2012,21 @@ class _ShimmerBoxState extends State<_ShimmerBox>
         animation: _controller,
         builder: (context, _) {
           final double t = _controller.value;
-          final base = AppColors.fieldFill;
-          final highlight = Color.lerp(AppColors.fieldFill, AppColors.card, 0.6)!;
           return ShaderMask(
             shaderCallback: (rect) => LinearGradient(
               begin: Alignment(-1 - t * 2, 0),
               end: Alignment(1 - t * 2, 0),
-              colors: [base, highlight, base],
+              colors: const [
+                Color(0xFFE7E7E7),
+                Color(0xFFF6F6F6),
+                Color(0xFFE7E7E7),
+              ],
               stops: const [0.35, 0.5, 0.65],
             ).createShader(rect),
             child: Container(
               height: widget.height,
               width: widget.width,
-              color: base,
+              color: const Color(0xFFE7E7E7),
             ),
           );
         },
@@ -1872,34 +2036,38 @@ class _ShimmerBoxState extends State<_ShimmerBox>
 }
 
 class _OccasionTile {
+  final String imageAsset;
   final String? imageUrl;
   final String handle;
-  final String? label;
   const _OccasionTile({
+    required this.imageAsset,
     this.imageUrl,
     required this.handle,
-    this.label,
   });
 }
 
 class _ShopTheLookProduct {
   final String title;
   final String price;
+  final String imageAsset;
   final String? imageUrl;
   final ShopifyProduct? product;
   const _ShopTheLookProduct({
     required this.title,
     required this.price,
+    required this.imageAsset,
     this.imageUrl,
     this.product,
   });
 }
 
 class _InstagramPost {
+  final String imageAsset;
   final String? imageUrl;
   final String postUrl;
   final String username;
   const _InstagramPost({
+    required this.imageAsset,
     this.imageUrl,
     required this.postUrl,
     required this.username,
@@ -1907,11 +2075,13 @@ class _InstagramPost {
 }
 
 class _PromoBlockData {
+  final String? assetPath;
   final String? imageUrl;
   final String label;
   final String buttonLabel;
   final String collectionHandle;
   const _PromoBlockData({
+    this.assetPath,
     this.imageUrl,
     required this.label,
     required this.buttonLabel,

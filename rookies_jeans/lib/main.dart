@@ -13,6 +13,7 @@ import 'package:rookies_jeans/screens/profile/address_book.dart';
 import 'package:rookies_jeans/screens/profile/change_password_screen.dart';
 import 'package:rookies_jeans/screens/profile/profile.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
+import 'package:rookies_jeans/screens/search/search.dart';
 import 'package:rookies_jeans/screens/splashscreen/splashscreen.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 
@@ -48,6 +49,7 @@ final GoRouter _appRouter = GoRouter(
   builder: (context, state) => const Register(),
 ),
     GoRoute(path: '/orders', builder: (_, __) => const OrdersScreen()),
+    GoRoute(path: '/wishlist', builder: (_, __) => const WishlistPage()),
     GoRoute(
   path: '/addresses',
   builder: (_, __) => const AddressBookScreen(),
@@ -99,12 +101,9 @@ final GoRouter _appRouter = GoRouter(
         return ScaffoldWithNavBar(navigationShell: navigationShell);
       },
       branches: [
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/home',
-            builder: (context, state) => const HomeScreen(),
-          ),
-        ]),
+        // Branch order must match the visual icon order in
+        // RookiesBottomNavBar (menu, search, home, profile, cart) so that
+        // navigationShell.currentIndex highlights the correct icon.
         StatefulShellBranch(routes: [
           GoRoute(
             path: '/category',
@@ -113,20 +112,26 @@ final GoRouter _appRouter = GoRouter(
         ]),
         StatefulShellBranch(routes: [
           GoRoute(
-            path: '/wishlist',
-            builder: (context, state) => const WishlistPage(),
+            path: '/search',
+            builder: (context, state) => const SearchPage(),
           ),
         ]),
         StatefulShellBranch(routes: [
           GoRoute(
-            path: '/cart',
-            builder: (context, state) => const CartScreen(),
+            path: '/home',
+            builder: (context, state) => const HomeScreen(),
           ),
         ]),
         StatefulShellBranch(routes: [
           GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfileScreen(),
+          ),
+        ]),
+        StatefulShellBranch(routes: [
+          GoRoute(
+            path: '/cart',
+            builder: (context, state) => const CartScreen(),
           ),
         ]),
       ],

@@ -23,15 +23,30 @@ class RookiesBottomNavBar extends StatelessWidget {
   static const Color _inactiveIconColor  = Colors.white70;
   static const Color _badgeBg            = AppColors.danger;
 
-  static const int _cartIndex = 3;
+  static const int _cartIndex = 4;
 
   static const List<_NavItem> _items = [
-    _NavItem(icon: Icons.home_outlined,           activeIcon: Icons.home_rounded),
-    _NavItem(icon: Icons.grid_view_outlined,      activeIcon: Icons.grid_view_rounded),
-    _NavItem(icon: Icons.favorite_border_rounded, activeIcon: Icons.favorite_rounded),
-    _NavItem(icon: Icons.shopping_bag_outlined,   activeIcon: Icons.shopping_bag_rounded),
-    _NavItem(icon: Icons.person_outline_rounded,  activeIcon: Icons.person_rounded),
-  ];
+    _NavItem(
+    icon: Icons.menu_outlined,
+    activeIcon: Icons.menu_rounded,
+  ),
+  _NavItem(
+    icon: Icons.search_rounded,
+    activeIcon: Icons.search_rounded,
+  ),
+  _NavItem(
+    icon: Icons.home_outlined,
+    activeIcon: Icons.home_rounded,
+  ),
+  _NavItem(
+    icon: Icons.person_outline_rounded,
+    activeIcon: Icons.person_rounded,
+  ),
+  _NavItem(
+    icon: Icons.shopping_bag_outlined,
+    activeIcon: Icons.shopping_bag_rounded,
+  ),
+];
 
   @override
   Widget build(BuildContext context) {

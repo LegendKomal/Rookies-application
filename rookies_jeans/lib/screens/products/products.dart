@@ -41,9 +41,16 @@ class _CenterFloatAboveBottomNav extends FloatingActionButtonLocation {
 }
 
 class ProductsPage extends StatefulWidget {
-  final ShopifyCollection collection;
+  final ShopifyCollection? collection;
+  final String? searchQuery;
 
-  const ProductsPage({super.key, required this.collection});
+  const ProductsPage({super.key, required ShopifyCollection collection})
+      : collection = collection,
+        searchQuery = null;
+
+  const ProductsPage.search({super.key, required String query})
+      : collection = null,
+        searchQuery = query;
 
   @override
   State<ProductsPage> createState() => _ProductsPageState();
@@ -77,6 +84,13 @@ class _ProductsPageState extends State<ProductsPage> {
   }
 
   final ScrollController _scrollController = ScrollController();
+
+  bool get _isSearchMode => widget.searchQuery != null;
+  static const String _kSearchPriceFilterId = 'search_price';
+
+  late final TextEditingController _searchCtrl =
+      TextEditingController(text: widget.searchQuery ?? '');
+  late String _activeQuery = widget.searchQuery ?? '';
 
   List<ShopifyProduct> _products = [];
   List<ShopifyFilter> _availableFilters = [];
@@ -126,6 +140,23 @@ class _ProductsPageState extends State<ProductsPage> {
   @override
   void initState() {
     super.initState();
+    if (_isSearchMode) {
+      _availableFilters = [
+        ShopifyFilter(
+          id: _kSearchPriceFilterId,
+          label: 'Price',
+          type: 'PRICE_RANGE',
+          values: _priceOptions
+              .map((o) => ShopifyFilterValue(
+                    id: o.toShopifyInput(),
+                    label: o.label,
+                    count: 0,
+                    input: o.toShopifyInput(),
+                  ))
+              .toList(),
+        ),
+      ];
+    }
     _fetchInitialProducts();
 
     _scrollController.addListener(() {
@@ -149,6 +180,7 @@ class _ProductsPageState extends State<ProductsPage> {
       n.dispose();
     }
     _scrollController.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -249,6 +281,44 @@ class _ProductsPageState extends State<ProductsPage> {
   List<String> get _flatSelectedInputs =>
       _selectedFilterInputs.values.expand((s) => s).toList();
 
+  _PriceOption? get _selectedSearchPriceOption {
+    final inputs = _selectedFilterInputs[_kSearchPriceFilterId];
+    if (inputs == null || inputs.isEmpty) return null;
+    final input = inputs.first;
+    for (final option in _priceOptions) {
+      if (option.toShopifyInput() == input) return option;
+    }
+    return null;
+  }
+
+  String get _searchSortKey =>
+      _sortOption == ProductSortOption.defaultSort
+          ? 'RELEVANCE'
+          : _sortOption.shopifyKey;
+
+  Future<PaginatedProductsResponse> _fetchProducts({String? after}) {
+    if (_isSearchMode) {
+      final priceOption = _selectedSearchPriceOption;
+      return ShopifyStorefrontService.instance.searchProductsPaginated(
+        _activeQuery,
+        first: 24,
+        after: after,
+        sortKey: _searchSortKey,
+        reverse: _sortOption.reverse,
+        minPrice: priceOption?.min,
+        maxPrice: priceOption?.max,
+      );
+    }
+    return ShopifyStorefrontService.instance.getProductsByCollectionPaginated(
+      widget.collection!.handle,
+      first: 24,
+      after: after,
+      sortKey: _sortOption.shopifyKey,
+      reverse: _sortOption.reverse,
+      filters: _flatSelectedInputs,
+    );
+  }
+
   Future<void> _fetchInitialProducts() async {
     if (mounted) {
       setState(() {
@@ -260,15 +330,19 @@ class _ProductsPageState extends State<ProductsPage> {
       });
     }
 
+    if (_isSearchMode && _activeQuery.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _products = [];
+          _hasNextPage = false;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
     try {
-      final response = await ShopifyStorefrontService.instance
-          .getProductsByCollectionPaginated(
-        widget.collection.handle,
-        first: 24,
-        sortKey: _sortOption.shopifyKey,
-        reverse: _sortOption.reverse,
-        filters: _flatSelectedInputs,
-      );
+      final response = await _fetchProducts();
 
       if (!mounted) return;
 
@@ -276,7 +350,7 @@ class _ProductsPageState extends State<ProductsPage> {
         _products = response.products;
         _hasNextPage = response.hasNextPage;
         _endCursor = response.endCursor;
-        if (response.filters.isNotEmpty) {
+        if (!_isSearchMode && response.filters.isNotEmpty) {
           _availableFilters = response.filters;
         }
         _isLoading = false;
@@ -301,15 +375,7 @@ class _ProductsPageState extends State<ProductsPage> {
     });
 
     try {
-      final response = await ShopifyStorefrontService.instance
-          .getProductsByCollectionPaginated(
-        widget.collection.handle,
-        first: 24,
-        after: _endCursor,
-        sortKey: _sortOption.shopifyKey,
-        reverse: _sortOption.reverse,
-        filters: _flatSelectedInputs,
-      );
+      final response = await _fetchProducts(after: _endCursor);
 
       if (!mounted) return;
 
@@ -333,6 +399,13 @@ class _ProductsPageState extends State<ProductsPage> {
     _autoScrollTimer?.cancel();
     ShopifyStorefrontService.instance.clearCache();
     await _fetchInitialProducts();
+  }
+
+  void _runNewSearch(String query) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty || trimmed == _activeQuery) return;
+    setState(() => _activeQuery = trimmed);
+    _fetchInitialProducts();
   }
 
   void _applySort(ProductSortOption option) {
@@ -811,22 +884,58 @@ class _ProductsPageState extends State<ProductsPage> {
             onPressed: () => Navigator.pop(context),
           ),
           Expanded(
-            child: Text(
-              widget.collection.label.toUpperCase(),
-              style: TextStyle(
-                fontFamily: _fHead,
-                fontSize: titleSize,
-                color: primary,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: _isSearchMode
+                ? _searchField()
+                : Text(
+                    widget.collection!.label.toUpperCase(),
+                    style: TextStyle(
+                      fontFamily: _fHead,
+                      fontSize: titleSize,
+                      color: primary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
           ),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: _sortButton(context),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _searchField() {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border.all(color: primary.withOpacity(0.15), width: 0.8),
+      ),
+      child: TextField(
+        controller: _searchCtrl,
+        textInputAction: TextInputAction.search,
+        onSubmitted: _runNewSearch,
+        onChanged: (_) => setState(() {}),
+        style: TextStyle(fontFamily: _fBody, fontSize: 14, color: primary),
+        decoration: InputDecoration(
+          hintText: 'Search products...',
+          hintStyle: TextStyle(fontFamily: _fBody, fontSize: 14, color: secondaryTxt),
+          border: InputBorder.none,
+          isDense: true,
+          prefixIcon: Icon(Icons.search_rounded, size: 18, color: secondaryTxt),
+          suffixIcon: _searchCtrl.text.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.close_rounded, size: 16, color: secondaryTxt),
+                  onPressed: () {
+                    _searchCtrl.clear();
+                    setState(() {});
+                  },
+                )
+              : null,
+        ),
       ),
     );
   }

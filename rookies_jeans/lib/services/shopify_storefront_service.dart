@@ -802,6 +802,165 @@ for (final e in rawVariantEdges) {
         () => _fetchSearchProducts(query, first: first),
       );
 
+  /// Scopes the search to the product title instead of Shopify's default
+  /// cross-field match (title, tags, product type, vendor, description),
+  /// which otherwise surfaces unrelated items — e.g. a "shirt" search
+  /// returning polo tees tagged/categorized as "Shirts" in the catalog.
+  String _titleScopedQuery(String raw) {
+    final words = raw
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .map((w) => w.replaceAll('"', ''));
+    if (words.isEmpty) return raw;
+    return words.map((w) => 'title:*$w*').join(' AND ');
+  }
+
+  Future<PaginatedProductsResponse> searchProductsPaginated(
+    String query, {
+    int first = 24,
+    String? after,
+    String sortKey = 'RELEVANCE',
+    bool reverse = false,
+    double? minPrice,
+    double? maxPrice,
+  }) {
+    final key =
+        'searchPaged:${query.toLowerCase()}:$first:${after ?? ''}:$sortKey:$reverse:$minPrice:$maxPrice';
+    return _cachedFetch(
+      key,
+      () => _fetchSearchProductsPaginated(
+        query,
+        first: first,
+        after: after,
+        sortKey: sortKey,
+        reverse: reverse,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+      ),
+    );
+  }
+
+  String _searchQueryString(
+    String raw, {
+    double? minPrice,
+    double? maxPrice,
+  }) {
+    final clauses = <String>[];
+    final titleQuery = _titleScopedQuery(raw);
+    if (titleQuery.isNotEmpty) clauses.add('($titleQuery)');
+    if (minPrice != null) clauses.add('variants.price:>=$minPrice');
+    if (maxPrice != null) clauses.add('variants.price:<=$maxPrice');
+    return clauses.join(' AND ');
+  }
+
+  Future<PaginatedProductsResponse> _fetchSearchProductsPaginated(
+    String query, {
+    int first = 24,
+    String? after,
+    String sortKey = 'RELEVANCE',
+    bool reverse = false,
+    double? minPrice,
+    double? maxPrice,
+  }) async {
+    const String gqlQuery = r'''
+    query searchProductsPaginated(
+      $query: String!
+      $first: Int!
+      $after: String
+      $sortKey: ProductSortKeys
+      $reverse: Boolean
+    ) {
+      products(
+        query: $query
+        first: $first
+        after: $after
+        sortKey: $sortKey
+        reverse: $reverse
+      ) {
+        edges {
+          cursor
+          node {
+            id
+            title
+            handle
+            priceRange { minVariantPrice { amount currencyCode } }
+            compareAtPriceRange { minVariantPrice { amount currencyCode } }
+            images(first: 2) { edges { node { url altText } } }
+            options {
+              name
+              values
+              optionValues { name swatch { color } }
+            }
+            variants(first: 10) {
+              edges {
+                node {
+                  id
+                  title
+                  availableForSale
+                  selectedOptions { name value }
+                }
+              }
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+    ''';
+
+    try {
+      final res = await ShopifyGraphQL.post(
+        gqlQuery,
+        variables: {
+          'query': _searchQueryString(query, minPrice: minPrice, maxPrice: maxPrice),
+          'first': first,
+          'after': after,
+          'sortKey': sortKey,
+          'reverse': reverse,
+        },
+      );
+
+      _log(
+        'searchProductsPaginated [$query, after=$after, sort=$sortKey, reverse=$reverse] → ${res.statusCode}',
+      );
+      final decoded = res.body;
+
+      if (decoded['errors'] != null || decoded['data'] == null) {
+        _log('searchProductsPaginated errors: ${decoded['errors']}');
+        return const PaginatedProductsResponse(
+          products: [],
+          hasNextPage: false,
+          endCursor: null,
+        );
+      }
+
+      final productsMap = decoded['data']?['products'] as Map<String, dynamic>?;
+      final edges = (productsMap?['edges'] as List?) ?? [];
+      final pageInfo = productsMap?['pageInfo'] as Map<String, dynamic>?;
+
+      final products = edges
+          .map((e) => ShopifyProduct.fromJson(e['node'] as Map<String, dynamic>))
+          .toList();
+
+      return PaginatedProductsResponse(
+        products: products,
+        hasNextPage: pageInfo?['hasNextPage'] as bool? ?? false,
+        endCursor: pageInfo?['endCursor'] as String?,
+      );
+    } catch (e) {
+      _log('searchProductsPaginated EXCEPTION: $e');
+      return const PaginatedProductsResponse(
+        products: [],
+        hasNextPage: false,
+        endCursor: null,
+      );
+    }
+  }
+
   Future<List<ShopifyProduct>> _fetchSearchProducts(
     String query, {
     int first = 20,
@@ -842,7 +1001,7 @@ for (final e in rawVariantEdges) {
       final res = await ShopifyGraphQL.post(
         gqlQuery,
         variables: {
-          'query': query,
+          'query': _titleScopedQuery(query),
           'first': first,
         },
       );

@@ -4,7 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
+import 'package:rookies_jeans/screens/products/products.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
+import 'package:rookies_jeans/widget/price_text.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -117,6 +119,18 @@ class _SearchPageState extends State<SearchPage>
     }
   }
 
+  void _openResultsPage(String query) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+    _focusNode.unfocus();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductsPage.search(query: trimmed),
+      ),
+    );
+  }
+
   void _openProductDetail(ShopifyProduct product) {
     Navigator.push(
       context,
@@ -202,6 +216,8 @@ class _SearchPageState extends State<SearchPage>
                 controller: _searchCtrl,
                 focusNode: _focusNode,
                 textAlignVertical: TextAlignVertical.center,
+                textInputAction: TextInputAction.search,
+                onSubmitted: _openResultsPage,
                 style: TextStyle(
                   fontFamily: _fBody,
                   fontSize: _s(14).clamp(13.0, 18.0),
@@ -531,14 +547,13 @@ class _SearchPageState extends State<SearchPage>
 
   Widget _priceRow(ShopifyProduct product) {
     if (!product.isOnSale) {
-      return Text(
+      return PriceText(
         product.formattedPrice,
-        style: TextStyle(
-          fontFamily: _fBold,
-          fontSize: _s(13).clamp(12.0, 18.0),
-          fontWeight: FontWeight.w700,
-          color: primary,
-        ),
+        currencyCode: product.currencyCode,
+        fontSize: _s(13).clamp(12.0, 18.0),
+        fontWeight: FontWeight.w700,
+        color: primary,
+        amountFontFamily: _fBold,
       );
     }
 
@@ -546,24 +561,21 @@ class _SearchPageState extends State<SearchPage>
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: _s(6),
       children: [
-        Text(
+        PriceText(
           product.formattedPrice,
-          style: TextStyle(
-            fontFamily: _fBold,
-            fontSize: _s(13).clamp(12.0, 18.0),
-            fontWeight: FontWeight.w700,
-            color: primary,
-          ),
+          currencyCode: product.currencyCode,
+          fontSize: _s(13).clamp(12.0, 18.0),
+          fontWeight: FontWeight.w700,
+          color: primary,
+          amountFontFamily: _fBold,
         ),
-        Text(
+        PriceText(
           product.formattedCompareAtPrice,
-          style: TextStyle(
-            fontFamily: _fBody,
-            fontSize: _s(11).clamp(10.0, 15.0),
-            color: secondaryTxt,
-            decoration: TextDecoration.lineThrough,
-            decorationColor: secondaryTxt,
-          ),
+          currencyCode: product.currencyCode,
+          fontSize: _s(11).clamp(10.0, 15.0),
+          color: secondaryTxt,
+          amountFontFamily: _fBody,
+          decoration: TextDecoration.lineThrough,
         ),
       ],
     );
