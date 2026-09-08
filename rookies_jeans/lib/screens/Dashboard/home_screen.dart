@@ -11,7 +11,6 @@ import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/screens/products/product_peek_dialog.dart';
 import 'package:rookies_jeans/screens/products/products.dart';
-import 'package:rookies_jeans/screens/search/search.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 
@@ -467,7 +466,7 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
     Navigator.push(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, animation, __) => const SearchPage(),
+        pageBuilder: (_, animation, __) => const ProductsPage.search(query: ''),
         transitionsBuilder: (_, animation, __, child) => FadeTransition(
           opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
           child: child,

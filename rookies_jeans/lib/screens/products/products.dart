@@ -86,11 +86,12 @@ class _ProductsPageState extends State<ProductsPage> {
   final ScrollController _scrollController = ScrollController();
 
   bool get _isSearchMode => widget.searchQuery != null;
-  static const String _kSearchPriceFilterId = 'search_price';
 
   late final TextEditingController _searchCtrl =
       TextEditingController(text: widget.searchQuery ?? '');
   late String _activeQuery = widget.searchQuery ?? '';
+  final FocusNode _searchFocusNode = FocusNode();
+  Timer? _searchDebounce;
 
   List<ShopifyProduct> _products = [];
   List<ShopifyFilter> _availableFilters = [];
@@ -140,24 +141,13 @@ class _ProductsPageState extends State<ProductsPage> {
   @override
   void initState() {
     super.initState();
-    if (_isSearchMode) {
-      _availableFilters = [
-        ShopifyFilter(
-          id: _kSearchPriceFilterId,
-          label: 'Price',
-          type: 'PRICE_RANGE',
-          values: _priceOptions
-              .map((o) => ShopifyFilterValue(
-                    id: o.toShopifyInput(),
-                    label: o.label,
-                    count: 0,
-                    input: o.toShopifyInput(),
-                  ))
-              .toList(),
-        ),
-      ];
-    }
     _fetchInitialProducts();
+
+    if (_isSearchMode && _activeQuery.trim().isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _searchFocusNode.requestFocus();
+      });
+    }
 
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
@@ -173,6 +163,7 @@ class _ProductsPageState extends State<ProductsPage> {
   @override
   void dispose() {
     _autoScrollTimer?.cancel();
+    _searchDebounce?.cancel();
     for (final c in _imagePageControllers.values) {
       c.dispose();
     }
@@ -181,6 +172,7 @@ class _ProductsPageState extends State<ProductsPage> {
     }
     _scrollController.dispose();
     _searchCtrl.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -281,32 +273,32 @@ class _ProductsPageState extends State<ProductsPage> {
   List<String> get _flatSelectedInputs =>
       _selectedFilterInputs.values.expand((s) => s).toList();
 
-  _PriceOption? get _selectedSearchPriceOption {
-    final inputs = _selectedFilterInputs[_kSearchPriceFilterId];
-    if (inputs == null || inputs.isEmpty) return null;
-    final input = inputs.first;
-    for (final option in _priceOptions) {
-      if (option.toShopifyInput() == input) return option;
-    }
-    return null;
-  }
-
   String get _searchSortKey =>
       _sortOption == ProductSortOption.defaultSort
           ? 'RELEVANCE'
           : _sortOption.shopifyKey;
 
+  // Shopify's `search` field (used for search results) only defines
+  // RELEVANCE and PRICE as sort keys — unlike collection browsing, which
+  // supports CREATED/TITLE too. Restrict the sort sheet accordingly so we
+  // never send a sortKey the search API will reject.
+  List<ProductSortOption> get _availableSortOptions => _isSearchMode
+      ? const [
+          ProductSortOption.defaultSort,
+          ProductSortOption.priceLowToHigh,
+          ProductSortOption.priceHighToLow,
+        ]
+      : ProductSortOption.values;
+
   Future<PaginatedProductsResponse> _fetchProducts({String? after}) {
     if (_isSearchMode) {
-      final priceOption = _selectedSearchPriceOption;
       return ShopifyStorefrontService.instance.searchProductsPaginated(
         _activeQuery,
         first: 24,
         after: after,
         sortKey: _searchSortKey,
         reverse: _sortOption.reverse,
-        minPrice: priceOption?.min,
-        maxPrice: priceOption?.max,
+        filters: _flatSelectedInputs,
       );
     }
     return ShopifyStorefrontService.instance.getProductsByCollectionPaginated(
@@ -350,7 +342,7 @@ class _ProductsPageState extends State<ProductsPage> {
         _products = response.products;
         _hasNextPage = response.hasNextPage;
         _endCursor = response.endCursor;
-        if (!_isSearchMode && response.filters.isNotEmpty) {
+        if (response.filters.isNotEmpty) {
           _availableFilters = response.filters;
         }
         _isLoading = false;
@@ -406,6 +398,45 @@ class _ProductsPageState extends State<ProductsPage> {
     if (trimmed.isEmpty || trimmed == _activeQuery) return;
     setState(() => _activeQuery = trimmed);
     _fetchInitialProducts();
+  }
+
+  static const int _kMinLiveSearchLength = 3;
+
+  void _onSearchInputChanged(String value) {
+    setState(() {});
+    _searchDebounce?.cancel();
+
+    final trimmed = value.trim();
+    if (trimmed.length < _kMinLiveSearchLength) {
+      _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+        if (!mounted || _searchCtrl.text.trim() != trimmed) return;
+        if (_activeQuery.isEmpty) return;
+        setState(() {
+          _activeQuery = '';
+          _products = [];
+          _hasNextPage = false;
+          _isLoading = false;
+        });
+      });
+      return;
+    }
+
+    _searchDebounce = Timer(const Duration(milliseconds: 380), () {
+      if (!mounted || _searchCtrl.text.trim() != trimmed) return;
+      _runNewSearch(trimmed);
+    });
+  }
+
+  void _clearSearchField() {
+    _searchDebounce?.cancel();
+    _searchCtrl.clear();
+    setState(() {
+      _activeQuery = '';
+      _products = [];
+      _hasNextPage = false;
+      _isLoading = false;
+    });
+    _searchFocusNode.requestFocus();
   }
 
   void _applySort(ProductSortOption option) {
@@ -805,17 +836,19 @@ class _ProductsPageState extends State<ProductsPage> {
           children: [
             _topBar(context),
             Expanded(
-              child: _isLoading
-                  ? _shimmerGrid()
-                  : RefreshIndicator(
-                      color: primary,
-                      onRefresh: _refreshProducts,
-                      child: _error != null
-                          ? _errorState()
-                          : _products.isEmpty
-                              ? _emptyState()
-                              : _productGrid(),
-                    ),
+              child: _isSearchMode && _activeQuery.trim().isEmpty
+                  ? _searchIdleState()
+                  : _isLoading
+                      ? _shimmerGrid()
+                      : RefreshIndicator(
+                          color: primary,
+                          onRefresh: _refreshProducts,
+                          child: _error != null
+                              ? _errorState()
+                              : _products.isEmpty
+                                  ? _emptyState()
+                                  : _productGrid(),
+                        ),
             ),
           ],
         ),
@@ -916,9 +949,11 @@ class _ProductsPageState extends State<ProductsPage> {
       ),
       child: TextField(
         controller: _searchCtrl,
+        focusNode: _searchFocusNode,
         textInputAction: TextInputAction.search,
+        textAlignVertical: TextAlignVertical.center,
         onSubmitted: _runNewSearch,
-        onChanged: (_) => setState(() {}),
+        onChanged: _onSearchInputChanged,
         style: TextStyle(fontFamily: _fBody, fontSize: 14, color: primary),
         decoration: InputDecoration(
           hintText: 'Search products...',
@@ -929,10 +964,7 @@ class _ProductsPageState extends State<ProductsPage> {
           suffixIcon: _searchCtrl.text.isNotEmpty
               ? IconButton(
                   icon: Icon(Icons.close_rounded, size: 16, color: secondaryTxt),
-                  onPressed: () {
-                    _searchCtrl.clear();
-                    setState(() {});
-                  },
+                  onPressed: _clearSearchField,
                 )
               : null,
         ),
@@ -1036,7 +1068,7 @@ class _ProductsPageState extends State<ProductsPage> {
                   child: ListView(
                     shrinkWrap: true,
                     padding: EdgeInsets.zero,
-                    children: ProductSortOption.values.map((option) {
+                    children: _availableSortOptions.map((option) {
                       final isSelected = option == _sortOption;
                       return ListTile(
                         title: Text(
@@ -2086,6 +2118,35 @@ class _ProductsPageState extends State<ProductsPage> {
         ((1 - product.price / product.compareAtPrice!) * 100).round();
     return '$pct% OFF';
   }
+
+  Widget _searchIdleState() => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_rounded,
+              size: 52,
+              color: AppColors.hint,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'SEARCH PRODUCTS',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+                color: primary.withOpacity(0.5),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Start typing to find what you\'re looking for',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: secondaryTxt),
+            ),
+          ],
+        ),
+      );
 
   Widget _emptyState() => Center(
         child: Column(

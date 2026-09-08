@@ -824,9 +824,11 @@ for (final e in rawVariantEdges) {
     bool reverse = false,
     double? minPrice,
     double? maxPrice,
+    List<String> filters = const [],
   }) {
+    final filterKey = filters.join('|');
     final key =
-        'searchPaged:${query.toLowerCase()}:$first:${after ?? ''}:$sortKey:$reverse:$minPrice:$maxPrice';
+        'searchPaged:${query.toLowerCase()}:$first:${after ?? ''}:$sortKey:$reverse:$minPrice:$maxPrice:$filterKey';
     return _cachedFetch(
       key,
       () => _fetchSearchProductsPaginated(
@@ -837,6 +839,7 @@ for (final e in rawVariantEdges) {
         reverse: reverse,
         minPrice: minPrice,
         maxPrice: maxPrice,
+        filters: filters,
       ),
     );
   }
@@ -862,43 +865,66 @@ for (final e in rawVariantEdges) {
     bool reverse = false,
     double? minPrice,
     double? maxPrice,
+    List<String> filters = const [],
   }) async {
+    // Uses the root `search` field rather than `products`: `products(query:)`
+    // never computes facets (its `filters` connection field is always empty),
+    // while `search` supports both `productFilters` (server-side filtering)
+    // and returns real facet counts, matching collection browsing behavior.
+    // Trade-off: SearchSortKeys only defines RELEVANCE and PRICE, so callers
+    // must restrict sortKey to one of those while in search mode.
     const String gqlQuery = r'''
     query searchProductsPaginated(
       $query: String!
       $first: Int!
       $after: String
-      $sortKey: ProductSortKeys
+      $sortKey: SearchSortKeys
       $reverse: Boolean
+      $productFilters: [ProductFilter!]
     ) {
-      products(
+      search(
         query: $query
         first: $first
         after: $after
         sortKey: $sortKey
         reverse: $reverse
+        types: [PRODUCT]
+        productFilters: $productFilters
       ) {
+        productFilters {
+          id
+          label
+          type
+          values {
+            id
+            label
+            count
+            input
+          }
+        }
         edges {
           cursor
           node {
-            id
-            title
-            handle
-            priceRange { minVariantPrice { amount currencyCode } }
-            compareAtPriceRange { minVariantPrice { amount currencyCode } }
-            images(first: 2) { edges { node { url altText } } }
-            options {
-              name
-              values
-              optionValues { name swatch { color } }
-            }
-            variants(first: 10) {
-              edges {
-                node {
-                  id
-                  title
-                  availableForSale
-                  selectedOptions { name value }
+            ... on Product {
+              id
+              title
+              handle
+              priceRange { minVariantPrice { amount currencyCode } }
+              compareAtPriceRange { minVariantPrice { amount currencyCode } }
+              images(first: 2) { edges { node { url altText } } }
+              options {
+                name
+                values
+                optionValues { name swatch { color } }
+              }
+              variants(first: 10) {
+                edges {
+                  node {
+                    id
+                    title
+                    availableForSale
+                    selectedOptions { name value }
+                  }
                 }
               }
             }
@@ -913,6 +939,17 @@ for (final e in rawVariantEdges) {
     ''';
 
     try {
+      final decodedFilters = filters
+          .map((f) {
+            try {
+              return jsonDecode(f) as Map<String, dynamic>;
+            } catch (_) {
+              return null;
+            }
+          })
+          .whereType<Map<String, dynamic>>()
+          .toList();
+
       final res = await ShopifyGraphQL.post(
         gqlQuery,
         variables: {
@@ -921,11 +958,12 @@ for (final e in rawVariantEdges) {
           'after': after,
           'sortKey': sortKey,
           'reverse': reverse,
+          'productFilters': decodedFilters,
         },
       );
 
       _log(
-        'searchProductsPaginated [$query, after=$after, sort=$sortKey, reverse=$reverse] → ${res.statusCode}',
+        'searchProductsPaginated [$query, after=$after, sort=$sortKey, reverse=$reverse, filters=$filters] → ${res.statusCode}',
       );
       final decoded = res.body;
 
@@ -938,18 +976,26 @@ for (final e in rawVariantEdges) {
         );
       }
 
-      final productsMap = decoded['data']?['products'] as Map<String, dynamic>?;
-      final edges = (productsMap?['edges'] as List?) ?? [];
-      final pageInfo = productsMap?['pageInfo'] as Map<String, dynamic>?;
+      final searchMap = decoded['data']?['search'] as Map<String, dynamic>?;
+      final edges = (searchMap?['edges'] as List?) ?? [];
+      final pageInfo = searchMap?['pageInfo'] as Map<String, dynamic>?;
+      final filtersList = (searchMap?['productFilters'] as List?) ?? [];
 
       final products = edges
-          .map((e) => ShopifyProduct.fromJson(e['node'] as Map<String, dynamic>))
+          .map((e) => e['node'] as Map<String, dynamic>?)
+          .where((node) => node != null && node.isNotEmpty)
+          .map((node) => ShopifyProduct.fromJson(node!))
+          .toList();
+
+      final parsedFilters = filtersList
+          .map((f) => ShopifyFilter.fromJson(f as Map<String, dynamic>))
           .toList();
 
       return PaginatedProductsResponse(
         products: products,
         hasNextPage: pageInfo?['hasNextPage'] as bool? ?? false,
         endCursor: pageInfo?['endCursor'] as String?,
+        filters: parsedFilters,
       );
     } catch (e) {
       _log('searchProductsPaginated EXCEPTION: $e');
