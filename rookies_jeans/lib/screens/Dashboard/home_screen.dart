@@ -11,6 +11,7 @@ import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/screens/products/product_peek_dialog.dart';
 import 'package:rookies_jeans/screens/products/products.dart';
+import 'package:rookies_jeans/screens/search/search_tab_page.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 
@@ -23,17 +24,21 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static final Color primary      = AppColors.primary;
-  static final Color bgColor      = AppColors.bg;
-  static final Color secondaryTxt = AppColors.secondaryText;
+  static Color get primary      => AppColors.primary;
+  static Color get bgColor      => AppColors.bg;
+  static Color get secondaryTxt => AppColors.secondaryText;
   static const String _fHead   = AppFonts.heading;
   static const String _fBody   = AppFonts.body;
   static const String _fBold   = AppFonts.bold;
   static const String _fNumber = AppFonts.number;
 
+  // Fixed dark color for text/icons that sit on a hard-coded white
+  // background (e.g. the hero CTA button). Using `primary` there breaks in
+  // dark mode, where AppColors.primary becomes white -> white-on-white.
+  static const Color _onLightBtn = Color(0xFF111111);
+
   static const double _kBottomNavHeight = 60.0;
   static const double _kBottomNavClearance = 84.0;
-  static const double _kSectionGap = 24.0;
 
   static const String _heroMarqueeText = 'READY FOR MORE';
   static const String _heroSubtitle =
@@ -466,7 +471,7 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
     Navigator.push(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, animation, __) => const ProductsPage.search(query: ''),
+        pageBuilder: (_, animation, __) => const SearchTabPage(),
         transitionsBuilder: (_, animation, __, child) => FadeTransition(
           opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
           child: child,
@@ -500,45 +505,45 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
 }
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        bottom: false,
-        child: _isLoading
-            ? _shimmer()
-            : Container(
-                color: bgColor,
-                child: RefreshIndicator(
-                  color: primary,
-                  onRefresh: _fetchAll,
-                  child: CustomScrollView(
-                    controller: _scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverToBoxAdapter(child: _heroSection()),
-                      ..._promoBlockSlivers(_promoBlocksFirstHalf),
-                      SliverToBoxAdapter(
-                        child: _sliverHeadAsBox('EXPLORE CATEGORIES'),
-                      ),
-                      SliverToBoxAdapter(child: _exploreCategoriesCarousel()),
-                      ..._promoBlockSlivers(_promoBlocksSecondHalf),
-                      SliverToBoxAdapter(child: _exploreCollectionSection()),
-                      const SliverToBoxAdapter(
-                        child: SizedBox(height: _kSectionGap),
-                      ),
-                      SliverToBoxAdapter(child: _shopTheLookSection()),
-                      SliverToBoxAdapter(child: _shopByOccasionsSection()),
-                      SliverToBoxAdapter(
-                        child: _sliverCenteredHeadAsBox('FOLLOW US @ROOKIESJEANS'),
-                      ),
-                      SliverToBoxAdapter(child: _instagramList()),
-                      const SliverToBoxAdapter(
-                        child: SizedBox(height: _kBottomNavClearance),
-                      ),
-                    ],
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) => Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          bottom: false,
+          child: _isLoading
+              ? _shimmer()
+              : Container(
+                  color: bgColor,
+                  child: RefreshIndicator(
+                    color: primary,
+                    onRefresh: _fetchAll,
+                    child: CustomScrollView(
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        SliverToBoxAdapter(child: _heroSection()),
+                        ..._promoBlockSlivers(_promoBlocksFirstHalf),
+                        SliverToBoxAdapter(
+                          child: _sliverHeadAsBox('EXPLORE CATEGORIES'),
+                        ),
+                        SliverToBoxAdapter(child: _exploreCategoriesCarousel()),
+                        ..._promoBlockSlivers(_promoBlocksSecondHalf),
+                        SliverToBoxAdapter(child: _exploreCollectionSection()),
+                        SliverToBoxAdapter(child: _shopTheLookSection()),
+                        SliverToBoxAdapter(child: _shopByOccasionsSection()),
+                        SliverToBoxAdapter(
+                          child: _sliverCenteredHeadAsBox('FOLLOW US @ROOKIESJEANS'),
+                        ),
+                        SliverToBoxAdapter(child: _instagramList()),
+                        const SliverToBoxAdapter(
+                          child: SizedBox(height: _kBottomNavClearance),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+        ),
       ),
     );
   }
@@ -680,14 +685,14 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                                   _primaryHeroBanner?.ctaLabel ?? 'Shop now',
                                   style: TextStyle(
                                     fontFamily: _fBold,
-                                    color: primary,
+                                    color: _onLightBtn,
                                     fontSize: r.sp(13),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 SizedBox(width: r.dp(6)),
                                 Icon(Icons.arrow_forward_rounded,
-                                    size: r.dp(16), color: primary),
+                                    size: r.dp(16), color: _onLightBtn),
                               ],
                             ),
                           ),
@@ -978,40 +983,42 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
               itemBuilder: (_, i) => _collectionProductCard(products[i], r),
             ),
           if (hasMore) ...[
-            SizedBox(height: r.dp(20)),
-            GestureDetector(
-              onTap: _isLoadingCollectionProducts
-                  ? null
-                  : () => _loadMoreCollectionProducts(_selectedCollectionTab),
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: r.dp(14)),
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(14),
+  Transform.translate(
+    offset: Offset(0, -r.dp(6)),
+    child: GestureDetector(
+      onTap: _isLoadingCollectionProducts
+          ? null
+          : () => _loadMoreCollectionProducts(_selectedCollectionTab),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(vertical: r.dp(14)),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        alignment: Alignment.center,
+        child: (_isLoadingCollectionProducts && products.isNotEmpty)
+            ? SizedBox(
+                width: r.dp(18),
+                height: r.dp(18),
+                child: const CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
                 ),
-                alignment: Alignment.center,
-                child: (_isLoadingCollectionProducts && products.isNotEmpty)
-                    ? SizedBox(
-                        width: r.dp(18),
-                        height: r.dp(18),
-                        child: const CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(
-                        'Show More',
-                        style: TextStyle(
-                          fontFamily: _fBold,
-                          color: Colors.white,
-                          fontSize: r.sp(13),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+              )
+            : Text(
+                'Show More',
+                style: TextStyle(
+                  fontFamily: _fBold,
+                  color: Colors.white,
+                  fontSize: r.sp(13),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
+      ),
+    ),
+  ),
+],
           SizedBox(height: r.dp(8)),
         ],
       ),
@@ -1199,53 +1206,76 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
   }
 
   Widget _shopByOccasionsSection() {
-  final r = R.of(context);
-  final double cardWidth = MediaQuery.of(context).size.width * 0.44;
-  final double cardHeight = (cardWidth * 1.3).clamp(220.0, 380.0);
-  final double gap = r.dp(10);
+    final r = R.of(context);
+    final double screenW = MediaQuery.of(context).size.width;
 
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Padding(
-        padding: EdgeInsets.fromLTRB(r.dp(16), r.dp(28), r.dp(16), 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'SHOP YOUR AESTHETICS',
-              style: TextStyle(
-                fontFamily: _fHead,
-                fontSize: r.sp(22),
-                fontWeight: FontWeight.w600,
-                color: primary,
-              ),
-            ),
-          ],
-        ),
-      ),
-      SizedBox(height: r.dp(16)),
-      Builder(builder: (context) {
-        final tiles = _occasionTilesToDisplay;
-        return SizedBox(
-          height: cardHeight,
-          child: _AutoScrollHorizontalList(
-            itemCount: tiles.length,
-            itemExtent: cardWidth + gap,
-            padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-            itemBuilder: (_, i) => Padding(
-              padding: EdgeInsets.only(right: i == tiles.length - 1 ? 0 : gap),
-              child: _occasionCard(tiles[i], cardWidth, cardHeight, r),
+    // Edge-to-edge banner cards: nearly full screen width, with a small peek
+    // of the next column so it's clear the row scrolls. Bigger height too.
+    final double cardWidth = screenW * 0.92;
+    final double cardHeight = (cardWidth * 0.72).clamp(180.0, 360.0);
+    final double gap = r.dp(8); // horizontal gap between columns
+    final double vGap = r.dp(8); // vertical gap between the two rows
+
+    final tiles = _occasionTilesToDisplay;
+
+    // Group tiles into vertical pairs. Each pair is ONE column (top + bottom
+    // card) inside the SAME horizontal list, so both rows scroll together.
+    final List<List<_OccasionTile>> pairs = [];
+    for (int i = 0; i < tiles.length; i += 2) {
+      pairs.add(tiles.sublist(i, (i + 2) > tiles.length ? tiles.length : i + 2));
+    }
+
+    final double sectionHeight = cardHeight * 2 + vGap;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(r.dp(16), r.dp(28), r.dp(16), 0),
+          child: Text(
+            'SHOP YOUR AESTHETICS',
+            style: TextStyle(
+              fontFamily: _fHead,
+              fontSize: r.sp(22),
+              fontWeight: FontWeight.w600,
+              color: primary,
             ),
           ),
-        );
-      }),
-      SizedBox(height: r.dp(20)),
-    ],
-  );
-}
+        ),
+        SizedBox(height: r.dp(16)),
+        if (pairs.isEmpty)
+          _empty()
+        else
+          SizedBox(
+            height: sectionHeight,
+            child: _AutoScrollHorizontalList(
+              itemCount: pairs.length,
+              itemExtent: cardWidth + gap,
+              padding: EdgeInsets.zero, // flush to the screen edges
+              itemBuilder: (_, i) {
+                final pair = pairs[i];
+                return Padding(
+                  padding:
+                      EdgeInsets.only(right: i == pairs.length - 1 ? 0 : gap),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _occasionCard(pair[0], cardWidth, cardHeight, r),
+                      if (pair.length > 1) ...[
+                        SizedBox(height: vGap),
+                        _occasionCard(pair[1], cardWidth, cardHeight, r),
+                      ],
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        SizedBox(height: r.dp(20)),
+      ],
+    );
+  }
 
   Widget _occasionCard(_OccasionTile tile, double width, double height, R r) {
     return GestureDetector(
@@ -1684,11 +1714,10 @@ class _ShopTheLookAutoSlideCard extends StatefulWidget {
 }
 
 class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
-  // This card's background is always white by design (a catalog-style photo
-  // card), regardless of the app theme. Its text/icons must stay fixed dark
-  // instead of following AppColors.primary, which turns white in dark mode
-  // and would otherwise vanish against this card's white background.
-  static const Color _cardTextColor = Color(0xFF111111);
+  // Now follows the app theme instead of a fixed white/dark palette.
+  Color get _cardBg => AppColors.card;
+  Color get _cardTextColor => AppColors.primary;
+  Color get _cardBorder => AppColors.border;
 
   late final PageController _controller;
   Timer? _timer;
@@ -1803,7 +1832,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
         final outfit = widget.outfits[i];
         return Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: _cardBg,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.08),
@@ -1822,7 +1851,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                   fit: StackFit.expand,
                   children: [
                     ColoredBox(
-                      color: Colors.white,
+                      color: _cardBg,
                       child: outfit.imageUrl != null
                           ? CachedNetworkImage(
                               imageUrl: outfit.imageUrl!,
@@ -1888,7 +1917,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                       decoration: BoxDecoration(
                         border: Border(
                           top: BorderSide(
-                            color: const Color(0xFFEDEDED),
+                            color: _cardBorder,
                             width: 1,
                           ),
                         ),

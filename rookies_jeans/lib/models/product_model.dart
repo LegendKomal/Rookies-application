@@ -57,6 +57,10 @@ class ShopifyProduct {
   final List<String> imageUrls;
   final List<ProductVariant> variants;
   final List<ProductOption> options;
+  // Only populated by queries that request it (currently just search) — used
+  // for the "Newest" client-side sort where Shopify's search API has no
+  // server-side CREATED sort key to rely on instead.
+  final DateTime? createdAt;
 
   const ShopifyProduct({
     required this.id,
@@ -68,6 +72,7 @@ class ShopifyProduct {
     required this.imageUrls,
     required this.variants,
     required this.options,
+    this.createdAt,
   });
 
   bool get isOnSale => compareAtPrice != null && compareAtPrice! > price;
@@ -131,6 +136,9 @@ String get formattedCompareAtPrice {
       imageUrls: images,
       variants: variants,
       options: options,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'] as String)
+          : null,
     );
   }
 }

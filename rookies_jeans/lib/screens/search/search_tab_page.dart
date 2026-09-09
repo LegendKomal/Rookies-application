@@ -1,0 +1,410 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
+import 'package:rookies_jeans/models/product_model.dart';
+import 'package:rookies_jeans/screens/products/product_detail_page.dart';
+import 'package:rookies_jeans/screens/search/search_results_page.dart';
+import 'package:rookies_jeans/services/shopify_storefront_service.dart';
+import 'package:rookies_jeans/widget/price_text.dart';
+
+/// The bottom-nav "Search" tab: a lightweight live-search landing page,
+/// separate from ProductsPage (which is collection browsing only). Typing
+/// shows a capped preview list; pressing enter/search opens SearchResultsPage
+/// for the full paginated, sortable, filterable grid.
+class SearchTabPage extends StatefulWidget {
+  const SearchTabPage({super.key});
+
+  @override
+  State<SearchTabPage> createState() => _SearchTabPageState();
+}
+
+class _SearchTabPageState extends State<SearchTabPage> {
+  static Color get primary => AppColors.primary;
+  static Color get bgColor => AppColors.bg;
+  static Color get cardColor => AppColors.card;
+  static Color get secondaryTxt => AppColors.secondaryText;
+  static Color get borderColor => AppColors.border;
+
+  static const String _fBody = AppFonts.body;
+  static const String _fBold = AppFonts.bold;
+  static const String _fBodyBold = AppFonts.alteBold;
+
+  static const int _kMinLiveSearchLength = 3;
+  static const int _kResultCount = 20;
+
+  final TextEditingController _searchCtrl = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  Timer? _searchDebounce;
+
+  String _activeQuery = '';
+  List<ShopifyProduct> _products = [];
+  bool _isLoading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchCtrl.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _onSearchInputChanged(String value) {
+    setState(() {});
+    _searchDebounce?.cancel();
+
+    final trimmed = value.trim();
+    if (trimmed.length < _kMinLiveSearchLength) {
+      _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+        if (!mounted || _searchCtrl.text.trim() != trimmed) return;
+        if (_activeQuery.isEmpty) return;
+        setState(() {
+          _activeQuery = '';
+          _products = [];
+          _isLoading = false;
+          _error = null;
+        });
+      });
+      return;
+    }
+
+    _searchDebounce = Timer(const Duration(milliseconds: 380), () {
+      if (!mounted || _searchCtrl.text.trim() != trimmed) return;
+      _fetchSuggestions(trimmed);
+    });
+  }
+
+  Future<void> _fetchSuggestions(String query) async {
+    setState(() {
+      _activeQuery = query;
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final response = await ShopifyStorefrontService.instance.searchProductsPaginated(
+        query,
+        first: _kResultCount,
+        sortKey: 'RELEVANCE',
+      );
+      if (!mounted || _searchCtrl.text.trim() != query) return;
+      setState(() {
+        _products = response.products;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted || _searchCtrl.text.trim() != query) return;
+      setState(() {
+        _error = 'Failed to load results.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _resetSearchState() {
+    _searchDebounce?.cancel();
+    _searchCtrl.clear();
+    if (!mounted) return;
+    setState(() {
+      _activeQuery = '';
+      _products = [];
+      _isLoading = false;
+      _error = null;
+    });
+  }
+
+  void _clearSearchField() {
+    _resetSearchState();
+    _searchFocusNode.requestFocus();
+  }
+
+  // Pressing enter/search on the keyboard opens a fresh results page for the
+  // query instead of just updating the live list in place.
+  void _openSearchResultsPage(String query) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+    _searchDebounce?.cancel();
+    FocusScope.of(context).unfocus();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SearchResultsPage(
+          initialQuery: trimmed,
+          // This tab's state persists across bottom-nav navigation, so the
+          // results page's back-to-dashboard action reaches back in to
+          // clear it — otherwise the old query/results would still be
+          // sitting here next time the user opens search.
+          onBackToDashboard: _resetSearchState,
+        ),
+      ),
+    );
+  }
+
+  void _goBack() {
+    // This tab is the root of its own bottom-nav branch with nothing
+    // beneath it to pop to, so a plain Navigator.pop here would leave a
+    // blank screen — fall back to the dashboard tab instead.
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) => Scaffold(
+        backgroundColor: bgColor,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _topBar(),
+              Expanded(child: _body()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _topBar() {
+    return Container(
+      color: cardColor,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+            color: primary,
+            onPressed: _goBack,
+          ),
+          Expanded(child: _searchField()),
+        ],
+      ),
+    );
+  }
+
+  Widget _searchField() {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border.all(color: primary.withOpacity(0.15), width: 0.8),
+      ),
+      child: TextField(
+        controller: _searchCtrl,
+        focusNode: _searchFocusNode,
+        textInputAction: TextInputAction.search,
+        textAlignVertical: TextAlignVertical.center,
+        onSubmitted: _openSearchResultsPage,
+        onChanged: _onSearchInputChanged,
+        style: TextStyle(fontFamily: _fBody, fontSize: 14, color: primary),
+        decoration: InputDecoration(
+          hintText: 'Search products...',
+          hintStyle: TextStyle(fontFamily: _fBody, fontSize: 14, color: secondaryTxt),
+          border: InputBorder.none,
+          isDense: true,
+          prefixIcon: Icon(Icons.search_rounded, size: 18, color: secondaryTxt),
+          suffixIcon: _searchCtrl.text.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.close_rounded, size: 16, color: secondaryTxt),
+                  onPressed: _clearSearchField,
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _body() {
+    if (_activeQuery.trim().isEmpty) return _idleState();
+    if (_isLoading) return _shimmerList();
+    if (_error != null) return _errorState();
+    if (_products.isEmpty) return _emptyState();
+    return _resultsList();
+  }
+
+  Widget _idleState() => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_rounded, size: 52, color: AppColors.hint),
+            const SizedBox(height: 14),
+            Text(
+              'SEARCH PRODUCTS',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+                color: primary.withOpacity(0.5),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Start typing to find what you\'re looking for',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: secondaryTxt),
+            ),
+          ],
+        ),
+      );
+
+  Widget _emptyState() => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_off_rounded, size: 48, color: AppColors.hint),
+              const SizedBox(height: 16),
+              Text(
+                'No results for "$_activeQuery"',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontFamily: _fBold, fontSize: 14, fontWeight: FontWeight.w700, color: primary),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Try a different search term.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontFamily: _fBody, fontSize: 12, color: secondaryTxt),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _errorState() => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.wifi_off_rounded, size: 52, color: AppColors.hint),
+              const SizedBox(height: 14),
+              Text(
+                _error ?? 'Something went wrong.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: secondaryTxt),
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: () => _fetchSuggestions(_activeQuery),
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('RETRY'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: primary,
+                  side: BorderSide(color: primary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _shimmerList() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: 8,
+      itemBuilder: (_, __) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Container(height: 60, color: AppColors.fieldFill),
+      ),
+    );
+  }
+
+  Widget _resultsList() {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 90),
+      itemCount: _products.length,
+      separatorBuilder: (_, __) => Divider(height: 1, color: borderColor),
+      itemBuilder: (_, i) => _resultTile(_products[i]),
+    );
+  }
+
+  Widget _resultTile(ShopifyProduct product) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: SizedBox(
+          width: 52,
+          height: 52,
+          child: product.primaryImageUrl != null
+              ? CachedNetworkImage(
+                  imageUrl: product.primaryImageUrl!,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(color: AppColors.fieldFill),
+                  errorWidget: (_, __, ___) => Icon(
+                    Icons.image_not_supported_outlined,
+                    color: AppColors.hint,
+                  ),
+                )
+              : Container(
+                  color: AppColors.fieldFill,
+                  child: Icon(Icons.image_not_supported_outlined, color: AppColors.hint),
+                ),
+        ),
+      ),
+      title: Text(
+        product.title,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(fontFamily: _fBodyBold, fontSize: 13, fontWeight: FontWeight.w700, color: primary),
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: _priceBlock(product),
+      ),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProductDetailPage(
+            handle: product.handle,
+            title: product.title,
+            heroImageUrl: product.primaryImageUrl,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _priceBlock(ShopifyProduct product) {
+    if (!product.isOnSale) {
+      return PriceText(
+        product.formattedPrice,
+        currencyCode: product.currencyCode,
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: primary,
+        amountFontFamily: _fBold,
+      );
+    }
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 6,
+      children: [
+        PriceText(
+          product.formattedPrice,
+          currencyCode: product.currencyCode,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: primary,
+          amountFontFamily: _fBold,
+        ),
+        PriceText(
+          product.formattedCompareAtPrice,
+          currencyCode: product.currencyCode,
+          fontSize: 11,
+          color: secondaryTxt,
+          amountFontFamily: _fBody,
+          decoration: TextDecoration.lineThrough,
+        ),
+      ],
+    );
+  }
+}

@@ -1,48 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
-import 'package:rookies_jeans/services/shopify_storefront_service.dart';
+import 'package:rookies_jeans/screens/products/products.dart' show ProductSortOption;
+import 'package:rookies_jeans/services/shopify_storefront_service.dart' hide ProductSortOption;
 import 'package:rookies_jeans/services/wishlist_service.dart';
 import 'package:rookies_jeans/widget/price_text.dart';
 
-enum _SearchSort {
-  relevance('Relevance', 'RELEVANCE', false),
-  newest('Newest', 'CREATED', true),
-  priceLowToHigh('Price: Low to High', 'PRICE', false),
-  priceHighToLow('Price: High to Low', 'PRICE', true),
-  titleAZ('Alphabetically: A-Z', 'TITLE', false),
-  titleZA('Alphabetically: Z-A', 'TITLE', true);
-
-  const _SearchSort(this.label, this.shopifyKey, this.reverse);
-  final String label;
-  final String shopifyKey;
-  final bool reverse;
-}
-
-class _PriceBracket {
-  final String label;
-  final double? min;
-  final double? max;
-  const _PriceBracket(this.label, this.min, this.max);
-}
-
-const List<_PriceBracket> _priceBrackets = [
-  _PriceBracket('Under ₹999', null, 999),
-  _PriceBracket('₹999 - ₹1,499', 999, 1499),
-  _PriceBracket('₹1,499 - ₹1,999', 1499, 1999),
-  _PriceBracket('₹1,999 - ₹2,499', 1999, 2499),
-  _PriceBracket('Above ₹2,499', 2499, null),
-];
-
 class SearchResultsPage extends StatefulWidget {
   final String initialQuery;
-  const SearchResultsPage({super.key, required this.initialQuery});
+  // Called when the user backs out of this page to the dashboard, so the
+  // search tab it came from can clear its stale query/results — that tab's
+  // state otherwise survives navigation (bottom-nav tabs stay alive).
+  final VoidCallback? onBackToDashboard;
+  const SearchResultsPage({super.key, required this.initialQuery, this.onBackToDashboard});
 
   @override
   State<SearchResultsPage> createState() => _SearchResultsPageState();
 }
+
+// Mirrors the fixed price brackets ProductsPage offers under its "Price"
+// filter section — Shopify's facets return real price *ranges* per query,
+// not clean brackets, so both pages special-case this one category with a
+// static list of brackets mapped onto the real filter id.
+class _PriceOption {
+  final String label;
+  final double? min;
+  final double? max;
+
+  const _PriceOption({required this.label, this.min, this.max});
+
+  String toShopifyInput() {
+    final parts = <String>[];
+    if (min != null) parts.add('"min":$min');
+    if (max != null) parts.add('"max":$max');
+    return '{"price":{${parts.join(',')}}}';
+  }
+}
+
+const List<_PriceOption> _priceOptions = [
+  _PriceOption(label: 'Under ₹999', max: 999.0),
+  _PriceOption(label: '₹999 - ₹1,499', min: 999.0, max: 1499.0),
+  _PriceOption(label: '₹1,499 - ₹1,999', min: 1499.0, max: 1999.0),
+  _PriceOption(label: '₹1,999 - ₹2,499', min: 1999.0, max: 2499.0),
+  _PriceOption(label: '₹2,499 - ₹2,999', min: 2499.0, max: 2999.0),
+  _PriceOption(label: 'Above ₹2,999', min: 2999.0),
+];
 
 class _SearchResultsPageState extends State<SearchResultsPage> {
   static Color get primary => AppColors.primary;
@@ -73,8 +78,67 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   String? _endCursor;
   String? _error;
 
-  _SearchSort _sort = _SearchSort.relevance;
-  _PriceBracket? _priceFilter;
+  // Same 6 sort labels the product page offers. Shopify's search API only
+  // has server-side sort keys for RELEVANCE and PRICE though (no CREATED or
+  // TITLE for `search`, confirmed against the Storefront API docs) — so
+  // Newest/Title A-Z/Title Z-A are fetched at RELEVANCE and then re-sorted
+  // client-side on whatever page of results is currently loaded. That's an
+  // approximation, not a true full-catalog sort, but it keeps the option
+  // available with a consistent label set instead of silently disappearing.
+  ProductSortOption _sortOption = ProductSortOption.defaultSort;
+  static const List<ProductSortOption> _availableSortOptions = ProductSortOption.values;
+
+  String get _searchSortKey {
+    switch (_sortOption) {
+      case ProductSortOption.priceLowToHigh:
+      case ProductSortOption.priceHighToLow:
+        return 'PRICE';
+      default:
+        return 'RELEVANCE';
+    }
+  }
+
+  bool get _searchReverse => _sortOption == ProductSortOption.priceHighToLow;
+
+  // Real Shopify facets for this query, fetched alongside the products —
+  // same source ProductsPage uses for collection browsing, so the filter
+  // sheet here reflects whatever colors/sizes/etc. actually exist in the
+  // current result set instead of a hand-picked list.
+  List<ShopifyFilter> _availableFilters = [];
+  final Map<String, Set<String>> _selectedFilterInputs = {};
+  final Map<String, bool> _expandedFilters = {};
+  int _activeFilterSectionIndex = 0;
+
+  List<ShopifyFilter> get _visibleFilters => _availableFilters
+      .where((filter) => filter.label.toLowerCase().trim() != 'availability')
+      .toList();
+
+  int get _activeFilterCount =>
+      _selectedFilterInputs.values.fold(0, (sum, s) => sum + s.length);
+
+  List<String> get _flatSelectedInputs =>
+      _selectedFilterInputs.values.expand((s) => s).toList();
+
+  void _applyClientSortIfNeeded() {
+    switch (_sortOption) {
+      case ProductSortOption.titleAZ:
+        _products.sort((a, b) => a.title.compareTo(b.title));
+        break;
+      case ProductSortOption.titleZA:
+        _products.sort((a, b) => b.title.compareTo(a.title));
+        break;
+      case ProductSortOption.newest:
+        _products.sort((a, b) {
+          final aDate = a.createdAt;
+          final bDate = b.createdAt;
+          if (aDate == null || bDate == null) return 0;
+          return bDate.compareTo(aDate);
+        });
+        break;
+      default:
+        break;
+    }
+  }
 
   @override
   void initState() {
@@ -129,16 +193,19 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
       final response = await ShopifyStorefrontService.instance.searchProductsPaginated(
         _query,
         first: 24,
-        sortKey: _sort.shopifyKey,
-        reverse: _sort.reverse,
-        minPrice: _priceFilter?.min,
-        maxPrice: _priceFilter?.max,
+        sortKey: _searchSortKey,
+        reverse: _searchReverse,
+        filters: _flatSelectedInputs,
       );
       if (!mounted) return;
       setState(() {
         _products = response.products;
+        _applyClientSortIfNeeded();
         _hasNextPage = response.hasNextPage;
         _endCursor = response.endCursor;
+        if (response.filters.isNotEmpty) {
+          _availableFilters = response.filters;
+        }
         _isLoading = false;
       });
     } catch (e) {
@@ -159,14 +226,14 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
         _query,
         first: 24,
         after: _endCursor,
-        sortKey: _sort.shopifyKey,
-        reverse: _sort.reverse,
-        minPrice: _priceFilter?.min,
-        maxPrice: _priceFilter?.max,
+        sortKey: _searchSortKey,
+        reverse: _searchReverse,
+        filters: _flatSelectedInputs,
       );
       if (!mounted) return;
       setState(() {
         _products.addAll(response.products);
+        _applyClientSortIfNeeded();
         _hasNextPage = response.hasNextPage;
         _endCursor = response.endCursor;
         _isLoadingMore = false;
@@ -182,15 +249,27 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     await _fetchInitial();
   }
 
-  void _applySort(_SearchSort sort) {
-    if (sort == _sort) return;
-    setState(() => _sort = sort);
+  void _applySort(ProductSortOption sort) {
+    if (sort == _sortOption) return;
+    setState(() => _sortOption = sort);
     _fetchInitial();
   }
 
-  void _applyPriceFilter(_PriceBracket? bracket) {
-    setState(() => _priceFilter = bracket);
+  void _applyFilters(Map<String, Set<String>> newSelection) {
+    setState(() {
+      _selectedFilterInputs
+        ..clear()
+        ..addAll(newSelection);
+    });
     _fetchInitial();
+  }
+
+  void _goToDashboard() {
+    widget.onBackToDashboard?.call();
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+    context.go('/home');
   }
 
   @override
@@ -234,7 +313,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
             children: [
               IconButton(
                 icon: Icon(Icons.arrow_back_ios_new_rounded, color: primary, size: 18),
-                onPressed: () => Navigator.pop(context),
+                onPressed: _goToDashboard,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               ),
@@ -343,7 +422,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                 style: TextStyle(fontFamily: _fBody, fontSize: 12, color: primary),
               ),
               Text(
-                _sort.label.toUpperCase(),
+                _sortOption.label.toUpperCase(),
                 style: TextStyle(fontFamily: _fBold, fontSize: 12, fontWeight: FontWeight.w800, color: primary),
               ),
               const SizedBox(width: 4),
@@ -356,10 +435,10 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   }
 
   Widget _filterButton() {
-    final active = _priceFilter != null;
+    final active = _activeFilterCount > 0;
     return Expanded(
       child: OutlinedButton(
-        onPressed: _openFilterSheet,
+        onPressed: () => _openFilterSheet(context),
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: borderColor),
           shape: const RoundedRectangleBorder(),
@@ -373,7 +452,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               Icon(Icons.tune_rounded, size: 16, color: primary),
               const SizedBox(width: 6),
               Text(
-                active ? 'FILTERS (1)' : 'FILTERS',
+                active ? 'FILTERS ($_activeFilterCount)' : 'FILTERS',
                 style: TextStyle(fontFamily: _fBold, fontSize: 12, fontWeight: FontWeight.w800, color: primary),
               ),
             ],
@@ -383,118 +462,415 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     );
   }
 
+  // isScrollControlled + an explicit max height keep this scrollable instead
+  // of overflowing — 6 sort options no longer fit the sheet's default,
+  // unscrolled intrinsic-height sizing on shorter screens.
   void _openSortSheet() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'SORT BY',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: primary),
-                ),
-              ),
-            ),
-            Divider(height: 1, color: borderColor),
-            ..._SearchSort.values.map((option) {
-              final isSelected = option == _sort;
-              return ListTile(
-                title: Text(
-                  option.label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                    color: primary,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(sheetContext).size.height * 0.7,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'SORT BY',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: primary),
                   ),
                 ),
-                trailing: isSelected ? Icon(Icons.check_rounded, color: primary) : null,
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _applySort(option);
-                },
-              );
-            }),
-            const SizedBox(height: 8),
-          ],
+              ),
+              Divider(height: 1, color: borderColor),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  children: _availableSortOptions.map((option) {
+                    final isSelected = option == _sortOption;
+                    return ListTile(
+                      title: Text(
+                        option.label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                          color: primary,
+                        ),
+                      ),
+                      trailing: isSelected ? Icon(Icons.check_rounded, color: primary) : null,
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _applySort(option);
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _openFilterSheet() {
-    _PriceBracket? draft = _priceFilter;
+  void _openFilterSheet(BuildContext context) {
+    final draft = Map<String, Set<String>>.from(
+      _selectedFilterInputs.map((k, v) => MapEntry(k, {...v})),
+    );
+
+    int localActiveIndex = _activeFilterSectionIndex;
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (sheetContext) {
+        final screenSize = MediaQuery.of(sheetContext).size;
+        final railWidth = (screenSize.width * 0.32).clamp(96.0, 200.0);
         return StatefulBuilder(
-          builder: (sheetContext, setSheetState) => SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Row(
+          builder: (sheetContext, setSheetState) {
+            final draftActiveCount =
+                draft.values.fold<int>(0, (sum, s) => sum + s.length);
+
+            if (_visibleFilters.isEmpty) {
+              return SafeArea(
+                child: SizedBox(
+                  height: 320,
+                  child: Center(
+                    child: Text(
+                      'No filters available for this search.',
+                      style: TextStyle(fontSize: 12, color: secondaryTxt),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            if (localActiveIndex >= _visibleFilters.length) {
+              localActiveIndex = 0;
+            }
+
+            final activeFilter = _visibleFilters[localActiveIndex];
+            final selected = draft[activeFilter.id] ?? <String>{};
+
+            final isPriceFilter = activeFilter.label.toLowerCase().contains('price');
+            final isColorFilter = activeFilter.label.toLowerCase().contains('color');
+            final isExpanded = _expandedFilters[activeFilter.id] ?? false;
+            final canShowMore = isColorFilter && activeFilter.values.length > 15;
+
+            final visibleValues = canShowMore && !isExpanded
+                ? activeFilter.values.take(15).toList()
+                : activeFilter.values;
+
+            return SafeArea(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 900),
+                child: SizedBox(
+                  height: screenSize.height * (screenSize.height < 600 ? 0.92 : 0.82),
+                  child: Column(
                     children: [
-                      Text(
-                        'PRICE',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: primary),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Filters',
+                              style: TextStyle(fontFamily: _fBody, fontSize: 16, color: primary),
+                            ),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: draftActiveCount == 0
+                                  ? null
+                                  : () => setSheetState(() => draft.clear()),
+                              child: Text(
+                                'Clear All',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: primary),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: draft == null
-                            ? null
-                            : () => setSheetState(() => draft = null),
-                        child: Text('Clear', style: TextStyle(color: primary)),
+                      Divider(height: 1, color: borderColor),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              width: railWidth,
+                              decoration: BoxDecoration(
+                                color: bgColor,
+                                border: Border(
+                                  right: BorderSide(color: borderColor.withOpacity(0.8)),
+                                ),
+                              ),
+                              child: ListView.builder(
+                                itemCount: _visibleFilters.length,
+                                itemBuilder: (context, index) {
+                                  final filter = _visibleFilters[index];
+                                  final isActive = index == localActiveIndex;
+                                  final count = draft[filter.id]?.length ?? 0;
+
+                                  return InkWell(
+                                    onTap: () => setSheetState(() => localActiveIndex = index),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                      decoration: BoxDecoration(
+                                        color: isActive ? cardColor : Colors.transparent,
+                                        border: Border(
+                                          left: BorderSide(
+                                            color: isActive ? primary : Colors.transparent,
+                                            width: 3,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              filter.label,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                                                color: primary,
+                                              ),
+                                            ),
+                                          ),
+                                          if (count > 0)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: primary,
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              child: Text(
+                                                '$count',
+                                                style: TextStyle(
+                                                  color: onPrimary,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      activeFilter.label,
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: primary),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Expanded(
+                                      child: isPriceFilter
+                                          ? _priceOptionsSection(
+                                              activeFilter: activeFilter,
+                                              draft: draft,
+                                              setSheetState: setSheetState,
+                                            )
+                                          : ListView.separated(
+                                              itemCount: visibleValues.length + (canShowMore ? 1 : 0),
+                                              separatorBuilder: (_, __) => Divider(height: 1, color: borderColor),
+                                              itemBuilder: (context, index) {
+                                                if (canShowMore && index == visibleValues.length) {
+                                                  return InkWell(
+                                                    onTap: () => setSheetState(() {
+                                                      _expandedFilters[activeFilter.id] = !isExpanded;
+                                                    }),
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                                      child: Text(
+                                                        isExpanded ? 'Show less' : 'Show more',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.w700,
+                                                          color: primary,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+
+                                                final value = visibleValues[index];
+                                                final isSelected = selected.contains(value.input);
+
+                                                return InkWell(
+                                                  onTap: () => setSheetState(() {
+                                                    final set = draft.putIfAbsent(activeFilter.id, () => <String>{});
+                                                    if (isSelected) {
+                                                      set.remove(value.input);
+                                                      if (set.isEmpty) draft.remove(activeFilter.id);
+                                                    } else {
+                                                      set.add(value.input);
+                                                    }
+                                                  }),
+                                                  child: Padding(
+                                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                                    child: Row(
+                                                      children: [
+                                                        Container(
+                                                          width: 18,
+                                                          height: 18,
+                                                          decoration: BoxDecoration(
+                                                            border: Border.all(
+                                                              color: isSelected ? primary : borderColor,
+                                                            ),
+                                                            borderRadius: BorderRadius.circular(4),
+                                                            color: isSelected ? primary : Colors.transparent,
+                                                          ),
+                                                          child: isSelected
+                                                              ? Icon(Icons.check, size: 13, color: onPrimary)
+                                                              : null,
+                                                        ),
+                                                        const SizedBox(width: 10),
+                                                        Expanded(
+                                                          child: Text(
+                                                            value.label,
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              color: primary,
+                                                              fontWeight: FontWeight.w500,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        if (value.count > 0)
+                                                          Text(
+                                                            '${value.count}',
+                                                            style: TextStyle(fontSize: 11, color: secondaryTxt),
+                                                          ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          border: Border(top: BorderSide(color: borderColor)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => setSheetState(() => draft.clear()),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: primary),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                  minimumSize: const Size.fromHeight(46),
+                                ),
+                                child: Text(
+                                  'Clear',
+                                  style: TextStyle(color: primary, fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  _activeFilterSectionIndex = localActiveIndex;
+                                  Navigator.pop(sheetContext);
+                                  _applyFilters(draft);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primary,
+                                  foregroundColor: onPrimary,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                  minimumSize: const Size.fromHeight(46),
+                                ),
+                                child: Text(
+                                  draftActiveCount > 0 ? 'Apply ($draftActiveCount)' : 'Apply',
+                                  style: TextStyle(color: onPrimary, fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-                Divider(height: 1, color: borderColor),
-                ..._priceBrackets.map((bracket) {
-                  final isSelected = draft?.label == bracket.label;
-                  return ListTile(
-                    title: Text(
-                      bracket.label,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                        color: primary,
-                      ),
-                    ),
-                    trailing: isSelected ? Icon(Icons.check_rounded, color: primary) : null,
-                    onTap: () => setSheetState(() => draft = bracket),
-                  );
-                }),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(sheetContext);
-                        _applyPriceFilter(draft);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primary,
-                        foregroundColor: onPrimary,
-                        shape: const RoundedRectangleBorder(),
-                        minimumSize: const Size.fromHeight(46),
-                      ),
-                      child: const Text('Apply'),
-                    ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _priceOptionsSection({
+    required ShopifyFilter activeFilter,
+    required Map<String, Set<String>> draft,
+    required void Function(void Function()) setSheetState,
+  }) {
+    final selected = draft[activeFilter.id] ?? <String>{};
+
+    return ListView.separated(
+      itemCount: _priceOptions.length,
+      separatorBuilder: (_, __) => Divider(height: 1, color: borderColor),
+      itemBuilder: (context, index) {
+        final option = _priceOptions[index];
+        final input = option.toShopifyInput();
+        final isSelected = selected.contains(input);
+
+        return InkWell(
+          onTap: () => setSheetState(() {
+            if (isSelected) {
+              draft.remove(activeFilter.id);
+            } else {
+              draft[activeFilter.id] = {input};
+            }
+          }),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: isSelected ? primary : borderColor),
+                    borderRadius: BorderRadius.circular(4),
+                    color: isSelected ? primary : cardColor,
+                  ),
+                  child: isSelected ? Icon(Icons.check, size: 13, color: onPrimary) : null,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    option.label,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: primary),
                   ),
                 ),
               ],
@@ -645,33 +1021,34 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 
   Widget _priceRow(ShopifyProduct product) {
     if (!product.isOnSale) {
-      return Text(
+      return PriceText(
         product.formattedPrice,
-        style: TextStyle(
-          fontFamily: _fBold,
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          color: primary,
-        ),
+        currencyCode: product.currencyCode,
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: primary,
+        amountFontFamily: _fBold,
       );
     }
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: 6,
       children: [
-        Text(
+        PriceText(
           product.formattedPrice,
-          style: TextStyle(fontFamily: _fBold, fontSize: 13, fontWeight: FontWeight.w700, color: primary),
+          currencyCode: product.currencyCode,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: primary,
+          amountFontFamily: _fBold,
         ),
-        Text(
+        PriceText(
           product.formattedCompareAtPrice,
-          style: TextStyle(
-            fontFamily: _fBody,
-            fontSize: 11,
-            color: secondaryTxt,
-            decoration: TextDecoration.lineThrough,
-            decorationColor: secondaryTxt,
-          ),
+          currencyCode: product.currencyCode,
+          fontSize: 11,
+          color: secondaryTxt,
+          amountFontFamily: _fBody,
+          decoration: TextDecoration.lineThrough,
         ),
       ],
     );

@@ -13,7 +13,7 @@ import 'package:rookies_jeans/screens/profile/address_book.dart';
 import 'package:rookies_jeans/screens/profile/change_password_screen.dart';
 import 'package:rookies_jeans/screens/profile/profile.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
-import 'package:rookies_jeans/screens/products/products.dart';
+import 'package:rookies_jeans/screens/search/search_tab_page.dart';
 import 'package:rookies_jeans/screens/splashscreen/splashscreen.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 
@@ -113,7 +113,7 @@ final GoRouter _appRouter = GoRouter(
         StatefulShellBranch(routes: [
           GoRoute(
             path: '/search',
-            builder: (context, state) => const ProductsPage.search(query: ''),
+            builder: (context, state) => const SearchTabPage(),
           ),
         ]),
         StatefulShellBranch(routes: [

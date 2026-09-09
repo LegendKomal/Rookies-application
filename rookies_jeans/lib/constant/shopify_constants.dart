@@ -53,6 +53,40 @@ class ShopifyConstants {
   static const String balloonCargosHandle    = 'BALLOON FIT CARGO';
   static const String oversizedShirtsHandle  = 'oversized-shirts';
 
+  /// The "Explore Categories" accordion's Top Wear / Bottom Wear grouping.
+  /// Shopify's own `top-wear`/`bottom-wear` navigation menus don't match
+  /// this list (they include Polos/Hoodies and omit Shackets, Jacket,
+  /// Linens, Co-ords), and the Storefront API has no way to list every menu
+  /// handle in the shop, so there's no reliable way to fetch "which
+  /// categories, grouped which way" purely from the API. This pins the
+  /// grouping/order to match the app's design; each category's *fits* are
+  /// still fetched live from Shopify (the flat menu handled the same as the
+  /// category, e.g. `shirts`) so those stay editable from Admin without an
+  /// app update. Add/remove/reorder entries here if the grouping changes.
+  static const List<Map<String, Object>> exploreMenuSections = [
+    {
+      'title': 'Top Wear',
+      'categories': [
+        {'title': 'Shirts', 'handle': 'shirts'},
+        {'title': 'Tshirts', 'handle': 'tshirts'},
+        {'title': 'Shackets', 'handle': 'shackets'},
+        {'title': 'Jacket', 'handle': 'jacket'},
+        {'title': 'Linens', 'handle': 'linens'},
+        {'title': 'Flatknits', 'handle': 'flatknits'},
+      ],
+    },
+    {
+      'title': 'Bottom Wear',
+      'categories': [
+        {'title': 'Jeans', 'handle': 'jeans'},
+        {'title': 'Cargos', 'handle': 'cargos'},
+        {'title': 'Chinos', 'handle': 'chinos'},
+        {'title': 'Shorts', 'handle': 'shorts'},
+        {'title': 'Co-ords', 'handle': 'co-ords'},
+      ],
+    },
+  ];
+
   static const List<Map<String, String>> exploreCategories = [
     {'handle': cargosHandle,   'label': 'CARGOS'},
     {'handle': jeansHandle,    'label': 'JEANS'},

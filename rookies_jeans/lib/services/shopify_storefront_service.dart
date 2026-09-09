@@ -6,6 +6,7 @@ import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/models/banner_model.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/models/home_content_models.dart';
+import 'package:rookies_jeans/models/shop_menu_model.dart';
 
 class PaginatedProductsResponse {
   final List<ShopifyProduct> products;
@@ -909,6 +910,7 @@ for (final e in rawVariantEdges) {
               id
               title
               handle
+              createdAt
               priceRange { minVariantPrice { amount currencyCode } }
               compareAtPriceRange { minVariantPrice { amount currencyCode } }
               images(first: 2) { edges { node { url altText } } }
@@ -1251,6 +1253,144 @@ for (final e in rawVariantEdges) {
       return categories;
     } catch (e) {
       _log('getExploreCategoriesContent EXCEPTION: $e');
+      return [];
+    }
+  }
+
+  /// The "Explore Categories" accordion's Top Wear / Bottom Wear grouping
+  /// is pinned in [ShopifyConstants.exploreMenuSections] (see that constant
+  /// for why — Shopify's own `top-wear`/`bottom-wear` navigation menus
+  /// don't match the intended design, and the Storefront API can't list
+  /// every menu handle in the shop to auto-discover the right ones). What
+  /// *is* fetched live here is each category's fits: Shopify Admin →
+  /// Content → Menus has one flat menu per category, handled the same as
+  /// the category itself (e.g. `shirts`), and its items become that
+  /// category's fit list.
+  Future<List<ShopMenuSection>> getExploreMenuSections() => _cachedFetch(
+        'exploreMenuSections',
+        _fetchExploreMenuSections,
+      );
+
+  Future<List<ShopMenuSection>> _fetchExploreMenuSections() async {
+    final sectionDefs = ShopifyConstants.exploreMenuSections;
+    final allHandles = <String>{
+      for (final section in sectionDefs)
+        for (final category in section['categories'] as List)
+          (category as Map)['handle'] as String,
+    }.toList();
+
+    final fitsByHandle = await _fetchFitMenusByHandle(allHandles);
+
+    return sectionDefs.map((section) {
+      final categories = (section['categories'] as List).map((raw) {
+        final category = raw as Map;
+        final handle = category['handle'] as String;
+        return ShopMenuCategory(
+          title: category['title'] as String,
+          collectionHandle: handle,
+          fits: fitsByHandle[handle] ?? const [],
+        );
+      }).toList();
+
+      final title = section['title'] as String;
+      return ShopMenuSection(
+        title: title,
+        handle: title.toLowerCase().replaceAll(' ', '-'),
+        categories: categories,
+      );
+    }).toList();
+  }
+
+  /// Batch-fetches one flat menu per handle in [handles] (each menu's items
+  /// become that category's fits) using a single aliased GraphQL request. A
+  /// handle with no matching menu is simply omitted from the result.
+  Future<Map<String, List<ShopMenuFit>>> _fetchFitMenusByHandle(
+    List<String> handles,
+  ) async {
+    if (handles.isEmpty) return {};
+
+    final buffer = StringBuffer('query getFitMenus {\n');
+    for (int i = 0; i < handles.length; i++) {
+      final safeHandle = handles[i].replaceAll('"', r'\"');
+      buffer.write('  f$i: menu(handle: "$safeHandle") {\n');
+      buffer.write('    items { title url }\n');
+      buffer.write('  }\n');
+    }
+    buffer.write('}');
+
+    try {
+      final res = await ShopifyGraphQL.post(buffer.toString());
+      _log('getExploreMenuSections (fits) [$handles] → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) return {};
+
+      final data = res.data!;
+      final Map<String, List<ShopMenuFit>> result = {};
+      for (int i = 0; i < handles.length; i++) {
+        final node = data['f$i'] as Map<String, dynamic>?;
+        if (node == null) continue;
+        final items = ((node['items'] as List?) ?? [])
+            .map((e) {
+              final fit = e as Map<String, dynamic>;
+              return ShopMenuFit(
+                title: fit['title'] as String? ?? '',
+                url: fit['url'] as String? ?? '',
+              );
+            })
+            .toList();
+        result[handles[i]] = items;
+      }
+      return result;
+    } catch (e) {
+      _log('_fetchFitMenusByHandle EXCEPTION: $e');
+      return {};
+    }
+  }
+
+  /// Every collection in the store, for the "Collections" page. Unlike
+  /// [getExploreCategories]/[getOurCollectionTiles] (which are curated,
+  /// hand-picked lists), this is the full catalog of collections as
+  /// configured in Shopify.
+  Future<List<ShopifyCollection>> getAllCollections({int first = 100}) =>
+      _cachedFetch(
+        'allCollections:$first',
+        () => _fetchAllCollections(first),
+      );
+
+  Future<List<ShopifyCollection>> _fetchAllCollections(int first) async {
+    const String query = r'''
+      query getAllCollections($first: Int!) {
+        collections(first: $first, sortKey: TITLE) {
+          edges {
+            node {
+              id
+              title
+              handle
+              image { url altText }
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final res =
+          await ShopifyGraphQL.post(query, variables: {'first': first});
+      _log('getAllCollections → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) {
+        _log('getAllCollections errors: ${res.errors}');
+        return [];
+      }
+
+      final edges = (res.data!['collections']?['edges'] as List?) ?? [];
+      return edges.map((e) {
+        final node = e['node'] as Map<String, dynamic>;
+        return ShopifyCollection.fromJson(
+          node,
+          label: (node['title'] as String? ?? '').toUpperCase(),
+        );
+      }).toList();
+    } catch (e) {
+      _log('getAllCollections EXCEPTION: $e');
       return [];
     }
   }

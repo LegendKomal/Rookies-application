@@ -41,16 +41,19 @@ class _CenterFloatAboveBottomNav extends FloatingActionButtonLocation {
 }
 
 class ProductsPage extends StatefulWidget {
-  final ShopifyCollection? collection;
-  final String? searchQuery;
+  final ShopifyCollection collection;
 
-  const ProductsPage({super.key, required ShopifyCollection collection})
-      : collection = collection,
-        searchQuery = null;
+  /// When set, the page auto-selects the "Fit" filter value matching this
+  /// label (case-insensitive) as soon as the collection's filters load —
+  /// used when arriving from a fit link like "Boxy fit" in Explore
+  /// Categories so the product grid opens pre-filtered.
+  final String? initialFitFilter;
 
-  const ProductsPage.search({super.key, required String query})
-      : collection = null,
-        searchQuery = query;
+  const ProductsPage({
+    super.key,
+    required this.collection,
+    this.initialFitFilter,
+  });
 
   @override
   State<ProductsPage> createState() => _ProductsPageState();
@@ -85,14 +88,6 @@ class _ProductsPageState extends State<ProductsPage> {
 
   final ScrollController _scrollController = ScrollController();
 
-  bool get _isSearchMode => widget.searchQuery != null;
-
-  late final TextEditingController _searchCtrl =
-      TextEditingController(text: widget.searchQuery ?? '');
-  late String _activeQuery = widget.searchQuery ?? '';
-  final FocusNode _searchFocusNode = FocusNode();
-  Timer? _searchDebounce;
-
   List<ShopifyProduct> _products = [];
   List<ShopifyFilter> _availableFilters = [];
   bool _isLoading = true;
@@ -115,6 +110,7 @@ class _ProductsPageState extends State<ProductsPage> {
   final Map<String, Set<String>> _selectedFilterInputs = {};
   final Map<String, bool> _expandedFilters = {};
   int _activeFilterSectionIndex = 0;
+  bool _appliedInitialFitFilter = false;
 
   final Map<String, PageController> _imagePageControllers = {};
 
@@ -143,12 +139,6 @@ class _ProductsPageState extends State<ProductsPage> {
     super.initState();
     _fetchInitialProducts();
 
-    if (_isSearchMode && _activeQuery.trim().isEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _searchFocusNode.requestFocus();
-      });
-    }
-
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
               _scrollController.position.maxScrollExtent - 300 &&
@@ -163,7 +153,6 @@ class _ProductsPageState extends State<ProductsPage> {
   @override
   void dispose() {
     _autoScrollTimer?.cancel();
-    _searchDebounce?.cancel();
     for (final c in _imagePageControllers.values) {
       c.dispose();
     }
@@ -171,8 +160,6 @@ class _ProductsPageState extends State<ProductsPage> {
       n.dispose();
     }
     _scrollController.dispose();
-    _searchCtrl.dispose();
-    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -273,36 +260,11 @@ class _ProductsPageState extends State<ProductsPage> {
   List<String> get _flatSelectedInputs =>
       _selectedFilterInputs.values.expand((s) => s).toList();
 
-  String get _searchSortKey =>
-      _sortOption == ProductSortOption.defaultSort
-          ? 'RELEVANCE'
-          : _sortOption.shopifyKey;
-
-  // Shopify's `search` field (used for search results) only defines
-  // RELEVANCE and PRICE as sort keys — unlike collection browsing, which
-  // supports CREATED/TITLE too. Restrict the sort sheet accordingly so we
-  // never send a sortKey the search API will reject.
-  List<ProductSortOption> get _availableSortOptions => _isSearchMode
-      ? const [
-          ProductSortOption.defaultSort,
-          ProductSortOption.priceLowToHigh,
-          ProductSortOption.priceHighToLow,
-        ]
-      : ProductSortOption.values;
+  List<ProductSortOption> get _availableSortOptions => ProductSortOption.values;
 
   Future<PaginatedProductsResponse> _fetchProducts({String? after}) {
-    if (_isSearchMode) {
-      return ShopifyStorefrontService.instance.searchProductsPaginated(
-        _activeQuery,
-        first: 24,
-        after: after,
-        sortKey: _searchSortKey,
-        reverse: _sortOption.reverse,
-        filters: _flatSelectedInputs,
-      );
-    }
     return ShopifyStorefrontService.instance.getProductsByCollectionPaginated(
-      widget.collection!.handle,
+      widget.collection.handle,
       first: 24,
       after: after,
       sortKey: _sortOption.shopifyKey,
@@ -322,17 +284,6 @@ class _ProductsPageState extends State<ProductsPage> {
       });
     }
 
-    if (_isSearchMode && _activeQuery.trim().isEmpty) {
-      if (mounted) {
-        setState(() {
-          _products = [];
-          _hasNextPage = false;
-          _isLoading = false;
-        });
-      }
-      return;
-    }
-
     try {
       final response = await _fetchProducts();
 
@@ -350,6 +301,8 @@ class _ProductsPageState extends State<ProductsPage> {
 
       _syncPageControllers();
       _startAutoScrollTimer();
+
+      if (_applyInitialFitFilterIfNeeded()) return;
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -357,6 +310,32 @@ class _ProductsPageState extends State<ProductsPage> {
         _isLoading = false;
       });
     }
+  }
+
+  /// Selects the "Fit" filter value matching [ProductsPage.initialFitFilter]
+  /// (once, on first load) and refetches with it applied. Returns true when
+  /// a refetch was kicked off, so the caller can skip its own state update
+  /// for this pass — [_fetchInitialProducts] runs again and updates state.
+  bool _applyInitialFitFilterIfNeeded() {
+    if (_appliedInitialFitFilter) return false;
+    _appliedInitialFitFilter = true;
+
+    final wanted = widget.initialFitFilter?.trim().toLowerCase();
+    if (wanted == null || wanted.isEmpty) return false;
+
+    for (final filter in _availableFilters) {
+      if (filter.label.trim().toLowerCase() != 'fit') continue;
+      for (final value in filter.values) {
+        if (value.label.trim().toLowerCase() == wanted) {
+          setState(() {
+            _selectedFilterInputs[filter.id] = {value.input};
+          });
+          _fetchInitialProducts();
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   Future<void> _loadMoreProducts() async {
@@ -391,52 +370,6 @@ class _ProductsPageState extends State<ProductsPage> {
     _autoScrollTimer?.cancel();
     ShopifyStorefrontService.instance.clearCache();
     await _fetchInitialProducts();
-  }
-
-  void _runNewSearch(String query) {
-    final trimmed = query.trim();
-    if (trimmed.isEmpty || trimmed == _activeQuery) return;
-    setState(() => _activeQuery = trimmed);
-    _fetchInitialProducts();
-  }
-
-  static const int _kMinLiveSearchLength = 3;
-
-  void _onSearchInputChanged(String value) {
-    setState(() {});
-    _searchDebounce?.cancel();
-
-    final trimmed = value.trim();
-    if (trimmed.length < _kMinLiveSearchLength) {
-      _searchDebounce = Timer(const Duration(milliseconds: 250), () {
-        if (!mounted || _searchCtrl.text.trim() != trimmed) return;
-        if (_activeQuery.isEmpty) return;
-        setState(() {
-          _activeQuery = '';
-          _products = [];
-          _hasNextPage = false;
-          _isLoading = false;
-        });
-      });
-      return;
-    }
-
-    _searchDebounce = Timer(const Duration(milliseconds: 380), () {
-      if (!mounted || _searchCtrl.text.trim() != trimmed) return;
-      _runNewSearch(trimmed);
-    });
-  }
-
-  void _clearSearchField() {
-    _searchDebounce?.cancel();
-    _searchCtrl.clear();
-    setState(() {
-      _activeQuery = '';
-      _products = [];
-      _hasNextPage = false;
-      _isLoading = false;
-    });
-    _searchFocusNode.requestFocus();
   }
 
   void _applySort(ProductSortOption option) {
@@ -836,19 +769,17 @@ class _ProductsPageState extends State<ProductsPage> {
           children: [
             _topBar(context),
             Expanded(
-              child: _isSearchMode && _activeQuery.trim().isEmpty
-                  ? _searchIdleState()
-                  : _isLoading
-                      ? _shimmerGrid()
-                      : RefreshIndicator(
-                          color: primary,
-                          onRefresh: _refreshProducts,
-                          child: _error != null
-                              ? _errorState()
-                              : _products.isEmpty
-                                  ? _emptyState()
-                                  : _productGrid(),
-                        ),
+              child: _isLoading
+                  ? _shimmerGrid()
+                  : RefreshIndicator(
+                      color: primary,
+                      onRefresh: _refreshProducts,
+                      child: _error != null
+                          ? _errorState()
+                          : _products.isEmpty
+                              ? _emptyState()
+                              : _productGrid(),
+                    ),
             ),
           ],
         ),
@@ -917,57 +848,22 @@ class _ProductsPageState extends State<ProductsPage> {
             onPressed: () => Navigator.pop(context),
           ),
           Expanded(
-            child: _isSearchMode
-                ? _searchField()
-                : Text(
-                    widget.collection!.label.toUpperCase(),
-                    style: TextStyle(
-                      fontFamily: _fHead,
-                      fontSize: titleSize,
-                      color: primary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+            child: Text(
+              widget.collection.label.toUpperCase(),
+              style: TextStyle(
+                fontFamily: _fHead,
+                fontSize: titleSize,
+                color: primary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: _sortButton(context),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _searchField() {
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        border: Border.all(color: primary.withOpacity(0.15), width: 0.8),
-      ),
-      child: TextField(
-        controller: _searchCtrl,
-        focusNode: _searchFocusNode,
-        textInputAction: TextInputAction.search,
-        textAlignVertical: TextAlignVertical.center,
-        onSubmitted: _runNewSearch,
-        onChanged: _onSearchInputChanged,
-        style: TextStyle(fontFamily: _fBody, fontSize: 14, color: primary),
-        decoration: InputDecoration(
-          hintText: 'Search products...',
-          hintStyle: TextStyle(fontFamily: _fBody, fontSize: 14, color: secondaryTxt),
-          border: InputBorder.none,
-          isDense: true,
-          prefixIcon: Icon(Icons.search_rounded, size: 18, color: secondaryTxt),
-          suffixIcon: _searchCtrl.text.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.close_rounded, size: 16, color: secondaryTxt),
-                  onPressed: _clearSearchField,
-                )
-              : null,
-        ),
       ),
     );
   }
@@ -1030,6 +926,7 @@ class _ProductsPageState extends State<ProductsPage> {
       },
     );
   }
+
 
   void _openSortSheet(BuildContext context) {
     showModalBottomSheet(
@@ -2118,35 +2015,6 @@ class _ProductsPageState extends State<ProductsPage> {
         ((1 - product.price / product.compareAtPrice!) * 100).round();
     return '$pct% OFF';
   }
-
-  Widget _searchIdleState() => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search_rounded,
-              size: 52,
-              color: AppColors.hint,
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'SEARCH PRODUCTS',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.5,
-                color: primary.withOpacity(0.5),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Start typing to find what you\'re looking for',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: secondaryTxt),
-            ),
-          ],
-        ),
-      );
 
   Widget _emptyState() => Center(
         child: Column(
