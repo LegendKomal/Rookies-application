@@ -1138,7 +1138,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                         ),
                                       ),
                                       child: Row(
-                                        children: [
+                                         children: [
                                           Expanded(
                                             child: Text(
                                               filter.label,

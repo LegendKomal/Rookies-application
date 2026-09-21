@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
+import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/banner_model.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/models/home_content_models.dart';
@@ -24,12 +25,12 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static Color get primary      => AppColors.primary;
-  static Color get bgColor      => AppColors.bg;
+  static Color get primary => AppColors.primary;
+  static Color get bgColor => AppColors.bg;
   static Color get secondaryTxt => AppColors.secondaryText;
-  static const String _fHead   = AppFonts.heading;
-  static const String _fBody   = AppFonts.body;
-  static const String _fBold   = AppFonts.bold;
+  static const String _fHead = AppFonts.heading;
+  static const String _fBody = AppFonts.body;
+  static const String _fBold = AppFonts.bold;
   static const String _fNumber = AppFonts.number;
 
   // Fixed dark color for text/icons that sit on a hard-coded white
@@ -51,28 +52,30 @@ class _HomeScreenState extends State<HomeScreen> {
   List<PromoBlockContent> _promoBlocksContent = [];
   List<ShopTheLookEntry> _shopTheLookEntries = [];
   List<OccasionTileContent> _occasionTilesContent = [];
-  List<InstagramPostContent> _instagramPostsContent = [];
 
   final ScrollController _scrollController = ScrollController();
 
-  _CollectionTab _selectedCollectionTab = _CollectionTab.newArrivals;
+  // "EXPLORE COLLECTIONS" section: a tab (its own collection) plus Shopify's
+  // native "Category" and "Fit" facet filters on that collection, combinable
+  // simultaneously, backed by an infinite-scrolling product grid.
+  static const List<_ExploreTabDef> _exploreTabDefs = [
+    _ExploreTabDef('HOT DEALS', ShopifyConstants.hotDealsHandle),
+    _ExploreTabDef('SALE', 'mid-season-deals'),
+    _ExploreTabDef('TRENDING NOW', ShopifyConstants.trendingNowHandle),
+  ];
 
-  final Map<_CollectionTab, List<_ShopifyProductItem>> _collectionProductsByTab = {
-    _CollectionTab.newArrivals: [],
-    _CollectionTab.bestsellers: [],
-    _CollectionTab.sale: [],
-  };
-  final Map<_CollectionTab, String?> _collectionCursorByTab = {
-    _CollectionTab.newArrivals: null,
-    _CollectionTab.bestsellers: null,
-    _CollectionTab.sale: null,
-  };
-  final Map<_CollectionTab, bool> _collectionHasMoreByTab = {
-    _CollectionTab.newArrivals: true,
-    _CollectionTab.bestsellers: true,
-    _CollectionTab.sale: true,
-  };
-  bool _isLoadingCollectionProducts = false;
+  int _exploreTabIndex = 0;
+  ShopifyFilter? _exploreCategoryFilter;
+  ShopifyFilter? _exploreFitFilter;
+  String? _selectedExploreCategoryInput;
+  String? _selectedExploreFitInput;
+  int _exploreRequestId = 0;
+
+  List<ShopifyProduct> _exploreProducts = [];
+  String? _exploreEndCursor;
+  bool _exploreHasMore = true;
+  bool _exploreLoadingFirst = true;
+  bool _exploreLoadingMore = false;
 
   final List<_ShopTheLookOutfit> _defaultShopTheLookOutfits = const [
     _ShopTheLookOutfit(
@@ -137,49 +140,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   ];
 
-  Future<void> _loadMoreCollectionProducts(_CollectionTab tab) async {
-    if (_isLoadingCollectionProducts) return;
-    if (_collectionHasMoreByTab[tab] == false) return;
-
-    setState(() => _isLoadingCollectionProducts = true);
-    try {
-      final page = await _fetchProductsPage(tab, after: _collectionCursorByTab[tab]);
-      if (!mounted) return;
-      setState(() {
-        _collectionProductsByTab[tab] = [
-          ...?_collectionProductsByTab[tab],
-          ...page.items,
-        ];
-        _collectionCursorByTab[tab] = page.endCursor;
-        _collectionHasMoreByTab[tab] = page.hasNextPage;
-      });
-    } finally {
-      if (mounted) setState(() => _isLoadingCollectionProducts = false);
-    }
-  }
-
-  Future<_ProductsPage> _fetchProductsPage(_CollectionTab tab, {String? after}) async {
-    final String handle = _collectionHandleForTab(tab);
-    try {
-      final PaginatedProductsResponse response = await ShopifyStorefrontService
-          .instance
-          .getProductsByCollectionPaginated(
-        handle,
-        first: 6,
-        after: after,
-      );
-
-      return _ProductsPage(
-        items: response.products.map(_mapShopifyProduct).toList(),
-        endCursor: response.endCursor,
-        hasNextPage: response.hasNextPage,
-      );
-    } catch (e) {
-      debugPrint('Failed to fetch products for "$handle": $e');
-      return const _ProductsPage(items: [], endCursor: null, hasNextPage: false);
-    }
-  }
-
   _ShopifyProductItem _mapShopifyProduct(ShopifyProduct product) {
     String? compareAtPrice;
     String? discountLabel;
@@ -193,6 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return _ShopifyProductItem(
       id: product.id,
+      handle: product.handle,
       title: product.title,
       price: '₹ ${_formatInr(product.price)}',
       compareAtPrice: compareAtPrice,
@@ -218,69 +179,18 @@ class _HomeScreenState extends State<HomeScreen> {
     return (negative ? '-' : '') + groups.join(',');
   }
 
-  String _collectionHandleForTab(_CollectionTab tab) {
-    switch (tab) {
-      case _CollectionTab.newArrivals:
-        return 'summer-edit';
-      case _CollectionTab.bestsellers:
-        return 'trending-now';
-      case _CollectionTab.sale:
-        return 'mid-season-deals';
-    }
-  }
-
   final List<_OccasionTile> _defaultOccasionTiles = const [
-    _OccasionTile(
-      imageAsset: 'assets/jeans_jann.jpeg',
-      handle: 'jeans-jann',
-    ),
-    _OccasionTile(
-      imageAsset: 'assets/jeans_jesse.jpeg',
-      handle: 'jeans-jesse',
-    ),
+    _OccasionTile(imageAsset: 'assets/jeans_jann.jpeg', handle: 'jeans-jann'),
+    _OccasionTile(imageAsset: 'assets/jeans_jesse.jpeg', handle: 'jeans-jesse'),
     _OccasionTile(
       imageAsset: 'assets/jeans_lennon.jpeg',
       handle: 'jeans-lennon',
     ),
-    _OccasionTile(
-      imageAsset: 'assets/jeans_mojo.jpeg',
-      handle: 'jeans-mojo',
-    ),
-    _OccasionTile(
-      imageAsset: 'assets/jeans_nikki.jpeg',
-      handle: 'jeans-nikki',
-    ),
+    _OccasionTile(imageAsset: 'assets/jeans_mojo.jpeg', handle: 'jeans-mojo'),
+    _OccasionTile(imageAsset: 'assets/jeans_nikki.jpeg', handle: 'jeans-nikki'),
     _OccasionTile(
       imageAsset: 'assets/jeans_springsteen.jpeg',
       handle: 'jeans-springsteen',
-    ),
-  ];
-
-  final List<_InstagramPost> _defaultInstagramPosts = const [
-    _InstagramPost(
-      imageAsset: 'assets/instagram_1.jpg',
-      postUrl: 'https://www.instagram.com/rookiesjeans/p/Dcd6aaiBeAo/',
-      username: 'rookiesjeans',
-    ),
-    _InstagramPost(
-      imageAsset: 'assets/instagram_2.jpg',
-      postUrl: 'https://www.instagram.com/rookiesjeans/p/DcbUohJhPWG/',
-      username: 'rookiesjeans',
-    ),
-    _InstagramPost(
-      imageAsset: 'assets/instagram_3.jpg',
-      postUrl: 'https://www.instagram.com/rookiesjeans/p/DcGW_51ibkB/',
-      username: 'rookiesjeans',
-    ),
-    _InstagramPost(
-      imageAsset: 'assets/instagram_4.jpg',
-      postUrl: 'https://www.instagram.com/rookiesjeans/p/DcOSq1EFKPf/',
-      username: 'rookiesjeans',
-    ),
-    _InstagramPost(
-      imageAsset: 'assets/instagram_5.jpg',
-      postUrl: 'https://www.instagram.com/rookiesjeans/p/DcTf3nQEcMS/',
-      username: 'rookiesjeans',
     ),
   ];
 
@@ -334,13 +244,15 @@ class _HomeScreenState extends State<HomeScreen> {
   List<_PromoBlockData> get _promoBlocksToDisplay {
     if (_promoBlocksContent.isEmpty) return _defaultPromoBlocks;
     return _promoBlocksContent
-        .map((p) => _PromoBlockData(
-              assetPath: null,
-              imageUrl: p.imageUrl,
-              label: p.label,
-              buttonLabel: p.buttonLabel ?? 'Shop ${p.label}',
-              collectionHandle: p.collectionHandle,
-            ))
+        .map(
+          (p) => _PromoBlockData(
+            assetPath: null,
+            imageUrl: p.imageUrl,
+            label: p.label,
+            buttonLabel: p.buttonLabel ?? 'Shop ${p.label}',
+            collectionHandle: p.collectionHandle,
+          ),
+        )
         .toList();
   }
 
@@ -348,69 +260,65 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_shopTheLookEntries.isEmpty) return _defaultShopTheLookOutfits;
     return _shopTheLookEntries
         .where((e) => e.imageUrl != null && e.products.isNotEmpty)
-        .map((e) => _ShopTheLookOutfit(
-              imageAsset: 'assets/shop_the_look_outfit_1.jpg',
-              imageUrl: e.imageUrl,
-              products: e.products
-                  .map((p) => _ShopTheLookProduct(
-                        title: p.title,
-                        price: '₹ ${_formatInr(p.price)}',
-                        imageAsset: 'assets/shop_the_look_item_1.jpg',
-                        imageUrl: p.primaryImageUrl,
-                        product: p,
-                      ))
-                  .toList(),
-            ))
+        .map(
+          (e) => _ShopTheLookOutfit(
+            imageAsset: 'assets/shop_the_look_outfit_1.jpg',
+            imageUrl: e.imageUrl,
+            products: e.products
+                .map(
+                  (p) => _ShopTheLookProduct(
+                    title: p.title,
+                    price: '₹ ${_formatInr(p.price)}',
+                    imageAsset: 'assets/shop_the_look_item_1.jpg',
+                    imageUrl: p.primaryImageUrl,
+                    product: p,
+                  ),
+                )
+                .toList(),
+          ),
+        )
         .toList();
   }
 
   List<_OccasionTile> get _occasionTilesToDisplay {
     if (_occasionTilesContent.isEmpty) return _defaultOccasionTiles;
     return _occasionTilesContent
-        .map((t) => _OccasionTile(
-              imageAsset: 'assets/jeans_jann.jpeg',
-              imageUrl: t.imageUrl,
-              handle: t.collectionHandle,
-            ))
-        .toList();
-  }
-
-  List<_InstagramPost> get _instagramPostsToDisplay {
-    if (_instagramPostsContent.isEmpty) return _defaultInstagramPosts;
-    return _instagramPostsContent
-        .map((p) => _InstagramPost(
-              imageAsset: 'assets/instagram_1.jpg',
-              imageUrl: p.imageUrl,
-              postUrl: p.postUrl,
-              username: p.username,
-            ))
+        .map(
+          (t) => _OccasionTile(
+            imageAsset: 'assets/jeans_jann.jpeg',
+            imageUrl: t.imageUrl,
+            handle: t.collectionHandle,
+          ),
+        )
         .toList();
   }
 
   List<_PromoBlockData> get _promoBlocksFirstHalf {
     return _promoBlocksToDisplay;
-}
+  }
 
-List<_PromoBlockData> get _promoBlocksSecondHalf {
+  List<_PromoBlockData> get _promoBlocksSecondHalf {
     return const [];
-}
+  }
 
   List<Widget> _promoBlockSlivers(List<_PromoBlockData> blocks) {
     return blocks
-        .map((block) => SliverToBoxAdapter(
-              child: _PromoBlockCard(
-                assetPath: block.assetPath,
-                imageUrl: block.imageUrl,
-                label: block.label,
-                buttonLabel: block.buttonLabel,
-                height: _promoBlockHeight(context),
-                onTap: () => _openCollectionByHandle(
-                  block.collectionHandle,
-                  title: block.label,
-                  label: block.label.toUpperCase(),
-                ),
+        .map(
+          (block) => SliverToBoxAdapter(
+            child: _PromoBlockCard(
+              assetPath: block.assetPath,
+              imageUrl: block.imageUrl,
+              label: block.label,
+              buttonLabel: block.buttonLabel,
+              height: _promoBlockHeight(context),
+              onTap: () => _openCollectionByHandle(
+                block.collectionHandle,
+                title: block.label,
+                label: block.label.toUpperCase(),
               ),
-            ))
+            ),
+          ),
+        )
         .toList();
   }
 
@@ -418,11 +326,13 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
   void initState() {
     super.initState();
     _fetchAll();
-    _loadMoreCollectionProducts(_selectedCollectionTab);
+    _fetchExploreProducts();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
   }
@@ -439,7 +349,6 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
       service.getPromoBlocks(),
       service.getShopTheLookEntries(),
       service.getOccasionTilesContent(),
-      service.getInstagramPostsContent(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -448,13 +357,127 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
       _promoBlocksContent = results[2] as List<PromoBlockContent>;
       _shopTheLookEntries = results[3] as List<ShopTheLookEntry>;
       _occasionTilesContent = results[4] as List<OccasionTileContent>;
-      _instagramPostsContent = results[5] as List<InstagramPostContent>;
       _isLoading = false;
     });
   }
 
-  void _openCollectionByHandle(String handle,
-      {String? title, String? label}) {
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (position.pixels >=
+        position.maxScrollExtent - _exploreLoadMoreThreshold) {
+      _loadMoreExploreProducts();
+    }
+  }
+
+  double get _exploreLoadMoreThreshold {
+    final r = R.of(context);
+    final double gridWidth = MediaQuery.of(context).size.width - r.dp(16) * 2;
+    final double cardWidth = (gridWidth - r.dp(12)) / 2;
+    final double rowHeight = cardWidth / 0.62 + r.dp(16);
+    // ~10 products at 2 columns per row = 5 rows.
+    return rowHeight * 5;
+  }
+
+  List<String> get _exploreFilterInputs => [
+    if (_selectedExploreCategoryInput != null) _selectedExploreCategoryInput!,
+    if (_selectedExploreFitInput != null) _selectedExploreFitInput!,
+  ];
+
+  Future<void> _fetchExploreProducts() async {
+    final int requestId = ++_exploreRequestId;
+    setState(() {
+      _exploreLoadingFirst = true;
+      _exploreProducts = [];
+      _exploreEndCursor = null;
+      _exploreHasMore = true;
+    });
+
+    final String handle = _exploreTabDefs[_exploreTabIndex].handle;
+
+    try {
+      final response = await ShopifyStorefrontService.instance
+          .getProductsByCollectionPaginated(
+            handle,
+            first: 20,
+            filters: _exploreFilterInputs,
+          );
+      if (!mounted || requestId != _exploreRequestId) return;
+
+      setState(() {
+        _exploreProducts = response.products;
+        _exploreEndCursor = response.endCursor;
+        _exploreHasMore = response.hasNextPage;
+        _exploreLoadingFirst = false;
+        for (final filter in response.filters) {
+          final label = filter.label.trim().toLowerCase();
+          if (label == 'category') _exploreCategoryFilter = filter;
+          if (label == 'fit') _exploreFitFilter = filter;
+        }
+      });
+    } catch (e) {
+      debugPrint('Failed to fetch explore products for "$handle": $e');
+      if (!mounted || requestId != _exploreRequestId) return;
+      setState(() => _exploreLoadingFirst = false);
+    }
+  }
+
+  Future<void> _loadMoreExploreProducts() async {
+    if (_exploreLoadingMore || !_exploreHasMore || _exploreLoadingFirst) return;
+
+    final int requestId = _exploreRequestId;
+    setState(() => _exploreLoadingMore = true);
+
+    final String handle = _exploreTabDefs[_exploreTabIndex].handle;
+
+    try {
+      final response = await ShopifyStorefrontService.instance
+          .getProductsByCollectionPaginated(
+            handle,
+            first: 20,
+            after: _exploreEndCursor,
+            filters: _exploreFilterInputs,
+          );
+      if (!mounted || requestId != _exploreRequestId) return;
+
+      setState(() {
+        _exploreProducts = [..._exploreProducts, ...response.products];
+        _exploreEndCursor = response.endCursor;
+        _exploreHasMore = response.hasNextPage;
+        _exploreLoadingMore = false;
+      });
+    } catch (e) {
+      debugPrint('Failed to load more explore products for "$handle": $e');
+      if (!mounted || requestId != _exploreRequestId) return;
+      setState(() => _exploreLoadingMore = false);
+    }
+  }
+
+  void _selectExploreTab(int index) {
+    if (_exploreTabIndex == index) return;
+    setState(() {
+      _exploreTabIndex = index;
+      _selectedExploreCategoryInput = null;
+      _selectedExploreFitInput = null;
+      _exploreCategoryFilter = null;
+      _exploreFitFilter = null;
+    });
+    _fetchExploreProducts();
+  }
+
+  void _selectExploreCategory(ShopifyFilterValue? value) {
+    if (_selectedExploreCategoryInput == value?.input) return;
+    setState(() => _selectedExploreCategoryInput = value?.input);
+    _fetchExploreProducts();
+  }
+
+  void _selectExploreFit(ShopifyFilterValue? value) {
+    if (_selectedExploreFitInput == value?.input) return;
+    setState(() => _selectedExploreFitInput = value?.input);
+    _fetchExploreProducts();
+  }
+
+  void _openCollectionByHandle(String handle, {String? title, String? label}) {
     final collection = ShopifyCollection(
       id: handle,
       title: title ?? label ?? handle,
@@ -481,28 +504,6 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
     );
   }
 
-  Future<void> _openInstagramPost(String url) async {
-  if (url.isEmpty) return;
-  final Uri uri = Uri.parse(url);
-  try {
-    final bool launched = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
-    if (!launched && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open Instagram link')),
-      );
-    }
-  } catch (e) {
-    debugPrint('Failed to launch $url: $e');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open Instagram link')),
-      );
-    }
-  }
-}
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -529,13 +530,9 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                         ),
                         SliverToBoxAdapter(child: _exploreCategoriesCarousel()),
                         ..._promoBlockSlivers(_promoBlocksSecondHalf),
-                        SliverToBoxAdapter(child: _exploreCollectionSection()),
                         SliverToBoxAdapter(child: _shopTheLookSection()),
                         SliverToBoxAdapter(child: _shopByOccasionsSection()),
-                        SliverToBoxAdapter(
-                          child: _sliverCenteredHeadAsBox('FOLLOW US @ROOKIESJEANS'),
-                        ),
-                        SliverToBoxAdapter(child: _instagramList()),
+                        SliverToBoxAdapter(child: _exploreCollectionsSection()),
                         const SliverToBoxAdapter(
                           child: SizedBox(height: _kBottomNavClearance),
                         ),
@@ -561,10 +558,7 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
     return SizedBox(
       height: r.dp(56),
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: r.dp(8),
-          vertical: r.dp(6),
-        ),
+        padding: EdgeInsets.symmetric(horizontal: r.dp(8), vertical: r.dp(6)),
         child: Row(
           children: [
             Expanded(
@@ -591,14 +585,12 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.favorite_border_rounded,
-                          size: r.dp(22)),
+                      icon: Icon(Icons.favorite_border_rounded, size: r.dp(22)),
                       color: Colors.white,
                       onPressed: () => context.go('/wishlist'),
                     ),
                     IconButton(
-                      icon: Icon(Icons.person_outline_rounded,
-                          size: r.dp(22)),
+                      icon: Icon(Icons.person_outline_rounded, size: r.dp(22)),
                       color: Colors.white,
                       tooltip: 'Account',
                       onPressed: () => context.go('/profile'),
@@ -621,12 +613,7 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
       child: Stack(
         children: [
           _heroBannerImage(),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: _topBar(),
-          ),
+          Positioned(top: 0, left: 0, right: 0, child: _topBar()),
           Positioned(
             left: 0,
             right: 0,
@@ -691,8 +678,11 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
                                   ),
                                 ),
                                 SizedBox(width: r.dp(6)),
-                                Icon(Icons.arrow_forward_rounded,
-                                    size: r.dp(16), color: _onLightBtn),
+                                Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: r.dp(16),
+                                  color: _onLightBtn,
+                                ),
                               ],
                             ),
                           ),
@@ -710,85 +700,65 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
   }
 
   Widget _heroBannerImage() => Stack(
-        fit: StackFit.expand,
-        children: [
-          _heroBannerImageUrl != null
-              ? CachedNetworkImage(
-                  imageUrl: _heroBannerImageUrl!,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) =>
-                      Container(color: const Color(0xFF6B7A5E)),
-                  errorWidget: (_, __, ___) =>
-                      Container(color: const Color(0xFF6B7A5E)),
-                )
-              : Image.asset(
-                  'assets/banner.jpeg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      Container(color: const Color(0xFF6B7A5E)),
-                ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.center,
-                    colors: [
-                      Colors.black.withOpacity(0.28),
-                      Colors.black.withOpacity(0.10),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.18, 0.38],
-                  ),
-                ),
+    fit: StackFit.expand,
+    children: [
+      _heroBannerImageUrl != null
+          ? CachedNetworkImage(
+              imageUrl: _heroBannerImageUrl!,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => Container(color: const Color(0xFF6B7A5E)),
+              errorWidget: (_, __, ___) =>
+                  Container(color: const Color(0xFF6B7A5E)),
+            )
+          : Image.asset(
+              'assets/banner.jpeg',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) =>
+                  Container(color: const Color(0xFF6B7A5E)),
+            ),
+      Positioned.fill(
+        child: IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.center,
+                colors: [
+                  Colors.black.withOpacity(0.28),
+                  Colors.black.withOpacity(0.10),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.18, 0.38],
               ),
             ),
           ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.center,
-                    colors: [
-                      Colors.black.withOpacity(0.60),
-                      Colors.black.withOpacity(0.38),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.30, 0.58],
-                  ),
-                ),
+        ),
+      ),
+      Positioned.fill(
+        child: IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.center,
+                colors: [
+                  Colors.black.withOpacity(0.60),
+                  Colors.black.withOpacity(0.38),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.30, 0.58],
               ),
             ),
           ),
-        ],
-      );
+        ),
+      ),
+    ],
+  );
 
   Widget _sliverHeadAsBox(String title) {
     final r = R.of(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(r.dp(16), r.dp(26), r.dp(16), r.dp(12)),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          title,
-          style: TextStyle(
-            fontFamily: _fHead,
-            fontSize: r.sp(28),
-            fontWeight: FontWeight.w600,
-            color: primary,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _sliverCenteredHeadAsBox(String title) {
-    final r = R.of(context);
-    return Padding(
-      padding: EdgeInsets.fromLTRB(r.dp(16), r.dp(40), r.dp(16), r.dp(16)),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
@@ -811,10 +781,12 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
     final double cardWidth = MediaQuery.of(context).size.width * 0.56;
     final double cardHeight = cardWidth.clamp(190.0, 260.0);
 
-    final List<ExploreCategoryContent> topwear =
-        _exploreCategories.where((c) => !c.isBottomwear).toList();
-    final List<ExploreCategoryContent> bottomwear =
-        _exploreCategories.where((c) => c.isBottomwear).toList();
+    final List<ExploreCategoryContent> topwear = _exploreCategories
+        .where((c) => !c.isBottomwear)
+        .toList();
+    final List<ExploreCategoryContent> bottomwear = _exploreCategories
+        .where((c) => c.isBottomwear)
+        .toList();
 
     return Padding(
       padding: EdgeInsets.only(bottom: r.dp(28)),
@@ -831,8 +803,12 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
     );
   }
 
-  Widget _categoryRow(List<ExploreCategoryContent> items, double cardWidth,
-      double cardHeight, R r) {
+  Widget _categoryRow(
+    List<ExploreCategoryContent> items,
+    double cardWidth,
+    double cardHeight,
+    R r,
+  ) {
     return SizedBox(
       height: cardHeight,
       child: ListView.separated(
@@ -857,10 +833,8 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
             label: cat.label,
             width: cardWidth,
             height: cardHeight,
-            onTap: () => _openCollectionByHandle(
-              cat.collectionHandle,
-              label: cat.label,
-            ),
+            onTap: () =>
+                _openCollectionByHandle(cat.collectionHandle, label: cat.label),
             r: r,
           );
         },
@@ -917,230 +891,111 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
     );
   }
 
-  Widget _exploreCollectionSection() {
-    final r = R.of(context);
-    final List<_ShopifyProductItem> products =
-        _collectionProductsByTab[_selectedCollectionTab] ?? const [];
-    final bool hasMore = _collectionHasMoreByTab[_selectedCollectionTab] ?? false;
-    final bool loadingFirstPage =
-        products.isEmpty && _isLoadingCollectionProducts;
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(height: r.dp(28)),
-          Text(
-            'EXPLORE COLLECTION',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: _fHead,
-              fontSize: r.sp(24),
-              fontWeight: FontWeight.w600,
-              color: primary,
-            ),
-          ),
-          SizedBox(height: r.dp(16)),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _collectionTabChip('NEW ARRIVALS', _CollectionTab.newArrivals, r),
-              SizedBox(width: r.dp(8)),
-              _collectionTabChip('BESTSELLERS', _CollectionTab.bestsellers, r),
-              SizedBox(width: r.dp(8)),
-              _collectionTabChip('SALE', _CollectionTab.sale, r),
-            ],
-          ),
-          SizedBox(height: r.dp(20)),
-          if (loadingFirstPage)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: r.dp(32)),
-              child: Center(
-                child: SizedBox(
-                  width: r.dp(24),
-                  height: r.dp(24),
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: primary,
-                  ),
-                ),
-              ),
-            )
-          else if (products.isEmpty)
-            _empty()
-          else
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: products.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: r.dp(16),
-                crossAxisSpacing: r.dp(12),
-                childAspectRatio: 0.62,
-              ),
-              itemBuilder: (_, i) => _collectionProductCard(products[i], r),
-            ),
-          if (hasMore) ...[
-  Transform.translate(
-    offset: Offset(0, -r.dp(6)),
-    child: GestureDetector(
-      onTap: _isLoadingCollectionProducts
-          ? null
-          : () => _loadMoreCollectionProducts(_selectedCollectionTab),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(vertical: r.dp(14)),
-        decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        alignment: Alignment.center,
-        child: (_isLoadingCollectionProducts && products.isNotEmpty)
-            ? SizedBox(
-                width: r.dp(18),
-                height: r.dp(18),
-                child: const CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : Text(
-                'Show More',
-                style: TextStyle(
-                  fontFamily: _fBold,
-                  color: Colors.white,
-                  fontSize: r.sp(13),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-      ),
-    ),
-  ),
-],
-          SizedBox(height: r.dp(8)),
-        ],
-      ),
-    );
-  }
-
-  Widget _collectionTabChip(String label, _CollectionTab tab, R r) {
-    final bool selected = _selectedCollectionTab == tab;
-    return GestureDetector(
-      onTap: () {
-        setState(() => _selectedCollectionTab = tab);
-        if ((_collectionProductsByTab[tab] ?? const []).isEmpty) {
-          _loadMoreCollectionProducts(tab);
-        }
-      },
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: r.dp(14), vertical: r.dp(9)),
-        decoration: BoxDecoration(
-          color: selected ? Colors.black : Colors.white,
-          border: Border.all(color: Colors.black, width: 1),
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontFamily: _fBold,
-            fontSize: r.sp(11),
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : Colors.black,
-          ),
+  void _openProductDetailFromExplore(_ShopifyProductItem product) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductDetailPage(
+          handle: product.handle,
+          title: product.title,
+          heroImageUrl: product.imageUrl,
         ),
       ),
     );
   }
 
   Widget _collectionProductCard(_ShopifyProductItem product, R r) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Container(
-                color: const Color(0xFFECECEC),
-                child: product.imageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: product.imageUrl!,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => const SizedBox(),
-                        errorWidget: (_, __, ___) => const SizedBox(),
-                      )
-                    : Image.asset(
-                        product.imageAssetFallback,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox(),
+    return GestureDetector(
+      onTap: () => _openProductDetailFromExplore(product),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Container(
+                  color: const Color(0xFFECECEC),
+                  child: product.imageUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: product.imageUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => const SizedBox(),
+                          errorWidget: (_, __, ___) => const SizedBox(),
+                        )
+                      : Image.asset(
+                          product.imageAssetFallback,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const SizedBox(),
+                        ),
+                ),
+                if (product.discountLabel != null)
+                  Positioned(
+                    left: r.dp(8),
+                    top: r.dp(8),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: r.dp(10),
+                        vertical: r.dp(5),
                       ),
-              ),
-              if (product.discountLabel != null)
-                Positioned(
-                  left: r.dp(8),
-                  top: r.dp(8),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: r.dp(10), vertical: r.dp(5)),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFB3261E),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      product.discountLabel!,
-                      style: TextStyle(
-                        fontFamily: _fBold,
-                        color: Colors.white,
-                        fontSize: r.sp(10),
-                        fontWeight: FontWeight.w600,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB3261E),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        product.discountLabel!,
+                        style: TextStyle(
+                          fontFamily: _fBold,
+                          color: Colors.white,
+                          fontSize: r.sp(10),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
-        ),
-        SizedBox(height: r.dp(8)),
-        Text(
-          product.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontFamily: _fBody,
-            fontSize: r.sp(12),
-            color: primary,
-            height: 1.25,
-          ),
-        ),
-        SizedBox(height: r.dp(4)),
-        Row(
-          children: [
-            Text(
-              product.price,
-              style: TextStyle(
-                fontFamily: _fNumber,
-                fontSize: r.sp(13),
-                fontWeight: FontWeight.w600,
-                color: primary,
-              ),
+              ],
             ),
-            if (product.compareAtPrice != null) ...[
-              SizedBox(width: r.dp(6)),
+          ),
+          SizedBox(height: r.dp(8)),
+          Text(
+            product.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: _fBody,
+              fontSize: r.sp(12),
+              color: primary,
+              height: 1.25,
+            ),
+          ),
+          SizedBox(height: r.dp(4)),
+          Row(
+            children: [
               Text(
-                product.compareAtPrice!,
+                product.price,
                 style: TextStyle(
                   fontFamily: _fNumber,
-                  fontSize: r.sp(12),
-                  color: secondaryTxt,
-                  decoration: TextDecoration.lineThrough,
+                  fontSize: r.sp(13),
+                  fontWeight: FontWeight.w600,
+                  color: primary,
                 ),
               ),
+              if (product.compareAtPrice != null) ...[
+                SizedBox(width: r.dp(6)),
+                Text(
+                  product.compareAtPrice!,
+                  style: TextStyle(
+                    fontFamily: _fNumber,
+                    fontSize: r.sp(12),
+                    color: secondaryTxt,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
+              ],
             ],
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1177,9 +1032,13 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
           heroHeight = heroHeight < 160.0 ? 160.0 : heroHeight;
           heroHeight = heroHeight > usable ? usable : heroHeight;
 
-          final double remainingForRows = (usable - heroHeight).clamp(0.0, usable);
-          double productRowHeight =
-              maxProducts > 0 ? remainingForRows / maxProducts : 0.0;
+          final double remainingForRows = (usable - heroHeight).clamp(
+            0.0,
+            usable,
+          );
+          double productRowHeight = maxProducts > 0
+              ? remainingForRows / maxProducts
+              : 0.0;
           if (maxProducts > 0 && productRowHeight < 84.0) {
             productRowHeight = 84.0;
           }
@@ -1222,7 +1081,9 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
     // card) inside the SAME horizontal list, so both rows scroll together.
     final List<List<_OccasionTile>> pairs = [];
     for (int i = 0; i < tiles.length; i += 2) {
-      pairs.add(tiles.sublist(i, (i + 2) > tiles.length ? tiles.length : i + 2));
+      pairs.add(
+        tiles.sublist(i, (i + 2) > tiles.length ? tiles.length : i + 2),
+      );
     }
 
     final double sectionHeight = cardHeight * 2 + vGap;
@@ -1256,8 +1117,9 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
               itemBuilder: (_, i) {
                 final pair = pairs[i];
                 return Padding(
-                  padding:
-                      EdgeInsets.only(right: i == pairs.length - 1 ? 0 : gap),
+                  padding: EdgeInsets.only(
+                    right: i == pairs.length - 1 ? 0 : gap,
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1279,9 +1141,7 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
 
   Widget _occasionCard(_OccasionTile tile, double width, double height, R r) {
     return GestureDetector(
-      onTap: () => _openCollectionByHandle(
-        tile.handle,
-      ),
+      onTap: () => _openCollectionByHandle(tile.handle),
       child: SizedBox(
         width: width,
         height: height,
@@ -1321,99 +1181,212 @@ List<_PromoBlockData> get _promoBlocksSecondHalf {
     );
   }
 
-  Widget _instagramList() {
-  final r = R.of(context);
-  final posts = _instagramPostsToDisplay;
-  final double cardSize =
-      (MediaQuery.of(context).size.width * 0.6).clamp(120.0, 168.0);
-  final double gap = r.dp(10);
-
-  return SizedBox(
-    height: cardSize,
-    child: _AutoScrollHorizontalList(
-      itemCount: posts.length,
-      itemExtent: cardSize + gap,
-      padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-      itemBuilder: (_, i) => Padding(
-        padding: EdgeInsets.only(right: i == posts.length - 1 ? 0 : gap),
-        child: _instagramBlock(posts[i], cardSize, r),
+  Widget _exploreCollectionsSection() {
+    final r = R.of(context);
+    return Padding(
+      padding: EdgeInsets.only(bottom: r.dp(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _sliverHeadAsBox('EXPLORE COLLECTIONS'),
+          _exploreTabsRow(r),
+          SizedBox(height: r.dp(16)),
+          _exploreCategoryChipsRow(r),
+          if ((_exploreFitFilter?.values.isNotEmpty ?? false)) ...[
+            SizedBox(height: r.dp(10)),
+            _exploreFitChipsRow(r),
+          ],
+          SizedBox(height: r.dp(18)),
+          _exploreProductGrid(r),
+        ],
       ),
-    ),
-  );
-}
+    );
+  }
 
-Widget _instagramBlock(_InstagramPost post, double size, R r) {
-  return GestureDetector(
-    onTap: () => _openInstagramPost(post.postUrl),
-    child: ClipRRect(
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            post.imageUrl != null
-                ? CachedNetworkImage(
-                    imageUrl: post.imageUrl!,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) =>
-                        Container(color: const Color(0xFFE0E0E0)),
-                    errorWidget: (_, __, ___) =>
-                        Container(color: const Color(0xFFE0E0E0)),
-                  )
-                : Image.asset(
-                    post.imageAsset,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        Container(color: const Color(0xFFE0E0E0)),
-                  ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.0),
-                    Colors.black.withOpacity(0.55),
-                  ],
-                  stops: const [0.5, 1.0],
-                ),
-              ),
-            ),
-            Positioned(
-              left: r.dp(8),
-              right: r.dp(8),
-              bottom: r.dp(8),
-              child: Row(
+  Widget _exploreTabsRow(R r) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+      child: Row(
+        children: List.generate(_exploreTabDefs.length, (i) {
+          final bool active = i == _exploreTabIndex;
+          return Padding(
+            padding: EdgeInsets.only(right: r.dp(22)),
+            child: GestureDetector(
+              onTap: () => _selectExploreTab(i),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.camera_alt_outlined,
-                      color: Colors.white, size: r.dp(12)),
-                  SizedBox(width: r.dp(4)),
-                  Expanded(
-                    child: Text(
-                      post.username,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: _fBody,
-                        color: Colors.white,
-                        fontSize: r.sp(10.5),
-                        shadows: const [
-                          Shadow(color: Colors.black45, blurRadius: 4),
-                        ],
-                      ),
+                  Text(
+                    _exploreTabDefs[i].label,
+                    style: TextStyle(
+                      fontFamily: _fBold,
+                      fontSize: r.sp(12),
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                      color: active ? primary : secondaryTxt,
                     ),
+                  ),
+                  SizedBox(height: r.dp(6)),
+                  Container(
+                    height: 2,
+                    width: r.dp(28),
+                    color: active ? primary : Colors.transparent,
                   ),
                 ],
               ),
             ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _exploreCategoryChipsRow(R r) {
+    final values = _exploreCategoryFilter?.values ?? const [];
+    if (values.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: r.dp(36),
+      child: ListView(
+        padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        children: [
+          _exploreChip(
+            label: 'ALL',
+            selected: _selectedExploreCategoryInput == null,
+            onTap: () => _selectExploreCategory(null),
+            r: r,
+          ),
+          for (final value in values) ...[
+            SizedBox(width: r.dp(8)),
+            _exploreChip(
+              label: value.label.toUpperCase(),
+              selected: _selectedExploreCategoryInput == value.input,
+              onTap: () => _selectExploreCategory(value),
+              r: r,
+            ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _exploreFitChipsRow(R r) {
+    final values = _exploreFitFilter?.values ?? const [];
+    return SizedBox(
+      height: r.dp(32),
+      child: ListView(
+        padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        children: [
+          _exploreChip(
+            label: 'ALL',
+            selected: _selectedExploreFitInput == null,
+            onTap: () => _selectExploreFit(null),
+            r: r,
+          ),
+          for (final value in values) ...[
+            SizedBox(width: r.dp(8)),
+            _exploreChip(
+              label: value.label.toUpperCase(),
+              selected: _selectedExploreFitInput == value.input,
+              onTap: () => _selectExploreFit(value),
+              r: r,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _exploreChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    required R r,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        alignment: Alignment.center,
+        padding: EdgeInsets.symmetric(horizontal: r.dp(14), vertical: r.dp(8)),
+        decoration: BoxDecoration(
+          color: selected ? Colors.black : Colors.white,
+          border: Border.all(color: Colors.black, width: 1),
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: _fBold,
+            fontSize: r.sp(11),
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : Colors.black,
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
+
+  Widget _exploreProductGrid(R r) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_exploreLoadingFirst)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: r.dp(32)),
+              child: Center(
+                child: SizedBox(
+                  width: r.dp(24),
+                  height: r.dp(24),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: primary,
+                  ),
+                ),
+              ),
+            )
+          else if (_exploreProducts.isEmpty)
+            _empty()
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _exploreProducts.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: r.dp(16),
+                crossAxisSpacing: r.dp(12),
+                childAspectRatio: 0.62,
+              ),
+              itemBuilder: (_, i) => _collectionProductCard(
+                _mapShopifyProduct(_exploreProducts[i]),
+                r,
+              ),
+            ),
+          if (_exploreLoadingMore)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: r.dp(20)),
+              child: Center(
+                child: SizedBox(
+                  width: r.dp(20),
+                  height: r.dp(20),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: primary,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   Widget _shimmer() {
     final r = R.of(context);
@@ -1449,7 +1422,10 @@ Widget _instagramBlock(_InstagramPost post, double size, R r) {
               crossAxisSpacing: r.dp(12),
               mainAxisSpacing: r.dp(16),
               childAspectRatio: 0.62,
-              children: List.generate(4, (_) => _ShimmerBox(height: double.infinity)),
+              children: List.generate(
+                4,
+                (_) => _ShimmerBox(height: double.infinity),
+              ),
             ),
           ),
         ],
@@ -1460,8 +1436,7 @@ Widget _instagramBlock(_InstagramPost post, double size, R r) {
   Widget _empty() {
     final r = R.of(context);
     return Padding(
-      padding: EdgeInsets.symmetric(
-          vertical: r.dp(24), horizontal: r.dp(16)),
+      padding: EdgeInsets.symmetric(vertical: r.dp(24), horizontal: r.dp(16)),
       child: Center(
         child: Text(
           'Nothing here yet.',
@@ -1629,7 +1604,9 @@ class _PromoBlockCardState extends State<_PromoBlockCard> {
                     SizedBox(height: r.dp(10)),
                     Container(
                       padding: EdgeInsets.symmetric(
-                          horizontal: r.dp(18), vertical: r.dp(11)),
+                        horizontal: r.dp(18),
+                        vertical: r.dp(11),
+                      ),
                       color: Colors.black,
                       child: Text(
                         widget.buttonLabel.toUpperCase(),
@@ -1653,10 +1630,9 @@ class _PromoBlockCardState extends State<_PromoBlockCard> {
   }
 }
 
-enum _CollectionTab { newArrivals, bestsellers, sale }
-
 class _ShopifyProductItem {
   final String id;
+  final String handle;
   final String title;
   final String price;
   final String? compareAtPrice;
@@ -1665,23 +1641,13 @@ class _ShopifyProductItem {
   final String imageAssetFallback;
   const _ShopifyProductItem({
     required this.id,
+    required this.handle,
     required this.title,
     required this.price,
     this.compareAtPrice,
     this.discountLabel,
     this.imageUrl,
     this.imageAssetFallback = 'assets/collection_cargo_olive.jpg',
-  });
-}
-
-class _ProductsPage {
-  final List<_ShopifyProductItem> items;
-  final String? endCursor;
-  final bool hasNextPage;
-  const _ProductsPage({
-    required this.items,
-    required this.endCursor,
-    required this.hasNextPage,
   });
 }
 
@@ -1792,18 +1758,23 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
               bodyFont: AppFonts.bold,
               onAddToCart: (variantId) async {
                 Navigator.of(ctx).pop();
-                final success =
-                    await CartService.instance.addLine(variantId: variantId);
+                final success = await CartService.instance.addLine(
+                  variantId: variantId,
+                );
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
-                  ..showSnackBar(SnackBar(
-                    content: Text(success
-                        ? '${product.title} added to cart'
-                        : 'Failed to add item to cart'),
-                    duration: const Duration(seconds: 2),
-                    behavior: SnackBarBehavior.floating,
-                  ));
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        success
+                            ? '${product.title} added to cart'
+                            : 'Failed to add item to cart',
+                      ),
+                      duration: const Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
               },
               onOpenDetail: () {
                 Navigator.of(ctx).pop();
@@ -1916,10 +1887,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                     child: Container(
                       decoration: BoxDecoration(
                         border: Border(
-                          top: BorderSide(
-                            color: _cardBorder,
-                            width: 1,
-                          ),
+                          top: BorderSide(color: _cardBorder, width: 1),
                         ),
                       ),
                       padding: EdgeInsets.symmetric(horizontal: r.dp(12)),
@@ -2089,17 +2057,10 @@ class _ShopTheLookProduct {
   });
 }
 
-class _InstagramPost {
-  final String imageAsset;
-  final String? imageUrl;
-  final String postUrl;
-  final String username;
-  const _InstagramPost({
-    required this.imageAsset,
-    this.imageUrl,
-    required this.postUrl,
-    required this.username,
-  });
+class _ExploreTabDef {
+  final String label;
+  final String handle;
+  const _ExploreTabDef(this.label, this.handle);
 }
 
 class _PromoBlockData {
@@ -2160,21 +2121,29 @@ class _AutoScrollHorizontalListState extends State<_AutoScrollHorizontalList> {
       final double next = _controller.offset + widget.itemExtent;
       if (next >= max) {
         _controller
-            .animateTo(max,
-                duration: widget.animationDuration, curve: Curves.easeInOut)
+            .animateTo(
+              max,
+              duration: widget.animationDuration,
+              curve: Curves.easeInOut,
+            )
             .then((_) {
-          if (!mounted) return;
-          Future.delayed(const Duration(milliseconds: 400), () {
-            if (mounted && _controller.hasClients) {
-              _controller.animateTo(0,
-                  duration: widget.animationDuration,
-                  curve: Curves.easeInOut);
-            }
-          });
-        });
+              if (!mounted) return;
+              Future.delayed(const Duration(milliseconds: 400), () {
+                if (mounted && _controller.hasClients) {
+                  _controller.animateTo(
+                    0,
+                    duration: widget.animationDuration,
+                    curve: Curves.easeInOut,
+                  );
+                }
+              });
+            });
       } else {
-        _controller.animateTo(next,
-            duration: widget.animationDuration, curve: Curves.easeInOut);
+        _controller.animateTo(
+          next,
+          duration: widget.animationDuration,
+          curve: Curves.easeInOut,
+        );
       }
     });
   }
