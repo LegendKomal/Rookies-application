@@ -424,6 +424,10 @@ class ShopifyStorefrontService {
 query getProduct($handle: String!, $identifiers: [HasMetafieldsIdentifier!]!) {
   productByHandle(handle: $handle) {
     id title handle description
+    vendor
+    productType
+    tags
+    collections(first: 10) { edges { node { id } } }
     priceRange { minVariantPrice { amount currencyCode } }
     compareAtPriceRange { minVariantPrice { amount currencyCode } }
     images(first: 10) { edges { node { url altText } } }

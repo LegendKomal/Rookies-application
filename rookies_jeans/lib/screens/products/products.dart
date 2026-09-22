@@ -40,6 +40,36 @@ class _CenterFloatAboveBottomNav extends FloatingActionButtonLocation {
   }
 }
 
+/// A collapsing sliver header for the product-listing banner. Unlike
+/// [SliverAppBar], it isn't pinned or floating: it shrinks continuously
+/// from [maxHeight] down to 0 as the user scrolls, then scrolls away
+/// completely like any other sliver — and grows back the same way when
+/// scrolling back up, since [build] is driven entirely by `shrinkOffset`.
+class _CollapsingBannerDelegate extends SliverPersistentHeaderDelegate {
+  _CollapsingBannerDelegate({required this.maxHeight, required this.builder});
+
+  final double maxHeight;
+  final Widget Function(BuildContext context, double progress) builder;
+
+  @override
+  double get minExtent => 0;
+
+  @override
+  double get maxExtent => maxHeight;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final progress =
+        maxHeight <= 0 ? 0.0 : (shrinkOffset / maxHeight).clamp(0.0, 1.0);
+    return builder(context, progress);
+  }
+
+  @override
+  bool shouldRebuild(covariant _CollapsingBannerDelegate oldDelegate) {
+    return oldDelegate.maxHeight != maxHeight || oldDelegate.builder != builder;
+  }
+}
+
 class ProductsPage extends StatefulWidget {
   final ShopifyCollection collection;
 
@@ -202,7 +232,7 @@ class _ProductsPageState extends State<ProductsPage> {
     final cardHeight = cardWidth / _kAspect;
     final rowHeight = cardHeight + _kMainSpacing;
 
-    const topPadding = _kGridPadding;
+    final topPadding = _bannerHeight(r) + _kGridPadding;
     final scrollOffset = _scrollController.offset;
 
     final firstVisibleRow =
@@ -756,76 +786,51 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
+  double _bannerHeight(_Responsive r) {
+    if (r.isDesktop) return 300;
+    if (r.isTablet) return 265;
+    return 220;
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: ThemeService.instance,
       builder: (context, _) => Scaffold(
-      backgroundColor: bgColor,
-      floatingActionButtonLocation: const _CenterFloatAboveBottomNav(),
-      floatingActionButton: _floatingFilterButton(context),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _topBar(context),
-            Expanded(
-              child: _isLoading
-                  ? _shimmerGrid()
-                  : RefreshIndicator(
-                      color: primary,
-                      onRefresh: _refreshProducts,
-                      child: _error != null
-                          ? _errorState()
-                          : _products.isEmpty
-                              ? _emptyState()
-                              : _productGrid(),
-                    ),
-            ),
-          ],
-        ),
-      ),
-      ),
-    );
-  }
-
-  Widget _floatingFilterButton(BuildContext context) {
-    return SafeArea(
-      child: Material(
-        color: Colors.transparent,
-        elevation: 8,
-        borderRadius: BorderRadius.circular(30),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(30),
-          onTap: () => _openFilterSheet(context),
-          child: Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(
-              color: primary,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 14,
-                  offset: Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.tune_rounded, color: onPrimary, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  _activeFilterCount > 0
-                      ? 'FILTERS ($_activeFilterCount)'
-                      : 'FILTERS',
-                  style: TextStyle(
-                    color: onPrimary,
-                    fontFamily: _fBody,
-                    fontSize: 10,
+        backgroundColor: bgColor,
+        floatingActionButtonLocation: const _CenterFloatAboveBottomNav(),
+        floatingActionButton: _filterSortCapsule(context),
+        body: SafeArea(
+          top: false,
+          child: RefreshIndicator(
+            color: primary,
+            onRefresh: _refreshProducts,
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverPersistentHeader(
+                  pinned: false,
+                  floating: false,
+                  delegate: _CollapsingBannerDelegate(
+                    maxHeight: _bannerHeight(_Responsive(context)),
+                    builder: _banner,
                   ),
                 ),
+                if (_isLoading)
+                  _shimmerSliverGrid()
+                else if (_error != null)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _errorState(),
+                  )
+                else if (_products.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _emptyState(),
+                  )
+                else
+                  _productSliverGrid(),
               ],
             ),
           ),
@@ -834,96 +839,252 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
-  Widget _topBar(BuildContext context) {
+  // `progress` is how far the banner has collapsed: 0 = fully expanded,
+  // 1 = fully collapsed (its bottom edge has reached the top and the
+  // sliver framework is about to hand scrolling over to the grid below).
+  Widget _banner(BuildContext context, double progress) {
     final r = _Responsive(context);
-    final titleSize = (r.width * 0.085).clamp(22.0, 40.0);
-    return Container(
-      color: cardColor,
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      child: Row(
+    final bannerHeight = _bannerHeight(r);
+    final titleSize = (r.width * 0.08).clamp(20.0, 36.0);
+    final imageUrl = widget.collection.imageUrl;
+
+    // The text scrolls up and out first, over just the first slice of the
+    // collapse — then, for the rest of the scroll, only the image is left
+    // slowly decreasing from the bottom (the sliver's own shrink).
+    const double textPhase = 0.35;
+    final textProgress = (progress / textPhase).clamp(0.0, 1.0);
+    final textFade = 1 - textProgress;
+    final textShift = textProgress * 32;
+
+    return SizedBox(
+      height: bannerHeight,
+      child: Stack(
+        fit: StackFit.expand,
+        clipBehavior: Clip.hardEdge,
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-            color: primary,
-            onPressed: () => Navigator.pop(context),
-          ),
-          Expanded(
-            child: Text(
-              widget.collection.label.toUpperCase(),
-              style: TextStyle(
-                fontFamily: _fHead,
-                fontSize: titleSize,
-                color: primary,
+          // No transform here — the sliver itself shrinks the visible
+          // extent from the bottom up as the user scrolls, so the image
+          // decreases only from the bottom, never the sides or top.
+          imageUrl != null && imageUrl.isNotEmpty
+              ? CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(color: AppColors.fieldFill),
+                  errorWidget: (_, __, ___) => Container(color: primary),
+                )
+              : Container(color: primary),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.25 + progress * 0.15),
+                  Colors.black.withOpacity(0.45 + progress * 0.15),
+                ],
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: _sortButton(context),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 12,
+            left: 16,
+            right: 16,
+            child: Opacity(
+              opacity: textFade,
+              child: Transform.translate(
+                offset: Offset(0, -textShift),
+                child: _breadcrumbNav(context),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 16,
+            child: Opacity(
+              opacity: textFade,
+              child: Transform.translate(
+                offset: Offset(0, -textShift),
+                child: Text(
+                  widget.collection.label.toUpperCase(),
+                  style: TextStyle(
+                    fontFamily: _fHead,
+                    fontSize: titleSize,
+                    color: Colors.white,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _sortButton(BuildContext context) => Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(6),
-          onTap: () => _openSortSheet(context),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.swap_vert_rounded, size: 17, color: primary),
-                const SizedBox(width: 4),
-                Text(
-                  'SORT',
-                  style: TextStyle(
-                    fontFamily: _fBody,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: primary,
-                  ),
-                ),
-              ],
+  Widget _breadcrumbNav(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
+          child: Text(
+            'HOME',
+            style: TextStyle(
+              fontFamily: _fBody,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+              color: Colors.white.withOpacity(0.75),
             ),
           ),
         ),
-      );
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Icon(
+            Icons.chevron_right_rounded,
+            size: 16,
+            color: Colors.white.withOpacity(0.75),
+          ),
+        ),
+        Flexible(
+          child: Text(
+            widget.collection.label.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: _fBold,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.4,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-  Widget _productGrid() {
+  Widget _filterSortCapsule(BuildContext context) {
+    return SafeArea(
+      child: Material(
+        color: Colors.transparent,
+        elevation: 8,
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: primary,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 14,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              InkWell(
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(30),
+                ),
+                onTap: () => _openFilterSheet(context),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 20, right: 14),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.tune_rounded, color: onPrimary, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        _activeFilterCount > 0
+                            ? 'FILTERS ($_activeFilterCount)'
+                            : 'FILTERS',
+                        style: TextStyle(
+                          color: onPrimary,
+                          fontFamily: _fBody,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 18,
+                child: VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: onPrimary.withOpacity(0.4),
+                ),
+              ),
+              InkWell(
+                borderRadius: const BorderRadius.horizontal(
+                  right: Radius.circular(30),
+                ),
+                onTap: () => _openSortSheet(context),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 14, right: 20),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.swap_vert_rounded,
+                          color: onPrimary, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'SORT',
+                        style: TextStyle(
+                          color: onPrimary,
+                          fontFamily: _fBody,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _productSliverGrid() {
     final r = _Responsive(context);
-    return GridView.builder(
-      controller: _scrollController,
+    return SliverPadding(
       padding: EdgeInsets.fromLTRB(
         _kGridPadding,
         _kGridPadding,
         _kGridPadding,
         90,
       ),
-      itemCount: _products.length + (_isLoadingMore ? 1 : 0),
-      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: _maxCardExtent(r),
-        mainAxisSpacing: _kMainSpacing,
-        crossAxisSpacing: _kCrossSpacing,
-        childAspectRatio: _kAspect,
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: _maxCardExtent(r),
+          mainAxisSpacing: _kMainSpacing,
+          crossAxisSpacing: _kCrossSpacing,
+          childAspectRatio: _kAspect,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (_, i) {
+            if (i >= _products.length) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+            return _productCard(_products[i]);
+          },
+          childCount: _products.length + (_isLoadingMore ? 1 : 0),
+        ),
       ),
-      itemBuilder: (_, i) {
-        if (i >= _products.length) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
-        return _productCard(_products[i]);
-      },
     );
   }
 
@@ -2080,20 +2241,24 @@ class _ProductsPageState extends State<ProductsPage> {
         ),
       );
 
-  Widget _shimmerGrid() {
+  Widget _shimmerSliverGrid() {
     final r = _Responsive(context);
-    return GridView.builder(
+    return SliverPadding(
       padding: const EdgeInsets.all(_kGridPadding),
-      itemCount: _columnsFor(r) * 3,
-      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: _maxCardExtent(r),
-        mainAxisSpacing: _kMainSpacing,
-        crossAxisSpacing: _kCrossSpacing,
-        childAspectRatio: _kAspect,
-      ),
-      itemBuilder: (_, __) => Container(
-        decoration: BoxDecoration(
-          color: AppColors.fieldFill,
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: _maxCardExtent(r),
+          mainAxisSpacing: _kMainSpacing,
+          crossAxisSpacing: _kCrossSpacing,
+          childAspectRatio: _kAspect,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (_, __) => Container(
+            decoration: BoxDecoration(
+              color: AppColors.fieldFill,
+            ),
+          ),
+          childCount: _columnsFor(r) * 3,
         ),
       ),
     );

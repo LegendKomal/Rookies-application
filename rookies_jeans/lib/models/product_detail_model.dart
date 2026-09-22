@@ -13,6 +13,10 @@ class ShopifyProductDetail {
   final List<ProductDetailOption> options;
   final String? shippingInfo;
   final String? careInstructions;
+  final String vendor;
+  final String productType;
+  final List<String> tags;
+  final List<String> collectionIds;
 
   const ShopifyProductDetail({
     required this.id,
@@ -27,6 +31,10 @@ class ShopifyProductDetail {
     required this.options,
     this.shippingInfo,
     this.careInstructions,
+    this.vendor = '',
+    this.productType = '',
+    this.tags = const [],
+    this.collectionIds = const [],
   });
 
   bool get isOnSale => compareAtPrice != null && compareAtPrice! > price;
@@ -65,6 +73,11 @@ class ShopifyProductDetail {
         .map((o) => ProductDetailOption.fromJson(o as Map<String, dynamic>))
         .toList();
 
+    final collectionEdges = (json['collections']?['edges'] as List?) ?? [];
+    final collectionIds = collectionEdges
+        .map((e) => (e['node']['id'] as String).split('/').last)
+        .toList();
+
     return ShopifyProductDetail(
       id: json['id'] as String,
       title: json['title'] as String,
@@ -78,6 +91,10 @@ class ShopifyProductDetail {
       options: options,
       shippingInfo: json['shippingInfo']?['value'] as String?,
       careInstructions: json['careInstructions']?['value'] as String?,
+      vendor: json['vendor'] as String? ?? '',
+      productType: json['productType'] as String? ?? '',
+      tags: ((json['tags'] as List?) ?? []).cast<String>(),
+      collectionIds: collectionIds,
     );
   }
 }

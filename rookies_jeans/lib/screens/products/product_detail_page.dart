@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -83,7 +86,48 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   // in the critical path — see `_prewarmSizeChart`.
   WebViewController? _sizeChartController;
   final ValueNotifier<bool> _sizeChartLoading = ValueNotifier<bool>(true);
+  // true until an availability check (see `_checkSizeChartAvailable`) comes
+  // back empty for this product — kept optimistic by default so the button
+  // never disappears just because the check is slow or fails.
+  final ValueNotifier<bool> _sizeChartAvailable = ValueNotifier<bool>(true);
   String? _sizeChartWarmedForHandle;
+
+  /// Kiwi-issued source id identifying this app as the integration
+  /// (per Kiwi support: https://intercom.help/kiwi-sizing-chart/en/articles/10291026).
+  static const String _kiwiSourceId = 'testing_only';
+
+  Uri _kiwiSizeChartUri(ShopifyProductDetail product) {
+    final params = <String, String>{
+      'shop': ShopifyConstants.shopDomain,
+      'product': _numericProductId(product.id),
+      'source': _kiwiSourceId,
+    };
+    if (product.vendor.isNotEmpty) params['vendor'] = product.vendor;
+    if (product.productType.isNotEmpty) params['type'] = product.productType;
+    if (product.tags.isNotEmpty) params['tags'] = product.tags.join(',');
+    if (product.collectionIds.isNotEmpty) {
+      params['collections'] = product.collectionIds.join(',');
+    }
+    return Uri.https('app.kiwisizing.com', '/size', params);
+  }
+
+  /// Per Kiwi's integration guide: probe the size chart URL first, and
+  /// only show the "Size Chart" button if something is actually returned
+  /// for this product.
+  Future<void> _checkSizeChartAvailable(Uri uri, String forHandle) async {
+    try {
+      final res = await http
+          .get(uri)
+          .timeout(const Duration(seconds: 8));
+      if (!mounted || _product?.handle != forHandle) return;
+      final hasData = res.statusCode == 200 && res.body.trim().isNotEmpty;
+      _sizeChartAvailable.value = hasData;
+    } catch (e) {
+      debugPrint('_checkSizeChartAvailable failed: $e');
+      // Leave it visible on failure — don't hide a working feature because
+      // of a flaky network check.
+    }
+  }
 
   // Never let a size-chart failure (e.g. no WebView platform implementation
   // on the current run target) bubble up and take down product loading —
@@ -95,14 +139,13 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       return;
     }
     try {
-      _sizeChartWarmedForHandle = _product!.handle;
+      final product = _product!;
+      _sizeChartWarmedForHandle = product.handle;
       _sizeChartLoading.value = true;
+      _sizeChartAvailable.value = true;
 
-      final uri = Uri.https('app.kiwisizing.com', '/size', {
-        'shop': ShopifyConstants.shopDomain,
-        'product': _numericProductId(_product!.id),
-        'source': 'testing_only', // Kiwi-issued source id (per Kiwi support)
-      });
+      final uri = _kiwiSizeChartUri(product);
+      unawaited(_checkSizeChartAvailable(uri, product.handle));
 
       _sizeChartController = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -191,6 +234,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     _pageController.dispose();
     _scrollController.dispose();
     _sizeChartLoading.dispose();
+    _sizeChartAvailable.dispose();
     super.dispose();
   }
 
@@ -976,23 +1020,36 @@ _variantMetafieldsSection(),
           ),
           // const Divider(height: 1),
           const SizedBox(height: 16),
-          GestureDetector(
-  onTap: _openSizeChart,
-  child: Padding(
-    padding: const EdgeInsets.symmetric(vertical: 14),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'Size Chart',
-          style: TextStyle(fontFamily: _fBold, fontSize: _s(14), color: primary),
-        ),
-        Icon(Icons.straighten_rounded, size: 18, color: primary),
-      ],
-    ),
-  ),
-),
-const Divider(height: 1),
+          ValueListenableBuilder<bool>(
+            valueListenable: _sizeChartAvailable,
+            builder: (context, available, _) => available
+                ? Column(
+                    children: [
+                      GestureDetector(
+                        onTap: _openSizeChart,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Size Chart',
+                                style: TextStyle(
+                                    fontFamily: _fBold,
+                                    fontSize: _s(14),
+                                    color: primary),
+                              ),
+                              Icon(Icons.straighten_rounded,
+                                  size: 18, color: primary),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                    ],
+                  )
+                : const SizedBox.shrink(),
+          ),
         ],
       ),
     );
