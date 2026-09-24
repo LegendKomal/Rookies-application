@@ -288,6 +288,7 @@ class _HomeScreenState extends State<HomeScreen> {
             imageAsset: 'assets/jeans_jann.jpeg',
             imageUrl: t.imageUrl,
             handle: t.collectionHandle,
+            label: t.label,
           ),
         )
         .toList();
@@ -1068,10 +1069,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final r = R.of(context);
     final double screenW = MediaQuery.of(context).size.width;
 
-    // Edge-to-edge banner cards: nearly full screen width, with a small peek
-    // of the next column so it's clear the row scrolls. Bigger height too.
-    final double cardWidth = screenW * 0.92;
-    final double cardHeight = (cardWidth * 0.72).clamp(180.0, 360.0);
+    // Portrait cards matching the 3:4 tile photos so the whole image fits
+    // without cropping. One large column visible, with a generous peek of the
+    // next one so it's clear the row scrolls.
+    final double cardWidth = screenW * 0.62;
+    final double cardHeight = cardWidth * 4 / 3;
     final double gap = r.dp(8); // horizontal gap between columns
     final double vGap = r.dp(8); // vertical gap between the two rows
 
@@ -1141,7 +1143,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _occasionCard(_OccasionTile tile, double width, double height, R r) {
     return GestureDetector(
-      onTap: () => _openCollectionByHandle(tile.handle),
+      onTap: () => _openCollectionByHandle(tile.handle, label: tile.label),
       child: SizedBox(
         width: width,
         height: height,
@@ -1152,6 +1154,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? CachedNetworkImage(
                     imageUrl: tile.imageUrl!,
                     fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
                     placeholder: (_, __) =>
                         Container(color: const Color(0xFFE0E0E0)),
                     errorWidget: (_, __, ___) =>
@@ -1160,6 +1163,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 : Image.asset(
                     tile.imageAsset,
                     fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
                     errorBuilder: (_, __, ___) =>
                         Container(color: const Color(0xFFE0E0E0)),
                   ),
@@ -1175,6 +1179,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
+            if (tile.label != null && tile.label!.trim().isNotEmpty)
+              Positioned(
+                left: r.dp(12),
+                right: r.dp(12),
+                bottom: r.dp(12),
+                child: Text(
+                  tile.label!.toUpperCase(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: _fHead,
+                    fontSize: r.sp(18),
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -2035,10 +2056,12 @@ class _OccasionTile {
   final String imageAsset;
   final String? imageUrl;
   final String handle;
+  final String? label;
   const _OccasionTile({
     required this.imageAsset,
     this.imageUrl,
     required this.handle,
+    this.label,
   });
 }
 

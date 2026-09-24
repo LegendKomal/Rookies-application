@@ -511,7 +511,7 @@ class _ProductsPageState extends State<ProductsPage> {
                     )
                   : null,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 4),    
             Text(
               title,
               maxLines: 1,
