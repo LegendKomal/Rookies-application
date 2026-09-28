@@ -38,6 +38,12 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.pickMode) {
+      final cached = AddressService.instance.addresses;
+      _selectedId = (cached.where((a) => a.isDefault).firstOrNull ??
+              cached.firstOrNull)
+          ?.id;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await AddressService.instance.fetchAddresses();
       if (mounted && widget.pickMode) {
@@ -295,6 +301,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                   child: SafeArea(
                     top: false,
                     child: Center(
+                      heightFactor: 1,
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: _kMaxContentW),
                         child: SizedBox(
@@ -548,7 +555,9 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
               ),
               SizedBox(height: _s(context, 6)),
               Text(
-                'Add an address for faster checkout',
+                widget.pickMode
+                    ? 'Add a delivery address to continue checkout'
+                    : 'Add an address for faster checkout',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontFamily: _fBody,

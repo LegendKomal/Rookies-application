@@ -2,14 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
-import 'package:rookies_jeans/models/address_model.dart';
 import 'package:rookies_jeans/models/cart_model.dart';
-import 'package:rookies_jeans/screens/cart/checkout.dart';
-import 'package:rookies_jeans/screens/profile/address_book.dart';
-import 'package:rookies_jeans/services/address_service.dart';
+import 'package:rookies_jeans/screens/cart/checkout_flow.dart';
+import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
-import 'package:rookies_jeans/services/shopify_auth_service.dart';
-import 'package:rookies_jeans/screens/authentication/login.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -88,91 +84,25 @@ class _CartScreenState extends State<CartScreen> {
     setState(() => _isCheckingOut = true);
 
     try {
-      final isLoggedIn = await ShopifyAuthService.instance.isLoggedIn();
-
-      if (!isLoggedIn) {
-        final loggedInNow = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(
-            builder: (_) => const Login(isCheckoutFlow: true),
-          ),
-        );
-        if (!mounted) return;
-        if (loggedInNow != true) return;
-      }
-
-      await AddressService.instance.fetchAddresses();
-      if (!mounted) return;
-
-      ShopifyAddress? selectedAddress;
-
-      if (AddressService.instance.addresses.isNotEmpty) {
-        selectedAddress = await Navigator.of(context).push<ShopifyAddress>(
-          MaterialPageRoute(
-            builder: (_) => const AddressBookScreen(pickMode: true),
-            fullscreenDialog: true,
-          ),
-        );
-        if (!mounted) return;
-
-        if (selectedAddress == null) return;
-
-        if (!selectedAddress.isDefault) {
-          await AddressService.instance.setDefaultAddress(selectedAddress.id);
-          if (!mounted) return;
-        }
-      }
-      final token = await ShopifyAuthService.instance.getSavedCustomerToken();
-      if (token != null && token.isNotEmpty) {
-        final linked = await CartService.instance.linkCheckoutToCustomer(
-          customerAccessToken: token,
-        );
-        if (!mounted) return;
-        if (!linked) {
-          _showToast(
-            'Could not link your account to checkout.',
-            isError: true,
-          );
-        }
-      }
-
-      final url = CartService.instance.cart.checkoutUrl;
-      if (url == null) {
-        if (!mounted) return;
-        _showToast('Checkout is not available right now.', isError: true);
+      final lines = CartService.instance.cart.lines;
+      if (lines.isEmpty) {
+        _showToast('Your cart is empty.', isError: true);
         return;
       }
 
-      final result = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          builder: (_) => CheckoutWebView(checkoutUrl: url),
-          fullscreenDialog: true,
-        ),
-      );
+      final placed = await runCheckoutFlow(context, lines: lines);
       if (!mounted) return;
 
-      if (result == true) {
-        await CartService.instance.refresh();
+      if (placed) {
+        // GoKwik places the order from the website's cart, so the app's
+        // Storefront cart is never converted; start a fresh one.
+        await CartService.instance.reset();
         if (!mounted) return;
         _showToast('Order placed successfully!');
       }
     } finally {
       if (mounted) setState(() => _isCheckingOut = false);
     }
-  }
-
-  void _openImageViewer(String imageUrl, String heroTag) {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: false,
-        barrierColor: Colors.black,
-        transitionDuration: const Duration(milliseconds: 220),
-        reverseTransitionDuration: const Duration(milliseconds: 200),
-        pageBuilder: (_, animation, __) => FadeTransition(
-          opacity: animation,
-          child: _ImageZoomViewer(imageUrl: imageUrl, heroTag: heroTag),
-        ),
-      ),
-    );
   }
 
   @override
@@ -316,9 +246,13 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _cartLineCard(ShopifyCartLine line) {
     final isPending = _pendingLineIds.contains(line.lineId);
-    final heroTag   = 'cart_image_${line.lineId}';
 
-    return Container(
+    // Tapping anywhere on the card opens the product; the quantity stepper
+    // and delete icon have their own tap handlers, which win over this one.
+    return GestureDetector(
+      onTap: line.productHandle != null ? () => _openProduct(line) : null,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
       decoration: BoxDecoration(
         color: cardColor,
         // borderRadius: BorderRadius.circular(10),
@@ -328,13 +262,7 @@ class _CartScreenState extends State<CartScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GestureDetector(
-            onTap: line.imageUrl != null
-                ? () => _openImageViewer(line.imageUrl!, heroTag)
-                : null,
-            child: Hero(
-              tag: heroTag,
-              child: ClipRRect(
+          ClipRRect(
                 // borderRadius: BorderRadius.circular(8),
                 child: SizedBox(
                   width: _s(80).clamp(72.0, 120.0),
@@ -357,8 +285,6 @@ class _CartScreenState extends State<CartScreen> {
                       : Container(color: fieldFill),
                 ),
               ),
-            ),
-          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -435,6 +361,19 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ),
         ],
+      ),
+      ),
+    );
+  }
+
+  void _openProduct(ShopifyCartLine line) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProductDetailPage(
+          handle: line.productHandle!,
+          title: line.productTitle,
+          heroImageUrl: line.imageUrl,
+        ),
       ),
     );
   }
@@ -572,129 +511,4 @@ class _CartScreenState extends State<CartScreen> {
           ),
         ),
       );
-}
-
-class _ImageZoomViewer extends StatefulWidget {
-  const _ImageZoomViewer({required this.imageUrl, required this.heroTag});
-
-  final String imageUrl;
-  final String heroTag;
-
-  @override
-  State<_ImageZoomViewer> createState() => _ImageZoomViewerState();
-}
-
-class _ImageZoomViewerState extends State<_ImageZoomViewer> {
-  final TransformationController _transformController =
-      TransformationController();
-
-  double _dragOffset      = 0;
-  double _backdropOpacity = 1;
-  bool   _isZoomed        = false;
-
-  static const double _dismissThreshold = 120;
-
-  @override
-  void dispose() {
-    _transformController.dispose();
-    super.dispose();
-  }
-
-  void _onInteractionUpdate(ScaleUpdateDetails details) {
-    final scale = _transformController.value.getMaxScaleOnAxis();
-    setState(() => _isZoomed = scale > 1.05);
-  }
-
-  void _onVerticalDragUpdate(DragUpdateDetails details) {
-    if (_isZoomed) return;
-    setState(() {
-      _dragOffset     += details.delta.dy;
-      _backdropOpacity = (1 - (_dragOffset.abs() / 350)).clamp(0.0, 1.0);
-    });
-  }
-
-  void _onVerticalDragEnd(DragEndDetails details) {
-    if (_isZoomed) return;
-    if (_dragOffset.abs() > _dismissThreshold ||
-        details.primaryVelocity!.abs() > 800) {
-      Navigator.of(context).pop();
-    } else {
-      setState(() {
-        _dragOffset      = 0;
-        _backdropOpacity = 1;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black.withOpacity(_backdropOpacity * 1.0),
-      body: Stack(
-        children: [
-          GestureDetector(
-            onVerticalDragUpdate: _onVerticalDragUpdate,
-            onVerticalDragEnd: _onVerticalDragEnd,
-            onTap: () => Navigator.of(context).pop(),
-            child: Container(color: Colors.transparent),
-          ),
-          Center(
-            child: Transform.translate(
-              offset: Offset(0, _dragOffset),
-              child: GestureDetector(
-                onVerticalDragUpdate: _onVerticalDragUpdate,
-                onVerticalDragEnd: _onVerticalDragEnd,
-                child: Hero(
-                  tag: widget.heroTag,
-                  child: InteractiveViewer(
-                    transformationController: _transformController,
-                    onInteractionUpdate: _onInteractionUpdate,
-                    onInteractionEnd: (_) {
-                      final scale =
-                          _transformController.value.getMaxScaleOnAxis();
-                      setState(() => _isZoomed = scale > 1.05);
-                    },
-                    minScale: 1.0,
-                    maxScale: 5.0,
-                    child: CachedNetworkImage(
-                      imageUrl: widget.imageUrl,
-                      fit: BoxFit.contain,
-                      placeholder: (_, __) => const SizedBox(
-                        width: 80,
-                        height: 80,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      errorWidget: (_, __, ___) => const Icon(
-                        Icons.image_not_supported_outlined,
-                        size: 48,
-                        color: Colors.white54,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: SafeArea(
-              child: IconButton(
-                icon: const Icon(
-                  Icons.close_rounded,
-                  color: Colors.white,
-                  size: 28,
-                ),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

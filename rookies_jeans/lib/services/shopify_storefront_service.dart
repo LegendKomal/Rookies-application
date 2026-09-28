@@ -849,18 +849,48 @@ for (final e in rawVariantEdges) {
     );
   }
 
-  String _searchQueryString(
-    String raw, {
-    double? minPrice,
-    double? maxPrice,
-  }) {
-    final clauses = <String>[];
-    final titleQuery = _titleScopedQuery(raw);
-    if (titleQuery.isNotEmpty) clauses.add('($titleQuery)');
-    if (minPrice != null) clauses.add('variants.price:>=$minPrice');
-    if (maxPrice != null) clauses.add('variants.price:<=$maxPrice');
-    return clauses.join(' AND ');
+  /// The root `search` field only understands plain search terms — it does
+  /// NOT support `products(query:)` syntax like `title:*shirt*` or
+  /// `variants.price:>=X`. Sending that syntax makes Shopify ignore the
+  /// terms and match the whole catalog, so every search returned the same
+  /// results. Pass the user's text as-is; Shopify matches it against title,
+  /// tags, product type, vendor and variant options (e.g. colors) and ranks
+  /// by relevance.
+  String _searchQueryString(String raw) =>
+      raw.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+  /// Shopify's `search` pads relevance results with loosely related items
+  /// (e.g. "black shirt" → 663 hits, only ~70 actually black shirts, spread
+  /// across the whole list). Keep a product only when every search word
+  /// starts a word in its title, product type, tags or option values (so a
+  /// color search also finds products whose color lives in the Color
+  /// option). Matching at word starts (hyphens count as part of a word)
+  /// keeps "shirt" from matching tees via "TSHIRTS" or a "T-SHIRT" tag.
+  bool _matchesSearchWords(Map<String, dynamic> node, List<RegExp> words) {
+    if (words.isEmpty) return true;
+    final haystack = [
+      node['title'],
+      node['productType'],
+      ...((node['tags'] as List?) ?? const []),
+      for (final opt in (node['options'] as List?) ?? const [])
+        ...(((opt as Map)['values'] as List?) ?? const []),
+    ].whereType<String>().join(' ');
+    return words.every((w) => w.hasMatch(haystack));
   }
+
+  List<RegExp> _searchWordPatterns(String raw) => raw
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((w) => w.isNotEmpty)
+      .map((w) => RegExp(
+            '(^|[^a-z0-9-])${RegExp.escape(w)}',
+            caseSensitive: false,
+          ))
+      .toList();
+
+  // Raw page size pulled from Shopify per request while collecting filtered
+  // matches — larger than a UI page so sparse queries need fewer round trips.
+  static const int _kSearchScanPageSize = 100;
 
   Future<PaginatedProductsResponse> _fetchSearchProductsPaginated(
     String query, {
@@ -894,6 +924,7 @@ for (final e in rawVariantEdges) {
         sortKey: $sortKey
         reverse: $reverse
         types: [PRODUCT]
+        prefix: LAST
         productFilters: $productFilters
       ) {
         productFilters {
@@ -915,6 +946,8 @@ for (final e in rawVariantEdges) {
               title
               handle
               createdAt
+              productType
+              tags
               priceRange { minVariantPrice { amount currencyCode } }
               compareAtPriceRange { minVariantPrice { amount currencyCode } }
               images(first: 2) { edges { node { url altText } } }
@@ -944,6 +977,12 @@ for (final e in rawVariantEdges) {
     }
     ''';
 
+    const empty = PaginatedProductsResponse(
+      products: [],
+      hasNextPage: false,
+      endCursor: null,
+    );
+
     try {
       final decodedFilters = filters
           .map((f) {
@@ -956,60 +995,80 @@ for (final e in rawVariantEdges) {
           .whereType<Map<String, dynamic>>()
           .toList();
 
-      final res = await ShopifyGraphQL.post(
-        gqlQuery,
-        variables: {
-          'query': _searchQueryString(query, minPrice: minPrice, maxPrice: maxPrice),
-          'first': first,
-          'after': after,
-          'sortKey': sortKey,
-          'reverse': reverse,
-          'productFilters': decodedFilters,
-        },
-      );
-
-      _log(
-        'searchProductsPaginated [$query, after=$after, sort=$sortKey, reverse=$reverse, filters=$filters] → ${res.statusCode}',
-      );
-      final decoded = res.body;
-
-      if (decoded['errors'] != null || decoded['data'] == null) {
-        _log('searchProductsPaginated errors: ${decoded['errors']}');
-        return const PaginatedProductsResponse(
-          products: [],
-          hasNextPage: false,
-          endCursor: null,
-        );
+      // Price bounds go through productFilters since `search` has no
+      // query-string syntax for them.
+      if (minPrice != null || maxPrice != null) {
+        decodedFilters.add({
+          'price': {
+            'min': ?minPrice,
+            'max': ?maxPrice,
+          },
+        });
       }
 
-      final searchMap = decoded['data']?['search'] as Map<String, dynamic>?;
-      final edges = (searchMap?['edges'] as List?) ?? [];
-      final pageInfo = searchMap?['pageInfo'] as Map<String, dynamic>?;
-      final filtersList = (searchMap?['productFilters'] as List?) ?? [];
+      final words = _searchWordPatterns(query);
+      final products = <ShopifyProduct>[];
+      List<ShopifyFilter>? parsedFilters;
+      String? cursor = after;
+      bool hasNextPage = true;
 
-      final products = edges
-          .map((e) => e['node'] as Map<String, dynamic>?)
-          .where((node) => node != null && node.isNotEmpty)
-          .map((node) => ShopifyProduct.fromJson(node!))
-          .toList();
+      // Keep scanning raw pages until we've collected at least `first` real
+      // matches or Shopify runs out, so a page of mostly-unrelated padding
+      // never comes back empty and stalls infinite scroll. Whole raw pages
+      // are consumed, so the returned cursor never skips a match.
+      while (products.length < first && hasNextPage) {
+        final res = await ShopifyGraphQL.post(
+          gqlQuery,
+          variables: {
+            'query': _searchQueryString(query),
+            'first': _kSearchScanPageSize,
+            'after': cursor,
+            'sortKey': sortKey,
+            'reverse': reverse,
+            'productFilters': decodedFilters,
+          },
+        );
 
-      final parsedFilters = filtersList
-          .map((f) => ShopifyFilter.fromJson(f as Map<String, dynamic>))
-          .toList();
+        _log(
+          'searchProductsPaginated [$query, after=$cursor, sort=$sortKey, reverse=$reverse, filters=$filters] → ${res.statusCode}',
+        );
+        final decoded = res.body;
+
+        if (decoded['errors'] != null || decoded['data'] == null) {
+          _log('searchProductsPaginated errors: ${decoded['errors']}');
+          if (products.isEmpty) return empty;
+          break;
+        }
+
+        final searchMap = decoded['data']?['search'] as Map<String, dynamic>?;
+        final edges = (searchMap?['edges'] as List?) ?? [];
+        final pageInfo = searchMap?['pageInfo'] as Map<String, dynamic>?;
+
+        parsedFilters ??= ((searchMap?['productFilters'] as List?) ?? [])
+            .map((f) => ShopifyFilter.fromJson(f as Map<String, dynamic>))
+            .toList();
+
+        products.addAll(edges
+            .map((e) => e['node'] as Map<String, dynamic>?)
+            .where((node) =>
+                node != null &&
+                node.isNotEmpty &&
+                _matchesSearchWords(node, words))
+            .map((node) => ShopifyProduct.fromJson(node!)));
+
+        hasNextPage = pageInfo?['hasNextPage'] as bool? ?? false;
+        cursor = pageInfo?['endCursor'] as String?;
+      }
 
       return PaginatedProductsResponse(
         products: products,
-        hasNextPage: pageInfo?['hasNextPage'] as bool? ?? false,
-        endCursor: pageInfo?['endCursor'] as String?,
-        filters: parsedFilters,
+        hasNextPage: hasNextPage,
+        endCursor: cursor,
+        filters: parsedFilters ?? const [],
       );
     } catch (e) {
       _log('searchProductsPaginated EXCEPTION: $e');
-      return const PaginatedProductsResponse(
-        products: [],
-        hasNextPage: false,
-        endCursor: null,
-      );
+      return empty;
     }
   }
 

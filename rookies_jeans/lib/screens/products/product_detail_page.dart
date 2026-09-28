@@ -13,7 +13,9 @@ import 'package:rookies_jeans/screens/products/size_chart_view.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/services/wishlist_service.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
+import 'package:rookies_jeans/models/cart_model.dart';
 import 'package:rookies_jeans/screens/cart/cart.dart';
+import 'package:rookies_jeans/screens/cart/checkout_flow.dart';
 import 'package:rookies_jeans/widget/price_text.dart';
 
 class ProductDetailPage extends StatefulWidget {
@@ -60,6 +62,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   bool _isWishlisted = false;
   bool _isWishlistLoading = false;
   bool _isAddingToCart = false;
+  bool _isBuyingNow = false;
 
   // Mirrors widget.handle/title/heroImageUrl but is mutable, so tapping a
   // color swatch can swap the product shown on THIS page instead of
@@ -470,6 +473,45 @@ debugPrint('==========================================');
       duration: const Duration(seconds: 2),
       behavior: SnackBarBehavior.floating,
     ));
+  }
+
+  /// Checks out only the selected variant (qty 1), leaving the app cart
+  /// untouched — the checkout replaces the website cart with these lines.
+  Future<void> _handleBuyNow() async {
+    final product = _product;
+    final variant = _selectedVariant;
+    if (product == null || variant == null || _isBuyingNow) return;
+    if (!variant.availableForSale) return;
+
+    setState(() => _isBuyingNow = true);
+    try {
+      final placed = await runCheckoutFlow(context, lines: [
+        ShopifyCartLine(
+          lineId: '',
+          variantId: variant.id,
+          productTitle: product.title,
+          productHandle: product.handle,
+          variantTitle: variant.title,
+          imageUrl: product.imageUrls.isNotEmpty ? product.imageUrls.first : null,
+          price: variant.price ?? product.price,
+          currencyCode: product.currencyCode,
+          quantity: 1,
+        ),
+      ]);
+      if (!mounted || !placed) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+          content: Text(
+            'Order placed successfully!',
+            style: TextStyle(fontFamily: _fBody),
+          ),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ));
+    } finally {
+      if (mounted) setState(() => _isBuyingNow = false);
+    }
   }
 
   void _openProductDetail(ShopifyProduct product) {
@@ -1628,45 +1670,77 @@ _variantMetafieldsSection(),
   Widget _addToCartButton() {
     final variant = _selectedVariant;
     final inStock = variant?.availableForSale ?? false;
+    final height = _s(50).clamp(46.0, 60.0);
+    final label = TextStyle(fontFamily: _fBold, fontSize: _s(13));
+
+    Widget spinner(Color color) => SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2, color: color),
+        );
+
+    if (!inStock) {
+      return SizedBox(
+        width: double.infinity,
+        height: height,
+        child: ElevatedButton(
+          onPressed: null,
+          style: ElevatedButton.styleFrom(
+            disabledBackgroundColor: borderColor,
+            elevation: 0,
+          ),
+          child: Text('SOLD OUT', style: label.copyWith(color: onPrimary)),
+        ),
+      );
+    }
+
+    final busy = _isAddingToCart || _isBuyingNow;
     return AnimatedBuilder(
       animation: CartService.instance,
       builder: (context, _) {
         final alreadyInCart =
             variant != null && CartService.instance.isInCart(variant.id);
         return SizedBox(
-          width: double.infinity,
-          height: _s(50).clamp(46.0, 60.0),
-          child: ElevatedButton(
-            onPressed: !inStock || _isAddingToCart
-                ? null
-                : alreadyInCart
-                    ? _goToCart
-                    : _handleAddToCart,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primary,
-              foregroundColor: onPrimary,
-              disabledBackgroundColor: borderColor,
-              elevation: 0,
-            ),
-            child: _isAddingToCart
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: onPrimary),
-                  )
-                : Text(
-                    !inStock
-                        ? 'SOLD OUT'
-                        : alreadyInCart
-                            ? 'GO TO CART'
-                            : 'ADD TO CART',
-                    style: TextStyle(
-                      fontFamily: _fBold,
-                      fontSize: _s(13),
-                      color: onPrimary,
-                    ),
+          height: height,
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: busy
+                      ? null
+                      : alreadyInCart
+                          ? _goToCart
+                          : _handleAddToCart,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: primary,
+                    side: BorderSide(color: primary, width: 1.2),
+                    minimumSize: Size.fromHeight(height),
                   ),
+                  child: _isAddingToCart
+                      ? spinner(primary)
+                      : Text(
+                          alreadyInCart ? 'GO TO CART' : 'ADD TO CART',
+                          style: label.copyWith(color: primary),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: busy ? null : _handleBuyNow,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: onPrimary,
+                    disabledBackgroundColor: primary.withValues(alpha: 0.6),
+                    elevation: 0,
+                    minimumSize: Size.fromHeight(height),
+                  ),
+                  child: _isBuyingNow
+                      ? spinner(onPrimary)
+                      : Text('BUY NOW', style: label.copyWith(color: onPrimary)),
+                ),
+              ),
+            ],
           ),
         );
       },

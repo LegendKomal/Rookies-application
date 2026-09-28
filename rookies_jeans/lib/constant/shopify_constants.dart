@@ -85,7 +85,7 @@ class ShopifyConstants {
         {'title': 'Co-ords', 'handle': 'co-ords'},
       ],
     },
-  ];
+  ];   
 
   static const List<Map<String, String>> exploreCategories = [
     {'handle': cargosHandle,   'label': 'CARGOS'},

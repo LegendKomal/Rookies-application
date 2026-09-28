@@ -588,7 +588,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     IconButton(
                       icon: Icon(Icons.favorite_border_rounded, size: r.dp(22)),
                       color: Colors.white,
-                      onPressed: () => context.go('/wishlist'),
+                      onPressed: () => context.push('/wishlist'),
                     ),
                     IconButton(
                       icon: Icon(Icons.person_outline_rounded, size: r.dp(22)),
@@ -1015,53 +1015,45 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _shopTheLookAsBox() {
-    final r = R.of(context);
-
     final List<_ShopTheLookOutfit> outfits = _shopTheLookOutfitsToDisplay;
     final int maxProducts = outfits
         .map((o) => o.products.length)
         .fold<int>(0, (a, b) => a > b ? a : b);
 
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final double available = constraints.maxHeight;
-          final double usable = available.clamp(0.0, available);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double available = constraints.maxHeight;
+        final double usable = available.clamp(0.0, available);
 
-          double heroHeight = usable * 0.55;
-          heroHeight = heroHeight < 160.0 ? 160.0 : heroHeight;
-          heroHeight = heroHeight > usable ? usable : heroHeight;
+        double heroHeight = usable * 0.55;
+        heroHeight = heroHeight < 160.0 ? 160.0 : heroHeight;
+        heroHeight = heroHeight > usable ? usable : heroHeight;
 
-          final double remainingForRows = (usable - heroHeight).clamp(
-            0.0,
-            usable,
-          );
-          double productRowHeight = maxProducts > 0
-              ? remainingForRows / maxProducts
-              : 0.0;
-          if (maxProducts > 0 && productRowHeight < 84.0) {
-            productRowHeight = 84.0;
-          }
+        final double remainingForRows = (usable - heroHeight).clamp(
+          0.0,
+          usable,
+        );
+        double productRowHeight = maxProducts > 0
+            ? remainingForRows / maxProducts
+            : 0.0;
+        if (maxProducts > 0 && productRowHeight < 84.0) {
+          productRowHeight = 84.0;
+        }
 
-          final double cardHeight =
-              heroHeight + (productRowHeight * maxProducts);
+        final double cardHeight =
+            heroHeight + (productRowHeight * maxProducts);
 
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: SizedBox(
-                height: cardHeight,
-                child: _ShopTheLookAutoSlideCard(
-                  outfits: outfits,
-                  heroHeight: heroHeight,
-                  productRowHeight: productRowHeight,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
+        // Edge to edge: card spans the full screen width.
+        return SizedBox(
+          height: cardHeight,
+          width: double.infinity,
+          child: _ShopTheLookAutoSlideCard(
+            outfits: outfits,
+            heroHeight: heroHeight,
+            productRowHeight: productRowHeight,
+          ),
+        );
+      },
     );
   }
 
@@ -1600,47 +1592,46 @@ class _PromoBlockCardState extends State<_PromoBlockCard> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
+                      Colors.black.withOpacity(0.45),
                       Colors.black.withOpacity(0.05),
-                      Colors.black.withOpacity(0.55),
+                      Colors.black.withOpacity(0.45),
                     ],
+                    stops: const [0.0, 0.5, 1.0],
                   ),
                 ),
               ),
               Positioned(
                 left: r.dp(18),
+                top: r.dp(20),
+                child: Text(
+                  widget.label.toUpperCase(),
+                  style: TextStyle(
+                    fontFamily: AppFonts.heading,
+                    color: Colors.white,
+                    fontSize: r.sp(32),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: r.dp(18),
                 bottom: r.dp(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      widget.label.toUpperCase(),
-                      style: TextStyle(
-                        fontFamily: AppFonts.heading,
-                        color: Colors.white,
-                        fontSize: r.sp(32),
-                        fontWeight: FontWeight.w600,
-                      ),
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: r.dp(18),
+                    vertical: r.dp(11),
+                  ),
+                  color: Colors.black,
+                  child: Text(
+                    widget.buttonLabel.toUpperCase(),
+                    style: TextStyle(
+                      fontFamily: AppFonts.bold,
+                      color: Colors.white,
+                      fontSize: r.sp(12),
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
                     ),
-                    SizedBox(height: r.dp(10)),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: r.dp(18),
-                        vertical: r.dp(11),
-                      ),
-                      color: Colors.black,
-                      child: Text(
-                        widget.buttonLabel.toUpperCase(),
-                        style: TextStyle(
-                          fontFamily: AppFonts.bold,
-                          color: Colors.white,
-                          fontSize: r.sp(12),
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ],

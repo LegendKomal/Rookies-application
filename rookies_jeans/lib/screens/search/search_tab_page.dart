@@ -6,12 +6,13 @@ import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/screens/search/search_results_page.dart';
+import 'package:rookies_jeans/services/search_history_service.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/widget/price_text.dart';
 
 /// The bottom-nav "Search" tab: a lightweight live-search landing page,
 /// separate from ProductsPage (which is collection browsing only). Typing
-/// shows a capped preview list; pressing enter/search opens SearchResultsPage
+/// shows an infinitely scrolling list; pressing enter/search opens SearchResultsPage
 /// for the full paginated, sortable, filterable grid.
 class SearchTabPage extends StatefulWidget {
   const SearchTabPage({super.key});
@@ -36,15 +37,37 @@ class _SearchTabPageState extends State<SearchTabPage> {
 
   final TextEditingController _searchCtrl = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
 
   String _activeQuery = '';
   List<ShopifyProduct> _products = [];
   bool _isLoading = false;
+  bool _isLoadingMore = false;
+  bool _hasNextPage = false;
+  String? _endCursor;
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    SearchHistoryService.instance.load();
+    // Keeps fetching the next page as the user nears the bottom, so the list
+    // grows until every matching product has been shown.
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 300 &&
+          !_isLoading &&
+          !_isLoadingMore &&
+          _hasNextPage) {
+        _loadMore();
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _scrollController.dispose();
     _searchDebounce?.cancel();
     _searchCtrl.dispose();
     _searchFocusNode.dispose();
@@ -80,6 +103,9 @@ class _SearchTabPageState extends State<SearchTabPage> {
     setState(() {
       _activeQuery = query;
       _isLoading = true;
+      _isLoadingMore = false;
+      _hasNextPage = false;
+      _endCursor = null;
       _error = null;
     });
 
@@ -92,14 +118,43 @@ class _SearchTabPageState extends State<SearchTabPage> {
       if (!mounted || _searchCtrl.text.trim() != query) return;
       setState(() {
         _products = response.products;
+        _hasNextPage = response.hasNextPage;
+        _endCursor = response.endCursor;
         _isLoading = false;
       });
+      if (_scrollController.hasClients) _scrollController.jumpTo(0);
     } catch (e) {
       if (!mounted || _searchCtrl.text.trim() != query) return;
       setState(() {
         _error = 'Failed to load results.';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasNextPage) return;
+    final query = _activeQuery;
+    setState(() => _isLoadingMore = true);
+
+    try {
+      final response = await ShopifyStorefrontService.instance.searchProductsPaginated(
+        query,
+        first: _kResultCount,
+        after: _endCursor,
+        sortKey: 'RELEVANCE',
+      );
+      // Drop the page if the user changed the query while it was in flight.
+      if (!mounted || _activeQuery != query) return;
+      setState(() {
+        _products.addAll(response.products);
+        _hasNextPage = response.hasNextPage;
+        _endCursor = response.endCursor;
+        _isLoadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted || _activeQuery != query) return;
+      setState(() => _isLoadingMore = false);
     }
   }
 
@@ -111,6 +166,9 @@ class _SearchTabPageState extends State<SearchTabPage> {
       _activeQuery = '';
       _products = [];
       _isLoading = false;
+      _isLoadingMore = false;
+      _hasNextPage = false;
+      _endCursor = null;
       _error = null;
     });
   }
@@ -126,6 +184,7 @@ class _SearchTabPageState extends State<SearchTabPage> {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return;
     _searchDebounce?.cancel();
+    SearchHistoryService.instance.add(trimmed);
     FocusScope.of(context).unfocus();
     Navigator.push(
       context,
@@ -222,11 +281,85 @@ class _SearchTabPageState extends State<SearchTabPage> {
   }
 
   Widget _body() {
-    if (_activeQuery.trim().isEmpty) return _idleState();
+    if (_activeQuery.trim().isEmpty) {
+      return AnimatedBuilder(
+        animation: SearchHistoryService.instance,
+        builder: (context, _) =>
+            SearchHistoryService.instance.queries.isEmpty
+                ? _idleState()
+                : _recentSearches(),
+      );
+    }
     if (_isLoading) return _shimmerList();
     if (_error != null) return _errorState();
     if (_products.isEmpty) return _emptyState();
     return _resultsList();
+  }
+
+  Widget _recentSearches() {
+    final queries = SearchHistoryService.instance.queries;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 90),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 4, 4),
+          child: Row(
+            children: [
+              Text(
+                'RECENT SEARCHES',
+                style: TextStyle(
+                  fontFamily: _fBold,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                  color: secondaryTxt,
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: SearchHistoryService.instance.clear,
+                child: Text(
+                  'CLEAR ALL',
+                  style: TextStyle(
+                    fontFamily: _fBold,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                    color: primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        for (final query in queries) ...[
+          ListTile(
+            dense: true,
+            contentPadding: const EdgeInsets.only(left: 16, right: 4),
+            leading: Icon(Icons.history_rounded, size: 20, color: secondaryTxt),
+            title: Text(
+              query,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontFamily: _fBody, fontSize: 14, color: primary),
+            ),
+            trailing: IconButton(
+              tooltip: 'Remove',
+              icon: Icon(Icons.close_rounded, size: 18, color: secondaryTxt),
+              onPressed: () => SearchHistoryService.instance.remove(query),
+            ),
+            onTap: () {
+              _searchCtrl.text = query;
+              _searchCtrl.selection =
+                  TextSelection.collapsed(offset: query.length);
+              _openSearchResultsPage(query);
+            },
+          ),
+          Divider(height: 1, indent: 16, color: borderColor),
+        ],
+      ],
+    );
   }
 
   Widget _idleState() => Center(
@@ -319,10 +452,19 @@ class _SearchTabPageState extends State<SearchTabPage> {
 
   Widget _resultsList() {
     return ListView.separated(
+      controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(4, 4, 4, 90),
-      itemCount: _products.length,
+      itemCount: _products.length + (_isLoadingMore ? 1 : 0),
       separatorBuilder: (_, __) => Divider(height: 1, color: borderColor),
-      itemBuilder: (_, i) => _resultTile(_products[i]),
+      itemBuilder: (_, i) {
+        if (i >= _products.length) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return _resultTile(_products[i]);
+      },
     );
   }
 
@@ -360,16 +502,20 @@ class _SearchTabPageState extends State<SearchTabPage> {
         padding: const EdgeInsets.only(top: 4),
         child: _priceBlock(product),
       ),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProductDetailPage(
-            handle: product.handle,
-            title: product.title,
-            heroImageUrl: product.primaryImageUrl,
+      onTap: () {
+        // Opening a live result counts as using this search.
+        SearchHistoryService.instance.add(_activeQuery);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductDetailPage(
+              handle: product.handle,
+              title: product.title,
+              heroImageUrl: product.primaryImageUrl,
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

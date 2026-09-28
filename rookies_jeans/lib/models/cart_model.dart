@@ -2,6 +2,7 @@ class ShopifyCartLine {
   final String lineId;
   final String variantId;
   final String productTitle;
+  final String? productHandle;
   final String? variantTitle;
   final String? imageUrl;
   final double price;
@@ -13,6 +14,7 @@ class ShopifyCartLine {
     required this.lineId,
     required this.variantId,
     required this.productTitle,
+    this.productHandle,
     this.variantTitle,
     this.imageUrl,
     required this.price,
@@ -43,6 +45,7 @@ class ShopifyCartLine {
     lineId: json['id'] as String,
     variantId: merchandise?['id'] as String? ?? '',
     productTitle: product?['title'] as String? ?? merchandise?['title'] as String? ?? '',
+    productHandle: product?['handle'] as String?,
     variantTitle: merchandise?['title'] as String?,
     imageUrl: imageUrl,
     price: double.tryParse('${priceNode?['amount'] ?? '0'}') ?? 0,

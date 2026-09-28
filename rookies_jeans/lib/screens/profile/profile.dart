@@ -434,7 +434,6 @@ class _LoggedInProfile extends StatelessWidget {
                                 label: 'Your\nFavourites',
                                 color: Color(0xFFD32F2F),
                                 route: '/wishlist',
-                                useGo: true,
                               ),
                             ),
                           ],
@@ -708,14 +707,12 @@ class _QuickAction extends StatelessWidget {
     required this.label,
     required this.color,
     required this.route,
-    this.useGo = false,
   });
 
   final IconData icon;
   final String   label;
   final Color    color;
   final String   route;
-  final bool     useGo;
 
   static const String _fBody = AppFonts.body;
 
@@ -723,7 +720,7 @@ class _QuickAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final circle = _s(context, 56).clamp(48.0, 72.0);
     return GestureDetector(
-      onTap: () => useGo ? context.go(route) : context.push(route),
+      onTap: () => context.push(route),
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: _s(context, 2)),

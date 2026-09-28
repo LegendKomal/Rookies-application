@@ -31,6 +31,39 @@ void main() async {
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
 
+/// Index of the Home branch in the StatefulShellRoute below.
+const int _homeBranchIndex = 2;
+
+/// A top-level (full-screen, outside the bottom nav) route whose system back
+/// falls back to the Home tab when there's nothing underneath it — e.g. it
+/// was opened from a shared link or via `context.go` — instead of closing
+/// the app.
+GoRoute _page(String path, Widget Function(GoRouterState state) builder) {
+  return GoRoute(
+    path: path,
+    builder: (context, state) => _HomeFallback(child: builder(state)),
+  );
+}
+
+class _HomeFallback extends StatelessWidget {
+  const _HomeFallback({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    // ModalRoute.of registers a dependency, so this rebuilds whenever the
+    // route's position in the stack changes.
+    final isOnlyRoute = ModalRoute.of(context)?.isFirst ?? false;
+    return PopScope(
+      canPop: !isOnlyRoute,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) context.go('/home');
+      },
+      child: child,
+    );
+  }
+}
+
 final GoRouter _appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/splash',
@@ -39,62 +72,31 @@ final GoRouter _appRouter = GoRouter(
       path: '/splash',
       builder: (context, state) => const SplashScreen(),
     ),
-    GoRoute(
-      path: '/login',
-      builder: (context, state) => const Login(),
-    ),
-
-    GoRoute(
-  path: '/register',
-  builder: (context, state) => const Register(),
-),
-    GoRoute(path: '/orders', builder: (_, __) => const OrdersScreen()),
-    GoRoute(path: '/wishlist', builder: (_, __) => const WishlistPage()),
-    GoRoute(
-  path: '/addresses',
-  builder: (_, __) => const AddressBookScreen(),
-),
-    GoRoute(
-  path: '/change-password',
-  builder: (context, state) => const ChangePasswordScreen(),
-),
-    GoRoute(
-      path: '/data-privacy',
-      builder: (context, state) =>
-          const Scaffold(body: Center(child: Text('Data & Privacy'))),
-    ),
-    GoRoute(
-      path: '/refund-policy',
-      builder: (context, state) =>
-          const Scaffold(body: Center(child: Text('Return & Refund Policy'))),
-    ),
-    GoRoute(
-      path: '/shipping-policy',
-      builder: (context, state) =>
-          const Scaffold(body: Center(child: Text('Shipping Policy'))),
-    ),
-    GoRoute(
-      path: '/store-locator',
-      builder: (context, state) =>
-          const Scaffold(body: Center(child: Text('Store Locator'))),
-    ),
-    GoRoute(
-      path: '/track-order',
-      builder: (context, state) =>
-          const Scaffold(body: Center(child: Text('Track Your Order'))),
-    ),
+    _page('/login', (_) => const Login()),
+    _page('/register', (_) => const Register()),
+    _page('/orders', (_) => const OrdersScreen()),
+    _page('/wishlist', (_) => const WishlistPage()),
+    _page('/addresses', (_) => const AddressBookScreen()),
+    _page('/change-password', (_) => const ChangePasswordScreen()),
+    _page('/data-privacy',
+        (_) => const Scaffold(body: Center(child: Text('Data & Privacy')))),
+    _page('/refund-policy',
+        (_) => const Scaffold(body: Center(child: Text('Return & Refund Policy')))),
+    _page('/shipping-policy',
+        (_) => const Scaffold(body: Center(child: Text('Shipping Policy')))),
+    _page('/store-locator',
+        (_) => const Scaffold(body: Center(child: Text('Store Locator')))),
+    _page('/track-order',
+        (_) => const Scaffold(body: Center(child: Text('Track Your Order')))),
     // Matches the /products/:handle path of shared product links
     // (https://rookiesjeans.com/products/<handle>) so tapping one when the
     // app is installed opens this page instead of falling through to the
     // browser. Title is unknown until ProductDetailPage fetches the
     // product, so the handle is shown as a placeholder while loading.
-    GoRoute(
-      path: '/products/:handle',
-      builder: (context, state) => ProductDetailPage(
-        handle: state.pathParameters['handle']!,
-        title: state.pathParameters['handle']!,
-      ),
-    ),
+    _page('/products/:handle', (state) => ProductDetailPage(
+          handle: state.pathParameters['handle']!,
+          title: state.pathParameters['handle']!,
+        )),
 
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
@@ -145,6 +147,20 @@ class ScaffoldWithNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Pages pushed inside a tab are popped by their own branch navigator
+    // before this is consulted. Once a non-Home tab is at its root, back
+    // returns to the Home tab; only back on Home itself exits the app.
+    final onHome = navigationShell.currentIndex == _homeBranchIndex;
+    return PopScope(
+      canPop: onHome,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) navigationShell.goBranch(_homeBranchIndex);
+      },
+      child: _buildScaffold(),
+    );
+  }
+
+  Widget _buildScaffold() {
     return Scaffold(
       extendBody: true,
       // This Scaffold's background is what shows through any gap behind

@@ -77,6 +77,7 @@ class CartService extends ChangeNotifier {
                 priceV2: price { amount currencyCode }
                 image { url }
                 product {
+                  handle
                   title
                   images(first: 1) { edges { node { url } } }
                 }

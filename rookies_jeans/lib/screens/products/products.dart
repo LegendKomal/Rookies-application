@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
@@ -27,51 +28,19 @@ class _Responsive {
   double sp(double base) => _r.sp(base);
 }
 
-class _CenterFloatAboveBottomNav extends FloatingActionButtonLocation {
-  const _CenterFloatAboveBottomNav();
-
-  static const double _extraBottomOffset = 50.0;
-
-  @override
-  Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
-    final Offset base =
-        FloatingActionButtonLocation.centerFloat.getOffset(scaffoldGeometry);
-    return Offset(base.dx, base.dy - _extraBottomOffset);
-  }
-}
-
-/// A collapsing sliver header for the product-listing banner. Unlike
-/// [SliverAppBar], it isn't pinned or floating: it shrinks continuously
-/// from [maxHeight] down to 0 as the user scrolls, then scrolls away
-/// completely like any other sliver — and grows back the same way when
-/// scrolling back up, since [build] is driven entirely by `shrinkOffset`.
-class _CollapsingBannerDelegate extends SliverPersistentHeaderDelegate {
-  _CollapsingBannerDelegate({required this.maxHeight, required this.builder});
-
-  final double maxHeight;
-  final Widget Function(BuildContext context, double progress) builder;
-
-  @override
-  double get minExtent => 0;
-
-  @override
-  double get maxExtent => maxHeight;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    final progress =
-        maxHeight <= 0 ? 0.0 : (shrinkOffset / maxHeight).clamp(0.0, 1.0);
-    return builder(context, progress);
-  }
-
-  @override
-  bool shouldRebuild(covariant _CollapsingBannerDelegate oldDelegate) {
-    return oldDelegate.maxHeight != maxHeight || oldDelegate.builder != builder;
-  }
-}
-
 class ProductsPage extends StatefulWidget {
-  final ShopifyCollection collection;
+  /// The collection being browsed. Null in search mode.
+  final ShopifyCollection? collection;
+
+  /// When set, the page lists search results for this query instead of a
+  /// collection — same banner, toolbar, grid and cards, so search results
+  /// look and behave exactly like collection browsing.
+  final String? searchQuery;
+
+  /// Search mode only: called when the user jumps back to the dashboard, so
+  /// the search tab it came from can clear its stale query/results (that
+  /// tab's state otherwise survives bottom-nav navigation).
+  final VoidCallback? onBackToDashboard;
 
   /// When set, the page auto-selects the "Fit" filter value matching this
   /// label (case-insensitive) as soon as the collection's filters load —
@@ -81,9 +50,17 @@ class ProductsPage extends StatefulWidget {
 
   const ProductsPage({
     super.key,
-    required this.collection,
+    required ShopifyCollection this.collection,
     this.initialFitFilter,
-  });
+  })  : searchQuery = null,
+        onBackToDashboard = null;
+
+  const ProductsPage.search({
+    super.key,
+    required String this.searchQuery,
+    this.onBackToDashboard,
+  })  : collection = null,
+        initialFitFilter = null;
 
   @override
   State<ProductsPage> createState() => _ProductsPageState();
@@ -100,20 +77,47 @@ class _ProductsPageState extends State<ProductsPage> {
   static const double _kGridPadding = 12.0;
   static const double _kCrossSpacing = 12.0;
   static const double _kMainSpacing = 14.0;
+  static const double _kCompactSpacing = 4.0;
   static const double _kAspect = 0.52;
+  static const double _kToolbarHeight = 48.0;
 
-  double _maxCardExtent(_Responsive r) {
-    if (r.isDesktop) return 260;
-    if (r.isTablet) return 240;
-    return 230;
-  }
+  /// Products per row picked from the toolbar: 1 = large cards,
+  /// 2 = standard cards, 3 = compact image-only tiles.
+  int _gridMode = 2;
+
+  bool get _isCompactGrid => _gridMode == 3;
 
   int _columnsFor(_Responsive r) {
+    if (r.isDesktop) return _gridMode + 2;
+    if (r.isTablet) return _gridMode + 1;
+    return _gridMode;
+  }
+
+  double get _crossSpacing => _isCompactGrid ? _kCompactSpacing : _kCrossSpacing;
+  double get _mainSpacing => _isCompactGrid ? _kCompactSpacing : _kMainSpacing;
+
+  double _cardHeightFor(_Responsive r) {
+    final columns = _columnsFor(r);
     final gridWidth = r.safeWidth - _kGridPadding * 2;
-    final extent = _maxCardExtent(r);
-    final count =
-        (gridWidth / (extent + _kCrossSpacing)).ceil();
-    return count < 1 ? 1 : count;
+    final cardWidth = (gridWidth - _crossSpacing * (columns - 1)) / columns;
+    switch (_gridMode) {
+      case 1:
+        // Portrait image plus the title / price / button block.
+        return cardWidth * 1.25 + 120;
+      case 3:
+        return cardWidth / 0.75;
+      default:
+        return cardWidth / _kAspect;
+    }
+  }
+
+  SliverGridDelegate _gridDelegate(_Responsive r) {
+    return SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: _columnsFor(r),
+      mainAxisSpacing: _mainSpacing,
+      crossAxisSpacing: _crossSpacing,
+      mainAxisExtent: _cardHeightFor(r),
+    );
   }
 
   final ScrollController _scrollController = ScrollController();
@@ -226,13 +230,9 @@ class _ProductsPageState extends State<ProductsPage> {
     final screenHeight = r.height;
 
     final crossAxisCount = _columnsFor(r);
-    final gridWidth = r.safeWidth - _kGridPadding * 2;
-    final cardWidth =
-        (gridWidth - _kCrossSpacing * (crossAxisCount - 1)) / crossAxisCount;
-    final cardHeight = cardWidth / _kAspect;
-    final rowHeight = cardHeight + _kMainSpacing;
+    final rowHeight = _cardHeightFor(r) + _mainSpacing;
 
-    final topPadding = _bannerHeight(r) + _kGridPadding;
+    final topPadding = _bannerHeight(r) + _kToolbarHeight + _kGridPadding;
     final scrollOffset = _scrollController.offset;
 
     final firstVisibleRow =
@@ -292,9 +292,51 @@ class _ProductsPageState extends State<ProductsPage> {
 
   List<ProductSortOption> get _availableSortOptions => ProductSortOption.values;
 
+  bool get _isSearch => widget.searchQuery != null;
+
+  String get _pageLabel => _isSearch
+      ? '"${widget.searchQuery!.trim()}"'
+      : widget.collection!.label;
+
+  // Shopify's `search` only sorts server-side by RELEVANCE or PRICE, so in
+  // search mode Newest / Title A-Z / Title Z-A are fetched by relevance and
+  // re-sorted client-side over the loaded results.
+  void _applySearchClientSort() {
+    if (!_isSearch) return;
+    switch (_sortOption) {
+      case ProductSortOption.titleAZ:
+        _products.sort((a, b) => a.title.compareTo(b.title));
+        break;
+      case ProductSortOption.titleZA:
+        _products.sort((a, b) => b.title.compareTo(a.title));
+        break;
+      case ProductSortOption.newest:
+        _products.sort((a, b) {
+          final aDate = a.createdAt;
+          final bDate = b.createdAt;
+          if (aDate == null || bDate == null) return 0;
+          return bDate.compareTo(aDate);
+        });
+        break;
+      default:
+        break;
+    }
+  }
+
   Future<PaginatedProductsResponse> _fetchProducts({String? after}) {
+    if (_isSearch) {
+      final isPriceSort = _sortOption.shopifyKey == 'PRICE';
+      return ShopifyStorefrontService.instance.searchProductsPaginated(
+        widget.searchQuery!.trim(),
+        first: 24,
+        after: after,
+        sortKey: isPriceSort ? 'PRICE' : 'RELEVANCE',
+        reverse: isPriceSort && _sortOption.reverse,
+        filters: _flatSelectedInputs,
+      );
+    }
     return ShopifyStorefrontService.instance.getProductsByCollectionPaginated(
-      widget.collection.handle,
+      widget.collection!.handle,
       first: 24,
       after: after,
       sortKey: _sortOption.shopifyKey,
@@ -321,6 +363,7 @@ class _ProductsPageState extends State<ProductsPage> {
 
       setState(() {
         _products = response.products;
+        _applySearchClientSort();
         _hasNextPage = response.hasNextPage;
         _endCursor = response.endCursor;
         if (response.filters.isNotEmpty) {
@@ -382,6 +425,7 @@ class _ProductsPageState extends State<ProductsPage> {
 
       setState(() {
         _products.addAll(response.products);
+        _applySearchClientSort();
         _hasNextPage = response.hasNextPage;
         _endCursor = response.endCursor;
         _isLoadingMore = false;
@@ -798,8 +842,6 @@ class _ProductsPageState extends State<ProductsPage> {
       animation: ThemeService.instance,
       builder: (context, _) => Scaffold(
         backgroundColor: bgColor,
-        floatingActionButtonLocation: const _CenterFloatAboveBottomNav(),
-        floatingActionButton: _filterSortCapsule(context),
         body: SafeArea(
           top: false,
           child: RefreshIndicator(
@@ -809,14 +851,7 @@ class _ProductsPageState extends State<ProductsPage> {
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-                SliverPersistentHeader(
-                  pinned: false,
-                  floating: false,
-                  delegate: _CollapsingBannerDelegate(
-                    maxHeight: _bannerHeight(_Responsive(context)),
-                    builder: _banner,
-                  ),
-                ),
+                _bannerWithToolbar(context),
                 if (_isLoading)
                   _shimmerSliverGrid()
                 else if (_error != null)
@@ -839,6 +874,155 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
+  /// The banner collapses and scrolls away as usual, while the view /
+  /// filter / sort toolbar under it stays pinned just below the status bar
+  /// once the banner is gone.
+  Widget _bannerWithToolbar(BuildContext context) {
+    final r = _Responsive(context);
+    final bannerHeight = _bannerHeight(r);
+    final topInset = MediaQuery.of(context).padding.top;
+
+    return SliverAppBar(
+      pinned: true,
+      automaticallyImplyLeading: false,
+      toolbarHeight: 0,
+      expandedHeight: bannerHeight + _kToolbarHeight,
+      backgroundColor: bgColor,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      flexibleSpace: LayoutBuilder(
+        builder: (context, constraints) {
+          final bannerArea =
+              (constraints.maxHeight - _kToolbarHeight).clamp(0.0, bannerHeight);
+          final range = bannerHeight - topInset;
+          final progress = range <= 0
+              ? 1.0
+              : (1 - (bannerArea - topInset) / range).clamp(0.0, 1.0);
+          // Once collapsed only a status-bar-sized strip of the banner is
+          // left; fade it into the page background so it doesn't show a
+          // sliver of the image behind the status bar.
+          final stripFade = ((progress - 0.85) / 0.15).clamp(0.0, 1.0);
+
+          return Stack(
+            children: [
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: bannerArea,
+                child: ClipRect(
+                  child: OverflowBox(
+                    alignment: Alignment.topCenter,
+                    minHeight: bannerHeight,
+                    maxHeight: bannerHeight,
+                    child: _banner(context, progress),
+                  ),
+                ),
+              ),
+              if (stripFade > 0)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: bannerArea,
+                  child: IgnorePointer(
+                    child: ColoredBox(color: bgColor.withOpacity(stripFade)),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(_kToolbarHeight),
+        child: _listingToolbar(context),
+      ),
+    );
+  }
+
+  Widget _listingToolbar(BuildContext context) {
+    final divider = SizedBox(
+      height: 20,
+      child: VerticalDivider(width: 1, thickness: 1, color: borderColor),
+    );
+    final labelStyle = TextStyle(
+      fontFamily: _fBody,
+      fontSize: 11,
+      letterSpacing: 0.6,
+      color: primary,
+    );
+
+    return Container(
+      height: _kToolbarHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(bottom: BorderSide(color: borderColor, width: 0.8)),
+      ),
+      child: Row(
+        children: [
+          _gridModeButton(1, Icons.view_agenda_sharp),
+          _gridModeButton(2, Icons.grid_view_sharp),
+          _gridModeButton(3, Icons.apps_sharp),
+          const SizedBox(width: 4),
+          divider,
+          Expanded(
+            child: InkWell(
+              onTap: () => _openFilterSheet(context),
+              child: SizedBox(
+                height: double.infinity,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.filter_alt_outlined, size: 18, color: primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      _activeFilterCount > 0
+                          ? 'FILTER ($_activeFilterCount)'
+                          : 'FILTER',
+                      style: labelStyle,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          divider,
+          InkWell(
+            onTap: () => _openSortSheet(context),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.swap_vert_rounded, size: 18, color: primary),
+                  const SizedBox(width: 6),
+                  Text('SORT', style: labelStyle),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _gridModeButton(int mode, IconData icon) {
+    final isActive = _gridMode == mode;
+    return InkWell(
+      onTap: isActive ? null : () => setState(() => _gridMode = mode),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Icon(
+          icon,
+          size: 22,
+          color: isActive ? primary : secondaryTxt.withOpacity(0.45),
+        ),
+      ),
+    );
+  }
+
   // `progress` is how far the banner has collapsed: 0 = fully expanded,
   // 1 = fully collapsed (its bottom edge has reached the top and the
   // sliver framework is about to hand scrolling over to the grid below).
@@ -846,7 +1030,7 @@ class _ProductsPageState extends State<ProductsPage> {
     final r = _Responsive(context);
     final bannerHeight = _bannerHeight(r);
     final titleSize = (r.width * 0.08).clamp(20.0, 36.0);
-    final imageUrl = widget.collection.imageUrl;
+    final imageUrl = widget.collection?.imageUrl;
 
     // The text scrolls up and out first, over just the first slice of the
     // collapse — then, for the rest of the scroll, only the image is left
@@ -905,15 +1089,34 @@ class _ProductsPageState extends State<ProductsPage> {
               opacity: textFade,
               child: Transform.translate(
                 offset: Offset(0, -textShift),
-                child: Text(
-                  widget.collection.label.toUpperCase(),
-                  style: TextStyle(
-                    fontFamily: _fHead,
-                    fontSize: titleSize,
-                    color: Colors.white,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _pageLabel.toUpperCase(),
+                      style: TextStyle(
+                        fontFamily: _fHead,
+                        fontSize: titleSize,
+                        color: Colors.white,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (_isSearch && !_isLoading && _error == null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_products.length}${_hasNextPage ? '+' : ''} '
+                        'RESULT${_products.length == 1 ? '' : 'S'}',
+                        style: TextStyle(
+                          fontFamily: _fBody,
+                          fontSize: 12,
+                          letterSpacing: 0.6,
+                          color: Colors.white.withOpacity(0.8),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
@@ -928,7 +1131,15 @@ class _ProductsPageState extends State<ProductsPage> {
       mainAxisSize: MainAxisSize.min,
       children: [
         GestureDetector(
-          onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
+          onTap: () {
+            if (_isSearch) {
+              widget.onBackToDashboard?.call();
+              Navigator.of(context).popUntil((r) => r.isFirst);
+              context.go('/home');
+              return;
+            }
+            Navigator.of(context).popUntil((r) => r.isFirst);
+          },
           child: Text(
             'HOME',
             style: TextStyle(
@@ -950,7 +1161,7 @@ class _ProductsPageState extends State<ProductsPage> {
         ),
         Flexible(
           child: Text(
-            widget.collection.label.toUpperCase(),
+            _isSearch ? 'SEARCH' : widget.collection!.label.toUpperCase(),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -966,94 +1177,6 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
-  Widget _filterSortCapsule(BuildContext context) {
-    return SafeArea(
-      child: Material(
-        color: Colors.transparent,
-        elevation: 8,
-        borderRadius: BorderRadius.circular(30),
-        child: Container(
-          height: 40,
-          decoration: BoxDecoration(
-            color: primary,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black26,
-                blurRadius: 14,
-                offset: Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              InkWell(
-                borderRadius: const BorderRadius.horizontal(
-                  left: Radius.circular(30),
-                ),
-                onTap: () => _openFilterSheet(context),
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 20, right: 14),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.tune_rounded, color: onPrimary, size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        _activeFilterCount > 0
-                            ? 'FILTERS ($_activeFilterCount)'
-                            : 'FILTERS',
-                        style: TextStyle(
-                          color: onPrimary,
-                          fontFamily: _fBody,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(
-                height: 18,
-                child: VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: onPrimary.withOpacity(0.4),
-                ),
-              ),
-              InkWell(
-                borderRadius: const BorderRadius.horizontal(
-                  right: Radius.circular(30),
-                ),
-                onTap: () => _openSortSheet(context),
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 14, right: 20),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.swap_vert_rounded,
-                          color: onPrimary, size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        'SORT',
-                        style: TextStyle(
-                          color: onPrimary,
-                          fontFamily: _fBody,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _productSliverGrid() {
     final r = _Responsive(context);
     return SliverPadding(
@@ -1064,12 +1187,7 @@ class _ProductsPageState extends State<ProductsPage> {
         90,
       ),
       sliver: SliverGrid(
-        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: _maxCardExtent(r),
-          mainAxisSpacing: _kMainSpacing,
-          crossAxisSpacing: _kCrossSpacing,
-          childAspectRatio: _kAspect,
-        ),
+        gridDelegate: _gridDelegate(r),
         delegate: SliverChildBuilderDelegate(
           (_, i) {
             if (i >= _products.length) {
@@ -1080,7 +1198,9 @@ class _ProductsPageState extends State<ProductsPage> {
                 ),
               );
             }
-            return _productCard(_products[i]);
+            return _isCompactGrid
+                ? _compactProductCard(_products[i])
+                : _productCard(_products[i]);
           },
           childCount: _products.length + (_isLoadingMore ? 1 : 0),
         ),
@@ -1186,7 +1306,9 @@ class _ProductsPageState extends State<ProductsPage> {
                   height: 320,
                   child: Center(
                     child: Text(
-                      'No filters available for this collection.',
+                      _isSearch
+                          ? 'No filters available for this search.'
+                          : 'No filters available for this collection.',
                       style: TextStyle(fontSize: 12, color: secondaryTxt),
                     ),
                   ),
@@ -1884,6 +2006,55 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
+  /// Image-only tile for the 3-per-row view: no title, price or button.
+  Widget _compactProductCard(ShopifyProduct product) {
+    return _LongPressZoomCard(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProductDetailPage(
+            handle: product.handle,
+            title: product.title,
+            heroImageUrl: product.primaryImageUrl,
+          ),
+        ),
+      ),
+      onLongPress: () => _showProductPeek(product),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          product.primaryImageUrl != null
+              ? CachedNetworkImage(
+                  imageUrl: product.primaryImageUrl!,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(color: AppColors.fieldFill),
+                  errorWidget: (_, __, ___) => _imagePlaceholder(),
+                )
+              : _imagePlaceholder(),
+          if (product.isOnSale)
+            Positioned(
+              top: 6,
+              left: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                color: const Color.fromARGB(255, 194, 0, 0),
+                child: RichText(
+                  text: TextSpan(
+                    children: _priceSpans(
+                      _discountPercent(product),
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   void _showProductPeek(ShopifyProduct product) {
     showGeneralDialog(
       context: context,
@@ -2188,7 +2359,8 @@ class _ProductsPageState extends State<ProductsPage> {
             ),
             const SizedBox(height: 14),
             Text(
-              'No products found',
+              _isSearch ? 'No results for $_pageLabel' : 'No products found',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
@@ -2199,7 +2371,9 @@ class _ProductsPageState extends State<ProductsPage> {
             Text(
               _activeFilterCount > 0
                   ? 'Try removing some filters.'
-                  : 'Check back soon for new arrivals.',
+                  : _isSearch
+                      ? 'Try a different search term.'
+                      : 'Check back soon for new arrivals.',
               style: TextStyle(fontSize: 12, color: secondaryTxt),
             ),
           ],
@@ -2246,12 +2420,7 @@ class _ProductsPageState extends State<ProductsPage> {
     return SliverPadding(
       padding: const EdgeInsets.all(_kGridPadding),
       sliver: SliverGrid(
-        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: _maxCardExtent(r),
-          mainAxisSpacing: _kMainSpacing,
-          crossAxisSpacing: _kCrossSpacing,
-          childAspectRatio: _kAspect,
-        ),
+        gridDelegate: _gridDelegate(r),
         delegate: SliverChildBuilderDelegate(
           (_, __) => Container(
             decoration: BoxDecoration(
