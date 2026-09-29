@@ -17,6 +17,7 @@ import 'package:rookies_jeans/models/cart_model.dart';
 import 'package:rookies_jeans/screens/cart/cart.dart';
 import 'package:rookies_jeans/screens/cart/checkout_flow.dart';
 import 'package:rookies_jeans/widget/price_text.dart';
+import 'package:rookies_jeans/widget/wishlist_heart_button.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final String handle;
@@ -1304,16 +1305,26 @@ _variantMetafieldsSection(),
               child: SizedBox(
                 width: cardWidth,
                 height: imgHeight,
-                child: product.primaryImageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: product.primaryImageUrl!,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) =>
-                            Container(color: fieldFill),
-                        errorWidget: (_, __, ___) =>
-                            Container(color: fieldFill),
-                      )
-                    : Container(color: fieldFill),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    product.primaryImageUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: product.primaryImageUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) =>
+                                Container(color: fieldFill),
+                            errorWidget: (_, __, ___) =>
+                                Container(color: fieldFill),
+                          )
+                        : Container(color: fieldFill),
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: WishlistHeartButton(product: product, size: 18),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 7),
@@ -1410,26 +1421,9 @@ _variantMetafieldsSection(),
                       : Container(color: fieldFill),
                 ),
                 Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () {
-                      WishlistService.instance.toggleProduct(product);
-                      setState(() {});
-                    },
-                    child: Icon(
-                      WishlistService.instance.isWishlisted(product.id)
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      size: 18,
-                      color: WishlistService.instance.isWishlisted(product.id)
-                          ? Colors.red
-                          : Colors.white,
-                      shadows: const [
-                        Shadow(blurRadius: 4, color: Colors.black38)
-                      ],
-                    ),
-                  ),
+                  top: 2,
+                  right: 2,
+                  child: WishlistHeartButton(product: product, size: 18),
                 ),
               ],
             ),

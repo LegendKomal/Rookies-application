@@ -15,6 +15,8 @@ import 'package:rookies_jeans/screens/products/products.dart';
 import 'package:rookies_jeans/screens/search/search_tab_page.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
+import 'package:rookies_jeans/widget/wishlist_heart_button.dart';
+import 'package:rookies_jeans/widget/slant_chip.dart';
 
 typedef R = Responsive;
 
@@ -148,10 +150,11 @@ class _HomeScreenState extends State<HomeScreen> {
       compareAtPrice = '₹ ${_formatInr(comparePrice)}';
       final int percentOff =
           (((comparePrice - product.price) / comparePrice) * 100).round();
-      discountLabel = '$percentOff% OFF';
+      discountLabel = '-$percentOff%';
     }
 
     return _ShopifyProductItem(
+      product: product,
       id: product.id,
       handle: product.handle,
       title: product.title,
@@ -198,13 +201,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _PromoBlockData(
       assetPath: 'assets/denim.png',
       label: 'Denim',
-      buttonLabel: 'Shop Denim',
+      buttonLabel: 'Explore',
       collectionHandle: 'JEANS',
     ),
     _PromoBlockData(
       assetPath: 'assets/cargo.png',
       label: 'Cargos',
-      buttonLabel: 'Shop Cargos',
+      buttonLabel: 'Explore',
       collectionHandle: 'CARGOS',
     ),
     // _PromoBlockData(
@@ -779,8 +782,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final r = R.of(context);
     if (_exploreCategories.isEmpty) return _empty();
 
-    final double cardWidth = MediaQuery.of(context).size.width * 0.56;
-    final double cardHeight = cardWidth.clamp(190.0, 260.0);
+    final double cardWidth = MediaQuery.of(context).size.width * 0.72;
+    final double cardHeight = (cardWidth * 1.15).clamp(260.0, 380.0);
 
     final List<ExploreCategoryContent> topwear = _exploreCategories
         .where((c) => !c.isBottomwear)
@@ -939,10 +942,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         horizontal: r.dp(10),
                         vertical: r.dp(5),
                       ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFB3261E),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                      color: const Color(0xFFB3261E),
                       child: Text(
                         product.discountLabel!,
                         style: TextStyle(
@@ -953,6 +953,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
+                  ),
+                if (product.product != null)
+                  Positioned(
+                    top: r.dp(2),
+                    right: r.dp(2),
+                    child: WishlistHeartButton(product: product.product!),
                   ),
               ],
             ),
@@ -1260,9 +1266,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (values.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
-      height: r.dp(36),
+      height: r.dp(44),
       child: ListView(
-        padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+        padding: EdgeInsets.fromLTRB(r.dp(12), 0, r.dp(12), r.dp(4)),
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         children: [
@@ -1273,9 +1279,10 @@ class _HomeScreenState extends State<HomeScreen> {
             r: r,
           ),
           for (final value in values) ...[
-            SizedBox(width: r.dp(8)),
+            SizedBox(width: r.dp(4)),
             _exploreChip(
               label: value.label.toUpperCase(),
+              count: value.count,
               selected: _selectedExploreCategoryInput == value.input,
               onTap: () => _selectExploreCategory(value),
               r: r,
@@ -1289,9 +1296,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _exploreFitChipsRow(R r) {
     final values = _exploreFitFilter?.values ?? const [];
     return SizedBox(
-      height: r.dp(32),
+      height: r.dp(40),
       child: ListView(
-        padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+        padding: EdgeInsets.fromLTRB(r.dp(12), 0, r.dp(12), r.dp(4)),
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         children: [
@@ -1302,9 +1309,10 @@ class _HomeScreenState extends State<HomeScreen> {
             r: r,
           ),
           for (final value in values) ...[
-            SizedBox(width: r.dp(8)),
+            SizedBox(width: r.dp(4)),
             _exploreChip(
               label: value.label.toUpperCase(),
+              count: value.count,
               selected: _selectedExploreFitInput == value.input,
               onTap: () => _selectExploreFit(value),
               r: r,
@@ -1320,27 +1328,14 @@ class _HomeScreenState extends State<HomeScreen> {
     required bool selected,
     required VoidCallback onTap,
     required R r,
+    int? count,
   }) {
-    return GestureDetector(
+    return SlantChip(
+      label: label,
+      selected: selected,
       onTap: onTap,
-      child: Container(
-        alignment: Alignment.center,
-        padding: EdgeInsets.symmetric(horizontal: r.dp(14), vertical: r.dp(8)),
-        decoration: BoxDecoration(
-          color: selected ? Colors.black : Colors.white,
-          border: Border.all(color: Colors.black, width: 1),
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontFamily: _fBold,
-            fontSize: r.sp(11),
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : Colors.black,
-          ),
-        ),
-      ),
+      count: count,
+      fontSize: r.sp(15),
     );
   }
 
@@ -1621,12 +1616,12 @@ class _PromoBlockCardState extends State<_PromoBlockCard> {
                     horizontal: r.dp(18),
                     vertical: r.dp(11),
                   ),
-                  color: Colors.black,
+                  color: Colors.white,
                   child: Text(
                     widget.buttonLabel.toUpperCase(),
                     style: TextStyle(
                       fontFamily: AppFonts.bold,
-                      color: Colors.white,
+                      color: const Color(0xFF111111),
                       fontSize: r.sp(12),
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.5,
@@ -1651,7 +1646,10 @@ class _ShopifyProductItem {
   final String? discountLabel;
   final String? imageUrl;
   final String imageAssetFallback;
+  /// Source product, when this item came from Shopify (needed for wishlist).
+  final ShopifyProduct? product;
   const _ShopifyProductItem({
+    this.product,
     required this.id,
     required this.handle,
     required this.title,
@@ -1693,7 +1691,8 @@ class _ShopTheLookAutoSlideCard extends StatefulWidget {
 
 class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
   // Now follows the app theme instead of a fixed white/dark palette.
-  Color get _cardBg => AppColors.card;
+  // Matches the home screen background so the card blends into the page.
+  Color get _cardBg => AppColors.bg;
   Color get _cardTextColor => AppColors.primary;
   Color get _cardBorder => AppColors.border;
 
@@ -1710,17 +1709,46 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
     }
   }
 
+  bool _precached = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Load every look's photo up front so sliding to the next one shows the
+    // image immediately instead of an empty box that pops in.
+    if (_precached) return;
+    _precached = true;
+    for (final outfit in widget.outfits) {
+      final ImageProvider provider = outfit.imageUrl != null
+          ? CachedNetworkImageProvider(outfit.imageUrl!)
+          : AssetImage(outfit.imageAsset);
+      precacheImage(provider, context, onError: (_, __) {});
+    }
+  }
+
   void _startAutoSlide() {
+    _timer?.cancel();
     _timer = Timer.periodic(widget.interval, (_) {
-      if (!mounted) return;
+      if (!mounted || !_controller.hasClients) return;
       _index = (_index + 1) % widget.outfits.length;
       _controller.animateToPage(
         _index,
         duration: const Duration(milliseconds: 600),
         curve: Curves.easeInOut,
       );
-      if (mounted) setState(() {});
     });
+  }
+
+  /// Pause auto-slide while the user drags, and restart the countdown when
+  /// they let go, so a timer tick never yanks the page mid-swipe.
+  bool _onScrollNotification(ScrollNotification n) {
+    if (widget.outfits.length < 2) return false;
+    if (n is ScrollStartNotification && n.dragDetails != null) {
+      _timer?.cancel();
+    } else if (n is ScrollEndNotification) {
+      if (_timer == null || !_timer!.isActive) _startAutoSlide();
+    }
+    return false;
   }
 
   @override
@@ -1807,23 +1835,21 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
       return Container(color: const Color(0xFF555555));
     }
 
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScrollNotification,
+      child: _buildPages(r),
+    );
+  }
+
+  Widget _buildPages(R r) {
     return PageView.builder(
       controller: _controller,
       itemCount: widget.outfits.length,
-      onPageChanged: (i) => setState(() => _index = i),
+      onPageChanged: (i) => _index = i,
       itemBuilder: (_, i) {
         final outfit = widget.outfits[i];
         return Container(
-          decoration: BoxDecoration(
-            color: _cardBg,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
+          decoration: BoxDecoration(color: _cardBg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1836,33 +1862,24 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                     ColoredBox(
                       color: _cardBg,
                       child: outfit.imageUrl != null
+                          // No fade and a background-coloured placeholder, so
+                          // a slide never flashes a dark box while the next
+                          // photo loads.
                           ? CachedNetworkImage(
                               imageUrl: outfit.imageUrl!,
                               fit: BoxFit.contain,
-                              placeholder: (_, __) =>
-                                  Container(color: const Color(0xFF555555)),
+                              fadeInDuration: Duration.zero,
+                              fadeOutDuration: Duration.zero,
+                              placeholder: (_, __) => const SizedBox.expand(),
                               errorWidget: (_, __, ___) =>
-                                  Container(color: const Color(0xFF555555)),
+                                  const SizedBox.expand(),
                             )
                           : Image.asset(
                               outfit.imageAsset,
                               fit: BoxFit.contain,
                               errorBuilder: (_, __, ___) =>
-                                  Container(color: const Color(0xFF555555)),
+                                  const SizedBox.expand(),
                             ),
-                    ),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withOpacity(0.20),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.3],
-                        ),
-                      ),
                     ),
                     // Positioned(
                     //   top: r.dp(12),

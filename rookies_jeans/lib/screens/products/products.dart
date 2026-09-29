@@ -11,6 +11,7 @@ import 'package:rookies_jeans/screens/products/product_peek_dialog.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/screens/cart/cart.dart';
+import 'package:rookies_jeans/widget/wishlist_heart_button.dart';
 
 class _Responsive {
   _Responsive(BuildContext context) : _r = Responsive.of(context, baseW: 400);
@@ -1958,6 +1959,11 @@ class _ProductsPageState extends State<ProductsPage> {
                           ),
                         ),
                       ),
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: WishlistHeartButton(product: product),
+                    ),
                     if (hasMultipleImages)
                       Positioned(
                         bottom: 6,
@@ -2050,6 +2056,11 @@ class _ProductsPageState extends State<ProductsPage> {
                 ),
               ),
             ),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: WishlistHeartButton(product: product, size: 16),
+          ),
         ],
       ),
     );

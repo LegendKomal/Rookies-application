@@ -31,6 +31,14 @@ void main() async {
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
 
+/// One navigator per bottom-nav branch, in the same order as the branches
+/// below. Kept here so a nav-bar tap can pop whatever was pushed inside a
+/// tab (e.g. a product opened from Home) back to that tab's root page.
+final List<GlobalKey<NavigatorState>> _branchNavigatorKeys = List.generate(
+  5,
+  (i) => GlobalKey<NavigatorState>(debugLabel: 'branch$i'),
+);
+
 /// Index of the Home branch in the StatefulShellRoute below.
 const int _homeBranchIndex = 2;
 
@@ -106,31 +114,31 @@ final GoRouter _appRouter = GoRouter(
         // Branch order must match the visual icon order in
         // RookiesBottomNavBar (menu, search, home, profile, cart) so that
         // navigationShell.currentIndex highlights the correct icon.
-        StatefulShellBranch(routes: [
+        StatefulShellBranch(navigatorKey: _branchNavigatorKeys[0], routes: [
           GoRoute(
             path: '/category',
             builder: (context, state) => const ExploreCategoriesPage(),
           ),
         ]),
-        StatefulShellBranch(routes: [
+        StatefulShellBranch(navigatorKey: _branchNavigatorKeys[1], routes: [
           GoRoute(
             path: '/search',
             builder: (context, state) => const SearchTabPage(),
           ),
         ]),
-        StatefulShellBranch(routes: [
+        StatefulShellBranch(navigatorKey: _branchNavigatorKeys[2], routes: [
           GoRoute(
             path: '/home',
             builder: (context, state) => const HomeScreen(),
           ),
         ]),
-        StatefulShellBranch(routes: [
+        StatefulShellBranch(navigatorKey: _branchNavigatorKeys[3], routes: [
           GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfileScreen(),
           ),
         ]),
-        StatefulShellBranch(routes: [
+        StatefulShellBranch(navigatorKey: _branchNavigatorKeys[4], routes: [
           GoRoute(
             path: '/cart',
             builder: (context, state) => const CartScreen(),
@@ -160,6 +168,13 @@ class ScaffoldWithNavBar extends StatelessWidget {
     );
   }
 
+  /// Always lands on the tapped tab's root page: pops anything pushed on
+  /// top of it (product pages etc.) and resets it to its initial location.
+  void _onTabTapped(int index) {
+    _branchNavigatorKeys[index].currentState?.popUntil((r) => r.isFirst);
+    navigationShell.goBranch(index, initialLocation: true);
+  }
+
   Widget _buildScaffold() {
     return Scaffold(
       extendBody: true,
@@ -174,10 +189,7 @@ class ScaffoldWithNavBar extends StatelessWidget {
       body: navigationShell,
       bottomNavigationBar: RookiesBottomNavBar(
         currentIndex: navigationShell.currentIndex,
-        onTap: (index) => navigationShell.goBranch(
-          index,
-          initialLocation: index == navigationShell.currentIndex,
-        ),
+        onTap: _onTabTapped,
       ),
     );
   }

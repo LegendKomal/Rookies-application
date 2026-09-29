@@ -1193,7 +1193,7 @@ for (final e in rawVariantEdges) {
   Future<List<ShopTheLookEntry>> _fetchShopTheLookEntries() async {
     const String query = r'''
       query getShopTheLook {
-        metaobjects(type: "shop_the_look", first: 20) {
+        metaobjects(type: "shop_the_look", first: 100) {
           edges {
             node {
               id
@@ -1320,15 +1320,10 @@ for (final e in rawVariantEdges) {
     }
   }
 
-  /// The "Explore Categories" accordion's Top Wear / Bottom Wear grouping
-  /// is pinned in [ShopifyConstants.exploreMenuSections] (see that constant
-  /// for why — Shopify's own `top-wear`/`bottom-wear` navigation menus
-  /// don't match the intended design, and the Storefront API can't list
-  /// every menu handle in the shop to auto-discover the right ones). What
-  /// *is* fetched live here is each category's fits: Shopify Admin →
-  /// Content → Menus has one flat menu per category, handled the same as
-  /// the category itself (e.g. `shirts`), and its items become that
-  /// category's fit list.
+  /// The Collections tab's tab → group → card taxonomy, pinned in
+  /// [ShopifyConstants.exploreMenuSections]. Each card is a collection;
+  /// its image is fetched live (collection image, else first product's) in
+  /// one batched request, so swapping photos in Shopify needs no app update.
   Future<List<ShopMenuSection>> getExploreMenuSections() => _cachedFetch(
         'exploreMenuSections',
         _fetchExploreMenuSections,
@@ -1338,20 +1333,34 @@ for (final e in rawVariantEdges) {
     final sectionDefs = ShopifyConstants.exploreMenuSections;
     final allHandles = <String>{
       for (final section in sectionDefs)
-        for (final category in section['categories'] as List)
-          (category as Map)['handle'] as String,
-    }.toList();
+        for (final group in section['groups'] as List) ...[
+          (group as Map)['handle'] as String,
+          for (final item in group['items'] as List)
+            (item as Map)['handle'] as String,
+        ],
+    }..remove('');
 
-    final fitsByHandle = await _fetchFitMenusByHandle(allHandles);
+    final imagesByHandle =
+        await _fetchCollectionImagesByHandle(allHandles.toList());
 
     return sectionDefs.map((section) {
-      final categories = (section['categories'] as List).map((raw) {
-        final category = raw as Map;
-        final handle = category['handle'] as String;
+      final categories = (section['groups'] as List).map((raw) {
+        final group = raw as Map;
+        final handle = group['handle'] as String;
         return ShopMenuCategory(
-          title: category['title'] as String,
+          title: group['title'] as String,
           collectionHandle: handle,
-          fits: fitsByHandle[handle] ?? const [],
+          imageUrl: imagesByHandle[handle],
+          fits: (group['items'] as List).map((rawItem) {
+            final item = rawItem as Map;
+            final itemHandle = item['handle'] as String;
+            return ShopMenuFit(
+              title: item['title'] as String,
+              url: '/collections/$itemHandle',
+              collectionHandle: itemHandle,
+              imageUrl: imagesByHandle[itemHandle],
+            );
+          }).toList(),
         );
       }).toList();
 
@@ -1364,47 +1373,45 @@ for (final e in rawVariantEdges) {
     }).toList();
   }
 
-  /// Batch-fetches one flat menu per handle in [handles] (each menu's items
-  /// become that category's fits) using a single aliased GraphQL request. A
-  /// handle with no matching menu is simply omitted from the result.
-  Future<Map<String, List<ShopMenuFit>>> _fetchFitMenusByHandle(
+  /// Image per collection handle — the collection's own image, else its
+  /// first product's — in one aliased request. Handles with neither are
+  /// omitted.
+  Future<Map<String, String>> _fetchCollectionImagesByHandle(
     List<String> handles,
   ) async {
     if (handles.isEmpty) return {};
 
-    final buffer = StringBuffer('query getFitMenus {\n');
+    final buffer = StringBuffer('query getCollectionImages {\n');
     for (int i = 0; i < handles.length; i++) {
       final safeHandle = handles[i].replaceAll('"', r'\"');
-      buffer.write('  f$i: menu(handle: "$safeHandle") {\n');
-      buffer.write('    items { title url }\n');
+      buffer.write('  c$i: collection(handle: "$safeHandle") {\n');
+      buffer.write('    image { url }\n');
+      buffer.write('    products(first: 1) { edges { node { featuredImage { url } } } }\n');
       buffer.write('  }\n');
     }
     buffer.write('}');
 
     try {
       final res = await ShopifyGraphQL.post(buffer.toString());
-      _log('getExploreMenuSections (fits) [$handles] → ${res.statusCode}');
+      _log('getExploreMenuSections (images) → ${res.statusCode}');
       if (res.hasErrors || res.data == null) return {};
 
       final data = res.data!;
-      final Map<String, List<ShopMenuFit>> result = {};
+      final Map<String, String> result = {};
       for (int i = 0; i < handles.length; i++) {
-        final node = data['f$i'] as Map<String, dynamic>?;
+        final node = data['c$i'] as Map<String, dynamic>?;
         if (node == null) continue;
-        final items = ((node['items'] as List?) ?? [])
-            .map((e) {
-              final fit = e as Map<String, dynamic>;
-              return ShopMenuFit(
-                title: fit['title'] as String? ?? '',
-                url: fit['url'] as String? ?? '',
-              );
-            })
-            .toList();
-        result[handles[i]] = items;
+        String? url = node['image']?['url'] as String?;
+        final edges = (node['products']?['edges'] as List?) ?? const [];
+        if (url == null && edges.isNotEmpty) {
+          final product = edges.first['node'] as Map?;
+          url = product?['featuredImage']?['url'] as String?;
+        }
+        if (url != null) result[handles[i]] = url;
       }
       return result;
     } catch (e) {
-      _log('_fetchFitMenusByHandle EXCEPTION: $e');
+      _log('_fetchCollectionImagesByHandle EXCEPTION: $e');
       return {};
     }
   }

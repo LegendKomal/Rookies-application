@@ -13,7 +13,20 @@ class ShopMenuFit {
   final String title;
   final String url;
 
-  const ShopMenuFit({required this.title, required this.url});
+  /// Handle of the collection this item links to (e.g. "cargo-shirts"), when
+  /// the menu item points at a collection.
+  final String? collectionHandle;
+
+  /// The collection's image, or its first product's image when the
+  /// collection has none.
+  final String? imageUrl;
+
+  const ShopMenuFit({
+    required this.title,
+    required this.url,
+    this.collectionHandle,
+    this.imageUrl,
+  });
 }
 
 class ShopMenuCategory {
@@ -21,10 +34,14 @@ class ShopMenuCategory {
   final String collectionHandle;
   final List<ShopMenuFit> fits;
 
+  /// The category collection's image (or its first product's image).
+  final String? imageUrl;
+
   const ShopMenuCategory({
     required this.title,
     required this.collectionHandle,
     this.fits = const [],
+    this.imageUrl,
   });
 }
 
