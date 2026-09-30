@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
+import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/banner_model.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/models/home_content_models.dart';
@@ -14,7 +15,7 @@ import 'package:rookies_jeans/screens/products/products.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/widget/price_text.dart';
-import 'package:rookies_jeans/widget/slant_chip.dart';
+import 'package:rookies_jeans/widget/sticker_chip.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Backdrop for product cutouts, which are shot on a light grey. Fixed in
@@ -54,8 +55,33 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
   static const int _kLooksInitial = 6;
   static const int _kLooksStep = 4;
 
+  /// Quick links shown above the category chips.
+  static const List<Map<String, String>> _kQuickLinks = [
+    {'title': 'New Arrivals', 'handle': ShopifyConstants.latestDropHandle},
+    {'title': 'Bestsellers', 'handle': 'bestsellers'},
+    {'title': 'On Sale', 'handle': ShopifyConstants.hotDealsHandle},
+  ];
+
+  /// "Fit & fabric" chips; each one only appears when some card in the
+  /// current category scope has it in its title.
+  static const List<String> _kFabrics = [
+    'Denim',
+    'Cargo',
+    'Linen',
+    'Flatknit',
+    'Twill',
+    'Corduroy',
+    'Suede',
+    'Leather',
+  ];
+
   late Future<_CollectionsPageData> _future;
-  int _sectionIndex = 0;
+
+  /// Index into the flattened category list; -1 = ALL.
+  int _categoryIndex = -1;
+
+  /// Selected fit & fabric chip; null = ALL.
+  String? _fabric;
   int _looksShown = _kLooksInitial;
 
   @override
@@ -242,9 +268,14 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
   }
 
   Widget _buildContent(_CollectionsPageData data) {
-    final sections = data.sections;
-    final int selected =
-        sections.isEmpty ? 0 : _sectionIndex.clamp(0, sections.length - 1);
+    final categories = [for (final s in data.sections) ...s.categories];
+    final int catIndex =
+        _categoryIndex < categories.length ? _categoryIndex : -1;
+    final scope = catIndex < 0 ? categories : [categories[catIndex]];
+    final fabrics = _kFabrics
+        .where((f) => scope.any((c) => c.fits.any((fit) => _hasFabric(fit, f))))
+        .toList();
+    final String? fabric = fabrics.contains(_fabric) ? _fabric : null;
 
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -255,11 +286,20 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
             onTap: _openBanner,
           ),
         ),
-        if (sections.isNotEmpty) ...[
+        if (categories.isNotEmpty) ...[
           SliverToBoxAdapter(child: _heading('SHOP BY CATEGORY')),
-          SliverToBoxAdapter(child: _sectionTabs(sections, selected)),
-          ...sections[selected].categories.map(
-                (c) => SliverToBoxAdapter(child: _categoryGroup(c)),
+          SliverToBoxAdapter(
+            child: _filterChips(categories, catIndex, fabrics, fabric),
+          ),
+          for (final c in scope)
+            if (fabric == null)
+              SliverToBoxAdapter(child: _categoryGroup(c))
+            else if (c.fits.any((fit) => _hasFabric(fit, fabric)))
+              SliverToBoxAdapter(
+                child: _categoryGroup(
+                  c,
+                  fits: c.fits.where((fit) => _hasFabric(fit, fabric)).toList(),
+                ),
               ),
         ],
         if (data.looks.isNotEmpty) ...[
@@ -361,37 +401,87 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
   // Shop by category
   // ---------------------------------------------------------------------
 
-  /// Number of cards a category shows: its fits, or itself when it has none.
-  int _cardCount(ShopMenuCategory c) => c.fits.isEmpty ? 1 : c.fits.length;
+  bool _hasFabric(ShopMenuFit fit, String fabric) =>
+      fit.title.toLowerCase().contains(fabric.toLowerCase());
 
-  Widget _sectionTabs(List<ShopMenuSection> sections, int selected) {
-    return SizedBox(
-      height: 44,
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: sections.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 4),
-        itemBuilder: (_, i) {
-          final section = sections[i];
-          return SlantChip(
-            label: section.title.toUpperCase(),
-            count: section.categories.fold<int>(
-              0,
-              (sum, c) => sum + _cardCount(c),
+  /// Quick links, category chips (ALL / JEANS / ...) and fit & fabric chips.
+  Widget _filterChips(
+    List<ShopMenuCategory> categories,
+    int catIndex,
+    List<String> fabrics,
+    String? fabric,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        children: [
+          StickerChipRow(
+            height: 42,
+            children: [
+              for (int i = 0; i < _kQuickLinks.length; i++)
+                StickerChip(
+                  label: _kQuickLinks[i]['title']!.toUpperCase(),
+                  selected: i == 0,
+                  style: StickerChipStyle.small,
+                  onTap: () => _openCollection(
+                    _kQuickLinks[i]['handle']!,
+                    _kQuickLinks[i]['title']!,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          StickerChipRow(
+            height: 60,
+            children: [
+              StickerChip(
+                label: 'ALL',
+                selected: catIndex < 0,
+                style: StickerChipStyle.large,
+                onTap: () => setState(() => _categoryIndex = -1),
+              ),
+              for (int i = 0; i < categories.length; i++)
+                StickerChip(
+                  label: categories[i].title.toUpperCase(),
+                  selected: i == catIndex,
+                  style: StickerChipStyle.large,
+                  onTap: () => setState(() => _categoryIndex = i),
+                ),
+            ],
+          ),
+          if (fabrics.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            StickerChipRow(
+              height: 40,
+              children: [
+                const StickerChipCaption('FIT & FABRIC'),
+                StickerChip(
+                  label: 'ALL',
+                  selected: fabric == null,
+                  style: StickerChipStyle.mono,
+                  onTap: () => setState(() => _fabric = null),
+                ),
+                for (final f in fabrics)
+                  StickerChip(
+                    label: f.toUpperCase(),
+                    selected: f == fabric,
+                    style: StickerChipStyle.mono,
+                    onTap: () => setState(() => _fabric = f),
+                  ),
+              ],
             ),
-            selected: i == selected,
-            onTap: () => setState(() => _sectionIndex = i),
-          );
-        },
+          ],
+        ],
       ),
     );
   }
 
   bool get _wideLayout => MediaQuery.of(context).size.width >= 700;
 
-  Widget _categoryGroup(ShopMenuCategory category) {
+  /// A category heading plus its cards; [fits] narrows the cards shown
+  /// (e.g. to one fabric), defaulting to all of the category's fits.
+  Widget _categoryGroup(ShopMenuCategory category, {List<ShopMenuFit>? fits}) {
+    final List<ShopMenuFit> shownFits = fits ?? category.fits;
     final double screenW = MediaQuery.of(context).size.width;
     // Wide: six cards per row (as in the design); phone: a swipeable row
     // with the next card peeking in.
@@ -399,9 +489,9 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
         ? (screenW - 32 - 10 * 5) / 6
         : (screenW * 0.38).clamp(120.0, 200.0);
     final double imageHeight = cardWidth * 1.2;
-    final int count = _cardCount(category);
+    final int count = shownFits.isEmpty ? 1 : shownFits.length;
 
-    final List<Widget> cards = category.fits.isEmpty
+    final List<Widget> cards = shownFits.isEmpty
         ? [
             _categoryCard(
               label: category.title,
@@ -414,7 +504,7 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
               ),
             ),
           ]
-        : category.fits
+        : shownFits
             .map((fit) => _categoryCard(
                   label: fit.title,
                   imageUrl: fit.imageUrl ?? category.imageUrl,

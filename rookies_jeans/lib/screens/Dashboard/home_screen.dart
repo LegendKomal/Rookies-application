@@ -16,7 +16,7 @@ import 'package:rookies_jeans/screens/search/search_tab_page.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/widget/wishlist_heart_button.dart';
-import 'package:rookies_jeans/widget/slant_chip.dart';
+import 'package:rookies_jeans/widget/sticker_chip.dart';
 
 typedef R = Responsive;
 
@@ -54,6 +54,12 @@ class _HomeScreenState extends State<HomeScreen> {
   List<PromoBlockContent> _promoBlocksContent = [];
   List<ShopTheLookEntry> _shopTheLookEntries = [];
   List<OccasionTileContent> _occasionTilesContent = [];
+  List<FeatureBannerContent> _featureBanners = [];
+  List<PriceTileContent> _priceTiles = [];
+
+  /// "Shop by price" is a 2×2 grid: two tiles per row, two rows.
+  static const int _kPriceTileColumns = 2;
+  static const int _kPriceTileMax = 4;
 
   final ScrollController _scrollController = ScrollController();
 
@@ -326,6 +332,111 @@ class _HomeScreenState extends State<HomeScreen> {
         .toList();
   }
 
+  /// Feature banners, stacked in the order they were added; same size as
+  /// the Denim / Cargos promo blocks.
+  List<Widget> _featureBannerSlivers() {
+    return _featureBanners
+        .map(
+          (b) => SliverToBoxAdapter(
+            child: _PromoBlockCard(
+              imageUrl: b.imageUrl,
+              label: b.label,
+              buttonLabel: b.buttonLabel ?? '',
+              height: _promoBlockHeight(context),
+              onTap: () => _openLink(b.link, title: b.label),
+            ),
+          ),
+        )
+        .toList();
+  }
+
+  Widget _shopByPriceSection() {
+    final r = R.of(context);
+    final tiles = _priceTiles.take(_kPriceTileMax).toList();
+    final double gap = r.dp(8);
+    final rows = <Widget>[];
+    for (int i = 0; i < tiles.length; i += _kPriceTileColumns) {
+      rows.add(Padding(
+        padding: EdgeInsets.only(top: i == 0 ? 0 : gap),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (int j = 0; j < _kPriceTileColumns; j++) ...[
+              if (j > 0) SizedBox(width: gap),
+              Expanded(
+                child: i + j < tiles.length
+                    ? _priceTile(tiles[i + j])
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ],
+        ),
+      ));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sliverHeadAsBox('SHOP BY PRICE'),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
+          child: Column(children: rows),
+        ),
+      ],
+    );
+  }
+
+  Widget _priceTile(PriceTileContent tile) {
+    return GestureDetector(
+      onTap: () => _openLink(tile.link),
+      // Full width at the image's own aspect ratio, so text baked into the
+      // artwork ("SHOP UNDER ₹999") is never cropped.
+      child: CachedNetworkImage(
+        imageUrl: tile.imageUrl!,
+        width: double.infinity,
+        fit: BoxFit.fitWidth,
+        placeholder: (_, __) => AspectRatio(
+          aspectRatio: 0.8,
+          child: Container(color: const Color(0xFF555555)),
+        ),
+        errorWidget: (_, __, ___) => AspectRatio(
+          aspectRatio: 0.8,
+          child: Container(color: const Color(0xFF555555)),
+        ),
+      ),
+    );
+  }
+
+  /// Opens a metaobject link: a collection handle, a `/collections/...` or
+  /// `/products/...` path (full store URLs too), or any other web URL.
+  void _openLink(String link, {String? title}) {
+    final String url = link.trim();
+    if (url.isEmpty) return;
+    final String? name = (title == null || title.trim().isEmpty) ? null : title;
+
+    final product = RegExp(r'/products/([^/?#]+)').firstMatch(url);
+    if (product != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProductDetailPage(
+            handle: product.group(1)!,
+            title: name ?? '',
+          ),
+        ),
+      );
+      return;
+    }
+    final collection = RegExp(r'/collections/([^/?#]+)').firstMatch(url);
+    if (collection != null) {
+      _openCollectionByHandle(collection.group(1)!, title: name);
+    } else if (url.startsWith('http://') || url.startsWith('https://')) {
+      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } else {
+      _openCollectionByHandle(url, title: name);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -353,6 +464,8 @@ class _HomeScreenState extends State<HomeScreen> {
       service.getPromoBlocks(),
       service.getShopTheLookEntries(),
       service.getOccasionTilesContent(),
+      service.getFeatureBanners(),
+      service.getPriceTiles(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -361,6 +474,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _promoBlocksContent = results[2] as List<PromoBlockContent>;
       _shopTheLookEntries = results[3] as List<ShopTheLookEntry>;
       _occasionTilesContent = results[4] as List<OccasionTileContent>;
+      _featureBanners = results[5] as List<FeatureBannerContent>;
+      _priceTiles = results[6] as List<PriceTileContent>;
       _isLoading = false;
     });
   }
@@ -534,6 +649,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         SliverToBoxAdapter(child: _exploreCategoriesCarousel()),
                         ..._promoBlockSlivers(_promoBlocksSecondHalf),
+                        ..._featureBannerSlivers(),
+                        if (_priceTiles.isNotEmpty)
+                          SliverToBoxAdapter(child: _shopByPriceSection()),
                         SliverToBoxAdapter(child: _shopTheLookSection()),
                         SliverToBoxAdapter(child: _shopByOccasionsSection()),
                         SliverToBoxAdapter(child: _exploreCollectionsSection()),
@@ -1209,10 +1327,10 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _sliverHeadAsBox('EXPLORE COLLECTIONS'),
           _exploreTabsRow(r),
-          SizedBox(height: r.dp(16)),
+          SizedBox(height: r.dp(6)),
           _exploreCategoryChipsRow(r),
           if ((_exploreFitFilter?.values.isNotEmpty ?? false)) ...[
-            SizedBox(height: r.dp(10)),
+            SizedBox(height: r.dp(6)),
             _exploreFitChipsRow(r),
           ],
           SizedBox(height: r.dp(18)),
@@ -1223,41 +1341,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _exploreTabsRow(R r) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
-      child: Row(
-        children: List.generate(_exploreTabDefs.length, (i) {
-          final bool active = i == _exploreTabIndex;
-          return Padding(
-            padding: EdgeInsets.only(right: r.dp(22)),
-            child: GestureDetector(
-              onTap: () => _selectExploreTab(i),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _exploreTabDefs[i].label,
-                    style: TextStyle(
-                      fontFamily: _fBold,
-                      fontSize: r.sp(12),
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
-                      color: active ? primary : secondaryTxt,
-                    ),
-                  ),
-                  SizedBox(height: r.dp(6)),
-                  Container(
-                    height: 2,
-                    width: r.dp(28),
-                    color: active ? primary : Colors.transparent,
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ),
+    return StickerChipRow(
+      height: 42,
+      children: [
+        for (int i = 0; i < _exploreTabDefs.length; i++)
+          StickerChip(
+            label: _exploreTabDefs[i].label,
+            selected: i == _exploreTabIndex,
+            style: StickerChipStyle.small,
+            onTap: () => _selectExploreTab(i),
+          ),
+      ],
     );
   }
 
@@ -1265,77 +1359,46 @@ class _HomeScreenState extends State<HomeScreen> {
     final values = _exploreCategoryFilter?.values ?? const [];
     if (values.isEmpty) return const SizedBox.shrink();
 
-    return SizedBox(
-      height: r.dp(44),
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(r.dp(12), 0, r.dp(12), r.dp(4)),
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        children: [
-          _exploreChip(
-            label: 'ALL',
-            selected: _selectedExploreCategoryInput == null,
-            onTap: () => _selectExploreCategory(null),
-            r: r,
+    return StickerChipRow(
+      height: 60,
+      children: [
+        StickerChip(
+          label: 'ALL',
+          selected: _selectedExploreCategoryInput == null,
+          style: StickerChipStyle.large,
+          onTap: () => _selectExploreCategory(null),
+        ),
+        for (final value in values)
+          StickerChip(
+            label: value.label.toUpperCase(),
+            selected: _selectedExploreCategoryInput == value.input,
+            style: StickerChipStyle.large,
+            onTap: () => _selectExploreCategory(value),
           ),
-          for (final value in values) ...[
-            SizedBox(width: r.dp(4)),
-            _exploreChip(
-              label: value.label.toUpperCase(),
-              count: value.count,
-              selected: _selectedExploreCategoryInput == value.input,
-              onTap: () => _selectExploreCategory(value),
-              r: r,
-            ),
-          ],
-        ],
-      ),
+      ],
     );
   }
 
   Widget _exploreFitChipsRow(R r) {
     final values = _exploreFitFilter?.values ?? const [];
-    return SizedBox(
-      height: r.dp(40),
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(r.dp(12), 0, r.dp(12), r.dp(4)),
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        children: [
-          _exploreChip(
-            label: 'ALL',
-            selected: _selectedExploreFitInput == null,
-            onTap: () => _selectExploreFit(null),
-            r: r,
+    return StickerChipRow(
+      height: 40,
+      children: [
+        const StickerChipCaption('FIT & FABRIC'),
+        StickerChip(
+          label: 'ALL',
+          selected: _selectedExploreFitInput == null,
+          style: StickerChipStyle.mono,
+          onTap: () => _selectExploreFit(null),
+        ),
+        for (final value in values)
+          StickerChip(
+            label: value.label.toUpperCase(),
+            selected: _selectedExploreFitInput == value.input,
+            style: StickerChipStyle.mono,
+            onTap: () => _selectExploreFit(value),
           ),
-          for (final value in values) ...[
-            SizedBox(width: r.dp(4)),
-            _exploreChip(
-              label: value.label.toUpperCase(),
-              count: value.count,
-              selected: _selectedExploreFitInput == value.input,
-              onTap: () => _selectExploreFit(value),
-              r: r,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _exploreChip({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-    required R r,
-    int? count,
-  }) {
-    return SlantChip(
-      label: label,
-      selected: selected,
-      onTap: onTap,
-      count: count,
-      fontSize: r.sp(15),
+      ],
     );
   }
 
@@ -1608,7 +1671,8 @@ class _PromoBlockCardState extends State<_PromoBlockCard> {
                   ),
                 ),
               ),
-              Positioned(
+              if (widget.buttonLabel.isNotEmpty)
+                Positioned(
                 right: r.dp(18),
                 bottom: r.dp(20),
                 child: Container(

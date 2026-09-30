@@ -51,6 +51,65 @@ class PromoBlockContent {
   }
 }
 
+/// A full-width banner shown between "Explore Categories" and
+/// "Shop The Look" (metaobject `feature_banner`).
+class FeatureBannerContent {
+  final String id;
+  final String? imageUrl;
+  final String label;
+  final String? buttonLabel;
+
+  /// Collection handle, `/collections/...`, `/products/...` or a full URL.
+  final String link;
+  final int sortOrder;
+
+  const FeatureBannerContent({
+    required this.id,
+    this.imageUrl,
+    this.label = '',
+    this.buttonLabel,
+    required this.link,
+    this.sortOrder = 0,
+  });
+
+  factory FeatureBannerContent.fromMetaobjectJson(Map<String, dynamic> json) {
+    return FeatureBannerContent(
+      id: json['id'] as String,
+      imageUrl: _imageUrlFrom(json['image']),
+      label: _textFrom(json['label']) ?? '',
+      buttonLabel: _textFrom(json['button_label']),
+      link: _textFrom(json['link']) ?? '',
+      sortOrder: _asInt(_textFrom(json['sort_order'])) ?? 0,
+    );
+  }
+}
+
+/// A tile in the "Shop By Price" grid (metaobject `price_tile`).
+class PriceTileContent {
+  final String id;
+  final String? imageUrl;
+
+  /// Collection handle, `/collections/...`, `/products/...` or a full URL.
+  final String link;
+  final int sortOrder;
+
+  const PriceTileContent({
+    required this.id,
+    this.imageUrl,
+    required this.link,
+    this.sortOrder = 0,
+  });
+
+  factory PriceTileContent.fromMetaobjectJson(Map<String, dynamic> json) {
+    return PriceTileContent(
+      id: json['id'] as String,
+      imageUrl: _imageUrlFrom(json['image']),
+      link: _textFrom(json['link']) ?? '',
+      sortOrder: _asInt(_textFrom(json['sort_order'])) ?? 0,
+    );
+  }
+}
+
 class ExploreCategoryContent {
   final String id;
   final String? imageUrl;

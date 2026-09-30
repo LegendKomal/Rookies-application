@@ -1187,6 +1187,93 @@ for (final e in rawVariantEdges) {
     }
   }
 
+  /// Sorts by `sort_order`, keeping creation order (the query's `id` sort)
+  /// for ties, so a newly added entry lands after the existing ones.
+  static List<T> _sortedStable<T>(List<T> items, int Function(T) sortOrder) {
+    final indexed = items.asMap().entries.toList()
+      ..sort((a, b) {
+        final c = sortOrder(a.value).compareTo(sortOrder(b.value));
+        return c != 0 ? c : a.key.compareTo(b.key);
+      });
+    return indexed.map((e) => e.value).toList();
+  }
+
+  Future<List<FeatureBannerContent>> getFeatureBanners() =>
+      _cachedFetch('featureBanners', _fetchFeatureBanners);
+
+  Future<List<FeatureBannerContent>> _fetchFeatureBanners() async {
+    const String query = r'''
+      query getFeatureBanners {
+        metaobjects(type: "feature_banner", first: 20, sortKey: "id") {
+          edges {
+            node {
+              id
+              image: field(key: "image") { reference { ... on MediaImage { image { url } } } }
+              label: field(key: "label") { value }
+              button_label: field(key: "button_label") { value }
+              link: field(key: "link") { value }
+              sort_order: field(key: "sort_order") { value }
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final res = await ShopifyGraphQL.post(query);
+      _log('getFeatureBanners → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) return [];
+
+      final edges = (res.data!['metaobjects']['edges'] as List?) ?? [];
+      final banners = edges
+          .map((e) => FeatureBannerContent.fromMetaobjectJson(
+              e['node'] as Map<String, dynamic>))
+          .where((b) => b.imageUrl != null)
+          .toList();
+      return _sortedStable(banners, (b) => b.sortOrder);
+    } catch (e) {
+      _log('getFeatureBanners EXCEPTION: $e');
+      return [];
+    }
+  }
+
+  Future<List<PriceTileContent>> getPriceTiles() =>
+      _cachedFetch('priceTiles', _fetchPriceTiles);
+
+  Future<List<PriceTileContent>> _fetchPriceTiles() async {
+    const String query = r'''
+      query getPriceTiles {
+        metaobjects(type: "price_tile", first: 20, sortKey: "id") {
+          edges {
+            node {
+              id
+              image: field(key: "image") { reference { ... on MediaImage { image { url } } } }
+              link: field(key: "link") { value }
+              sort_order: field(key: "sort_order") { value }
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final res = await ShopifyGraphQL.post(query);
+      _log('getPriceTiles → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) return [];
+
+      final edges = (res.data!['metaobjects']['edges'] as List?) ?? [];
+      final tiles = edges
+          .map((e) => PriceTileContent.fromMetaobjectJson(
+              e['node'] as Map<String, dynamic>))
+          .where((t) => t.imageUrl != null)
+          .toList();
+      return _sortedStable(tiles, (t) => t.sortOrder);
+    } catch (e) {
+      _log('getPriceTiles EXCEPTION: $e');
+      return [];
+    }
+  }
+
   Future<List<ShopTheLookEntry>> getShopTheLookEntries() =>
       _cachedFetch('shopTheLookEntries', _fetchShopTheLookEntries);
 
