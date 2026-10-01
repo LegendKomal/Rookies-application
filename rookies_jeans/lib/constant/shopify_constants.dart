@@ -15,15 +15,28 @@ class ShopifyConstants {
         'X-Shopify-Storefront-Access-Token': storefrontAccessToken,
       };
 
+  /// The APP's own MSG91 OTP widget (e.g. "OTPLOGIN_APP", Mobile Integration
+  /// ON) — not the website's OTPLOGIN widget, which stays web-only so the
+  /// site is unaffected. The widget ID and token are meant to live in the
+  /// app; the MSG91 authkey must NOT — it stays in the otp_login_worker.
+  static const String msg91WidgetId  = 'YOUR_MSG91_WIDGET_ID';
+  static const String msg91TokenAuth = 'YOUR_MSG91_WIDGET_TOKEN';
+
+  /// URL printed by `npm run deploy` in otp_login_worker/.
+  static const String otpLoginUrl =
+      'https://rookies-otp-login.YOUR-SUBDOMAIN.workers.dev';
+
   static const String storeUrl      = 'https://rookiesjeans.com';
   static const String shiprocketUrl  = 'https://rookiesjeans.shiprocket.co/';
 
-  static const String fontHeading  = 'BebasNene';
-  static const String fontBody     = 'AlteHaasGroteskRegular';
-  static const String fontBodyBold = 'SplineSansMono';
-  static const String fontAlteBold = 'AlteHaasGroteskBold';
-  static const String fontNumber = 'Typist';
-  static const String fontRupee = 'Serif4';
+  static const String fontHeading    = 'Anton';
+  static const String fontSubheading = 'BebasNeue';
+  static const String fontBody       = 'Archivo';
+  static const String fontAccent     = 'RobotoMono';
+  static const String fontBodyBold   = fontAccent;
+  static const String fontAlteBold   = fontBody;
+  static const String fontNumber     = fontBody;
+  static const String fontRupee      = 'Serif4';
 
   static const TextStyle tsHeading = TextStyle(
     fontFamily: fontHeading,

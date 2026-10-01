@@ -118,8 +118,10 @@ class AppColors {
 class AppFonts {
   AppFonts._();
 
-  static const String heading  = ShopifyConstants.fontHeading;
-  static const String body     = ShopifyConstants.fontBody;
+  static const String heading    = ShopifyConstants.fontHeading;
+  static const String subheading = ShopifyConstants.fontSubheading;
+  static const String body       = ShopifyConstants.fontBody;
+  static const String accent     = ShopifyConstants.fontAccent;
   static const String bold     = ShopifyConstants.fontBodyBold;
   static const String alteBold = ShopifyConstants.fontAlteBold;
   static const String number   = ShopifyConstants.fontNumber;

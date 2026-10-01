@@ -54,7 +54,7 @@ class SlantChip extends StatelessWidget {
                 Text(
                   label,
                   style: TextStyle(
-                    fontFamily: AppFonts.heading,
+                    fontFamily: AppFonts.subheading,
                     fontSize: fontSize,
                     fontWeight: FontWeight.w700,
                     color: fg,

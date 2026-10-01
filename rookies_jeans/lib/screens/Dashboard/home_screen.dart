@@ -43,7 +43,6 @@ class _HomeScreenState extends State<HomeScreen> {
   static const double _kBottomNavHeight = 60.0;
   static const double _kBottomNavClearance = 84.0;
 
-  static const String _heroMarqueeText = 'READY FOR MORE';
   static const String _heroSubtitle =
       'Renaisse redefines streetwear with bold silhouettes and clean essentials.';
 
@@ -755,13 +754,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _HeroMarqueeText(
-                    text: (_primaryHeroBanner?.title.isNotEmpty ?? false)
-                        ? _primaryHeroBanner!.title
-                        : _heroMarqueeText,
-                    height: r.dp(44),
-                  ),
-                  SizedBox(height: r.dp(14)),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: r.dp(20)),
                     child: Column(
@@ -914,13 +906,36 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: EdgeInsets.only(bottom: r.dp(28)),
       child: Column(
         children: [
-          if (topwear.isNotEmpty)
+          if (topwear.isNotEmpty) ...[
+            _categoryRowLabel('TOP WEAR', r),
             _categoryRow(topwear, cardWidth, cardHeight, r),
+          ],
           if (topwear.isNotEmpty && bottomwear.isNotEmpty)
-            SizedBox(height: r.dp(10)),
-          if (bottomwear.isNotEmpty)
+            SizedBox(height: r.dp(20)),
+          if (bottomwear.isNotEmpty) ...[
+            _categoryRowLabel('BOTTOM WEAR', r),
             _categoryRow(bottomwear, cardWidth, cardHeight, r),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _categoryRowLabel(String title, R r) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(r.dp(16), 0, r.dp(16), r.dp(10)),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          title,
+          style: TextStyle(
+            fontFamily: AppFonts.subheading,
+            fontSize: r.sp(18),
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+            color: primary,
+          ),
+        ),
       ),
     );
   }
@@ -1000,7 +1015,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Text(
                 label,
                 style: TextStyle(
-                  fontFamily: AppFonts.heading,
+                  fontFamily: AppFonts.subheading,
                   color: Colors.white,
                   fontSize: r.sp(17),
                   fontWeight: FontWeight.w600,
@@ -1305,7 +1320,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontFamily: _fHead,
+                    fontFamily: AppFonts.subheading,
                     fontSize: r.sp(18),
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
@@ -1517,73 +1532,6 @@ class _HomeScreenState extends State<HomeScreen> {
             fontSize: r.sp(14),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _HeroMarqueeText extends StatefulWidget {
-  final String text;
-  final double height;
-  const _HeroMarqueeText({required this.text, required this.height});
-
-  @override
-  State<_HeroMarqueeText> createState() => _HeroMarqueeTextState();
-}
-
-class _HeroMarqueeTextState extends State<_HeroMarqueeText> {
-  final ScrollController _controller = ScrollController();
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startAutoScroll());
-  }
-
-  void _startAutoScroll() {
-    _timer = Timer.periodic(const Duration(milliseconds: 24), (_) {
-      if (!mounted || !_controller.hasClients) return;
-      final double max = _controller.position.maxScrollExtent;
-      if (max <= 0) return;
-      double next = _controller.offset + 1.4;
-      if (next >= max) next = 0;
-      _controller.jumpTo(next);
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final r = R.of(context);
-    final String unit = '${widget.text.toUpperCase()}        ';
-    final String looped = List.filled(8, unit).join();
-    return SizedBox(
-      height: widget.height,
-      width: double.infinity,
-      child: ListView(
-        controller: _controller,
-        scrollDirection: Axis.horizontal,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          Text(
-            looped,
-            maxLines: 1,
-            style: TextStyle(
-              fontFamily: AppFonts.heading,
-              color: Colors.white,
-              fontSize: r.sp(34),
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1,
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -120,21 +120,9 @@ class ShopifyAuthService {
         );
       }
 
-      await _storage.write(key: _customerTokenKey, value: accessToken);
-      await _storage.write(key: _customerTokenExpiryKey, value: expiresAt ?? '');
-
-      _log('AUTH TOKEN SAVED -> secure storage');
-
-      final customer = await getCurrentCustomer();
-
-      _log('AUTH LOGIN SUCCESS -> customer: ${customer?.toJson()}');
-
-      return ShopifyAuthResult(
-        success: true,
-        message: 'Login successful',
+      return await signInWithToken(
         accessToken: accessToken,
         expiresAt: expiresAt,
-        customer: customer,
       );
     } catch (e, stack) {
       _log('AUTH LOGIN EXCEPTION -> $e');
@@ -144,6 +132,30 @@ class ShopifyAuthService {
         message: 'Something went wrong: $e',
       );
     }
+  }
+
+  /// Saves a customer access token obtained elsewhere (email/password login
+  /// above, or phone OTP via OtpAuthService) and loads the customer.
+  Future<ShopifyAuthResult> signInWithToken({
+    required String accessToken,
+    String? expiresAt,
+  }) async {
+    await _storage.write(key: _customerTokenKey, value: accessToken);
+    await _storage.write(key: _customerTokenExpiryKey, value: expiresAt ?? '');
+
+    _log('AUTH TOKEN SAVED -> secure storage');
+
+    final customer = await getCurrentCustomer();
+
+    _log('AUTH LOGIN SUCCESS -> customer: ${customer?.toJson()}');
+
+    return ShopifyAuthResult(
+      success: true,
+      message: 'Login successful',
+      accessToken: accessToken,
+      expiresAt: expiresAt,
+      customer: customer,
+    );
   }
 
   Future<ShopifyAuthResult> recoverPassword({

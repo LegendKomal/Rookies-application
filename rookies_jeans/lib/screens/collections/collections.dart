@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/banner_model.dart';
@@ -37,9 +38,14 @@ class _CollectionsPageData {
   final List<OccasionTileContent> aesthetics;
 }
 
-/// The Collections tab (menu icon in the bottom nav): hero banner, "Shop by
-/// category" with Top/Bottom wear tabs, "Shop the look" and "Find your
-/// aesthetic".
+/// Which inline accordion panel is currently open. `null` means both are
+/// collapsed. Only one panel can be open at a time — opening one closes the
+/// other.
+enum _MenuPanel { topWear, bottomWear }
+
+/// The Collections tab (menu icon in the bottom nav): a "Collections" row
+/// that opens [CollectionsShowcasePage], plus Top Wear / Bottom Wear
+/// accordions listing each category and its fits.
 class ExploreCategoriesPage extends StatefulWidget {
   const ExploreCategoriesPage({super.key});
   @override
@@ -47,6 +53,430 @@ class ExploreCategoriesPage extends StatefulWidget {
 }
 
 class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
+  late Future<List<ShopMenuSection>> _future;
+  static const String _fHead = AppFonts.heading;
+  static const String _fBody = AppFonts.body;
+  static const String _fBold = AppFonts.bold;
+
+  _MenuPanel? _expandedPanel;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = ShopifyStorefrontService.instance.getExploreMenuSections();
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      ShopifyStorefrontService.instance.clearCache();
+      _future = ShopifyStorefrontService.instance.getExploreMenuSections();
+      _expandedPanel = null;
+    });
+    await _future;
+  }
+
+  void _togglePanel(_MenuPanel panel) {
+    setState(() {
+      _expandedPanel = _expandedPanel == panel ? null : panel;
+    });
+  }
+
+  void _openCollections() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CollectionsShowcasePage()),
+    );
+  }
+
+  void _openCategory(
+    String title,
+    String collectionHandle, {
+    String? fitTitle,
+  }) {
+    if (collectionHandle.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductsPage(
+          collection: ShopifyCollection(
+            id: collectionHandle,
+            title: title,
+            handle: collectionHandle,
+            label: title.toUpperCase(),
+          ),
+          initialFitFilter: fitTitle,
+        ),
+      ),
+    );
+  }
+
+  void _openFit(String categoryTitle, String categoryHandle, ShopMenuFit fit) {
+    // Fits that link to their own collection open it directly; older ones
+    // fall back to filtering the parent category by fit name.
+    final String? handle = fit.collectionHandle;
+    if (handle != null && handle.isNotEmpty) {
+      _openCategory(fit.title, handle);
+    } else {
+      _openCategory(categoryTitle, categoryHandle, fitTitle: fit.title);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final titleSize = (width * 0.09).clamp(20.0, 40.0);
+
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) => Scaffold(
+        backgroundColor: AppColors.bg,
+        appBar: AppBar(
+          backgroundColor: AppColors.card,
+          elevation: 0,
+          centerTitle: false,
+          automaticallyImplyLeading: false,
+          titleSpacing: 0,
+          title: Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/home');
+                  }
+                },
+              ),
+              Expanded(
+                child: Text(
+                  'EXPLORE CATEGORIES',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: titleSize,
+                    height: 1,
+                    fontFamily: _fHead,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        body: SafeArea(
+          child: RefreshIndicator(
+            onRefresh: _refresh,
+            child: FutureBuilder<List<ShopMenuSection>>(
+              future: _future,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return _ErrorState(onRetry: _refresh);
+                }
+
+                final sections = snapshot.data ?? [];
+                final ShopMenuSection? topWear =
+                    _sectionByHandle(sections, 'top-wear');
+                final ShopMenuSection? bottomWear =
+                    _sectionByHandle(sections, 'bottom-wear');
+
+                return ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  children: [
+                    _MenuRow(
+                      title: 'COLLECTIONS',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.primary,
+                      ),
+                      onTap: _openCollections,
+                      fontFamily: _fBold,
+                    ),
+                    _divider(),
+                    _MenuRow(
+                      title: (topWear?.title ?? 'TOP WEAR').toUpperCase(),
+                      trailing: _panelIcon(_expandedPanel == _MenuPanel.topWear),
+                      onTap: () => _togglePanel(_MenuPanel.topWear),
+                      fontFamily: _fBold,
+                    ),
+                    AnimatedCrossFade(
+                      duration: const Duration(milliseconds: 200),
+                      crossFadeState: _expandedPanel == _MenuPanel.topWear
+                          ? CrossFadeState.showFirst
+                          : CrossFadeState.showSecond,
+                      firstChild: _CategoriesGrid(
+                        categories: topWear?.categories ?? const [],
+                        headFont: _fBold,
+                        bodyFont: _fBody,
+                        onCategoryTap: _openCategory,
+                        onFitTap: _openFit,
+                      ),
+                      secondChild: const SizedBox(width: double.infinity),
+                    ),
+                    _divider(),
+                    _MenuRow(
+                      title: (bottomWear?.title ?? 'BOTTOM WEAR').toUpperCase(),
+                      trailing:
+                          _panelIcon(_expandedPanel == _MenuPanel.bottomWear),
+                      onTap: () => _togglePanel(_MenuPanel.bottomWear),
+                      fontFamily: _fBold,
+                    ),
+                    AnimatedCrossFade(
+                      duration: const Duration(milliseconds: 200),
+                      crossFadeState: _expandedPanel == _MenuPanel.bottomWear
+                          ? CrossFadeState.showFirst
+                          : CrossFadeState.showSecond,
+                      firstChild: _CategoriesGrid(
+                        categories: bottomWear?.categories ?? const [],
+                        headFont: _fBold,
+                        bodyFont: _fBody,
+                        onCategoryTap: _openCategory,
+                        onFitTap: _openFit,
+                      ),
+                      secondChild: const SizedBox(width: double.infinity),
+                    ),
+                    _divider(),
+                    // Clearance for the floating bottom nav bar.
+                    const SizedBox(height: 110),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _panelIcon(bool expanded) => Icon(
+        expanded ? Icons.remove_rounded : Icons.add_rounded,
+        color: AppColors.primary,
+        size: 22,
+      );
+
+  Widget _divider() => Divider(height: 1, thickness: 1, color: AppColors.border);
+
+  ShopMenuSection? _sectionByHandle(
+      List<ShopMenuSection> sections, String handle) {
+    for (final s in sections) {
+      if (s.handle == handle) return s;
+    }
+    return null;
+  }
+}
+
+class _MenuRow extends StatelessWidget {
+  const _MenuRow({
+    required this.title,
+    required this.trailing,
+    required this.onTap,
+    required this.fontFamily,
+  });
+
+  final String title;
+  final Widget trailing;
+  final VoidCallback onTap;
+  final String fontFamily;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontFamily: fontFamily,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+            trailing,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The two-column "category name (bold) + list of fits" grid shown under an
+/// expanded Top Wear / Bottom Wear panel — matches the merchant's menu
+/// design: categories alternate left/right column in the order Shopify
+/// returns them.
+class _CategoriesGrid extends StatelessWidget {
+  const _CategoriesGrid({
+    required this.categories,
+    required this.headFont,
+    required this.bodyFont,
+    required this.onCategoryTap,
+    required this.onFitTap,
+  });
+
+  final List<ShopMenuCategory> categories;
+  final String headFont;
+  final String bodyFont;
+  final void Function(String title, String collectionHandle) onCategoryTap;
+  final void Function(
+    String categoryTitle,
+    String collectionHandle,
+    ShopMenuFit fit,
+  ) onFitTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (categories.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+        child: Text(
+          'No categories found',
+          style: TextStyle(fontFamily: bodyFont, color: AppColors.secondaryText),
+        ),
+      );
+    }
+
+    final List<ShopMenuCategory> left = [];
+    final List<ShopMenuCategory> right = [];
+    for (int i = 0; i < categories.length; i++) {
+      (i.isEven ? left : right).add(categories[i]);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: left.map(_block).toList(),
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: right.map(_block).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _block(ShopMenuCategory category) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: () => onCategoryTap(category.title, category.collectionHandle),
+            child: Text(
+              category.title,
+              style: TextStyle(
+                fontFamily: headFont,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          for (final fit in category.fits)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: GestureDetector(
+                onTap: () =>
+                    onFitTap(category.title, category.collectionHandle, fit),
+                child: Text(
+                  fit.title,
+                  style: TextStyle(
+                    fontFamily: bodyFont,
+                    fontSize: 13,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// App bar with a back arrow and a big heading-font title, used by pages
+/// pushed from the Collections tab.
+class _BackTitleAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const _BackTitleAppBar({required this.title});
+  final String title;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    final titleSize =
+        (MediaQuery.of(context).size.width * 0.09).clamp(20.0, 40.0);
+    return AppBar(
+      backgroundColor: AppColors.card,
+      elevation: 0,
+      centerTitle: false,
+      automaticallyImplyLeading: false,
+      titleSpacing: 0,
+      title: Row(
+        children: [
+          IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 18,
+              color: AppColors.primary,
+            ),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: titleSize,
+                height: 1,
+                fontFamily: AppFonts.heading,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The full collections showcase opened from the "Collections" row on
+/// [ExploreCategoriesPage]: hero banner, "Shop by category", "Shop the
+/// look" and "Find your aesthetic".
+class CollectionsShowcasePage extends StatefulWidget {
+  const CollectionsShowcasePage({super.key});
+  @override
+  State<CollectionsShowcasePage> createState() => _CollectionsShowcasePageState();
+}
+
+class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
   static const String _fHead = AppFonts.heading;
   static const String _fBold = AppFonts.bold;
   static const String _fNumber = AppFonts.number;
@@ -244,6 +674,7 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
       animation: ThemeService.instance,
       builder: (context, _) => Scaffold(
         backgroundColor: AppColors.bg,
+        appBar: _BackTitleAppBar(title: 'COLLECTIONS'),
         body: SafeArea(
           bottom: false,
           child: RefreshIndicator(
@@ -751,7 +1182,7 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
                 child: _aestheticTile(rest[i], large: false),
               ),
             ),
-            const SizedBox(width: gap),
+            const SizedBox(width: gap), 
             Expanded(
               child: i + 1 < rest.length
                   ? AspectRatio(

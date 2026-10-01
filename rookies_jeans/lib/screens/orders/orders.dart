@@ -79,7 +79,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         title: Text(
           'Order History',
           style: TextStyle(
-            fontFamily: ShopifyConstants.fontHeading,
+            fontFamily: ShopifyConstants.fontSubheading,
             fontSize: r.s(17),
             fontWeight: FontWeight.w500,
             color: _primary,
@@ -320,7 +320,7 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'No orders yet',
-            style: TextStyle(fontFamily: ShopifyConstants.fontHeading, fontSize: 16, color: AppColors.secondaryText),
+            style: TextStyle(fontFamily: ShopifyConstants.fontSubheading, fontSize: 16, color: AppColors.secondaryText),
           ),
           const SizedBox(height: 6),
           Text(

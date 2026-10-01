@@ -75,7 +75,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
           widget.title,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontFamily: ShopifyConstants.fontHeading,
+            fontFamily: ShopifyConstants.fontSubheading,
             fontSize: _s(context, 17).clamp(15.0, 22.0),
             fontWeight: FontWeight.w500,
             color: _primary,
@@ -530,7 +530,7 @@ class _MoreSection extends StatelessWidget {
                       child: Text(
                         'Theme Appearance',
                         style: TextStyle(
-                          fontFamily: AppFonts.heading,
+                          fontFamily: AppFonts.subheading,
                           fontSize: _s(context, 18).clamp(16.0, 24.0),
                           fontWeight: FontWeight.w500,
                           color: AppColors.primary,

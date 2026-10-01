@@ -1,0 +1,9 @@
+name = "rookies-otp-login"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# Non-secret settings. Secrets are set with `npx wrangler secret put <NAME>`
+# (see README.md) and never written in this file.
+[vars]
+SHOPIFY_SHOP_DOMAIN = "rookies-jeans.myshopify.com"
+SHOPIFY_API_VERSION = "2026-04"

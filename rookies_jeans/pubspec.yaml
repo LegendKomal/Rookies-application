@@ -23,6 +23,7 @@ dependencies:
   webview_flutter: ^4.14.0
   flutter_launcher_icons: ^0.14.4
   share_plus: ^11.0.0
+  sendotp_flutter_sdk: ^0.0.2
 
 dev_dependencies:
   flutter_test:
@@ -43,33 +44,27 @@ flutter:
     - assets/fonts/    # ← required so Flutter finds the .ttf files
 
   fonts:
-  - family: BebasNene
+  # HEADING
+  - family: Anton
+    fonts:
+      - asset: assets/fonts/Anton-Regular.ttf
+
+  # SUBHEADING
+  - family: BebasNeue
     fonts:
       - asset: assets/fonts/BebasNeue-Regular.ttf
-        weight: 500
 
-  - family: SplineSansMono
+  # BODY (variable font: wght 100–900, wdth 62–125)
+  - family: Archivo
     fonts:
-      - asset: assets/fonts/SplineSansMono-VariableFont_wght.ttf 
-        weight: 400
+      - asset: assets/fonts/Archivo-VariableFont_wdth,wght.ttf
 
-  - family: LibreFranklin
+  # ACCENT (variable font: wght 100–700)
+  - family: RobotoMono
     fonts:
-      - asset: assets/fonts/LibreFranklin-VariableFont_wght.ttf 
-        weight: 500
-  - family: AlteHaasGroteskRegular
-    fonts:
-      - asset: assets/fonts/AlteHaasGroteskRegular.ttf
+      - asset: assets/fonts/RobotoMono-VariableFont_wght.ttf
 
-  - family: AlteHaasGroteskBold
-    fonts:
-      - asset: assets/fonts/AlteHaasGroteskBold.ttf
-        weight: 700
-
-  - family: Typist
-    fonts:
-      - asset: assets/fonts/Typist.ttf
-
+  # Kept only for the ₹ glyph in prices
   - family: Serif4
     fonts:
       - asset: assets/fonts/SourceSerif4.ttf
