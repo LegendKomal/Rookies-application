@@ -141,6 +141,42 @@ class ExploreCategoryContent {
   }
 }
 
+/// A tab in the home screen's "EXPLORE COLLECTIONS" row (HOT DEALS, SALE...);
+/// each one shows the products of [collectionHandle].
+class ExploreTabContent {
+  final String id;
+  final String label;
+  final String collectionHandle;
+  final int sortOrder;
+
+  const ExploreTabContent({
+    required this.id,
+    required this.label,
+    required this.collectionHandle,
+    this.sortOrder = 0,
+  });
+
+  factory ExploreTabContent.fromMetaobjectJson(Map<String, dynamic> json) {
+    return ExploreTabContent(
+      id: json['id'] as String,
+      label: (_textFrom(json['label']) ?? '').trim(),
+      collectionHandle: _handleFrom(_textFrom(json['collection_handle'])),
+      sortOrder: _asInt(_textFrom(json['sort_order'])) ?? 0,
+    );
+  }
+
+  /// Accepts either a bare handle ("under-999") or a pasted collection URL
+  /// ("https://rookiesjeans.com/collections/under-999?x=1") and returns the
+  /// handle.
+  static String _handleFrom(String? raw) {
+    String value = (raw ?? '').trim();
+    final int idx = value.indexOf('/collections/');
+    if (idx >= 0) value = value.substring(idx + '/collections/'.length);
+    value = value.split(RegExp(r'[/?#]')).first;
+    return value.trim().toLowerCase();
+  }
+}
+
 class ShopTheLookEntry {
   final String id;
   final String? imageUrl;

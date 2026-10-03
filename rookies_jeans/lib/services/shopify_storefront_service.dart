@@ -1407,6 +1407,136 @@ for (final e in rawVariantEdges) {
     }
   }
 
+  Future<List<ExploreTabContent>> getExploreTabs() =>
+      _cachedFetch('exploreTabs', _fetchExploreTabs);
+
+  Future<List<ExploreTabContent>> _fetchExploreTabs() async {
+    const String query = r'''
+      query getExploreTabs {
+        metaobjects(type: "explore_tab", first: 20) {
+          edges {
+            node {
+              id
+              label: field(key: "label") { value }
+              collection_handle: field(key: "collection_handle") { value }
+              sort_order: field(key: "sort_order") { value }
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final res = await ShopifyGraphQL.post(query);
+      _log('getExploreTabs → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) return [];
+
+      final edges = (res.data!['metaobjects']['edges'] as List?) ?? [];
+      final tabs = edges
+          .map((e) => ExploreTabContent.fromMetaobjectJson(
+              e['node'] as Map<String, dynamic>))
+          .where((t) =>
+              t.label.trim().isNotEmpty && t.collectionHandle.trim().isNotEmpty)
+          .toList();
+      return _sortedStable(tabs, (t) => t.sortOrder);
+    } catch (e) {
+      _log('getExploreTabs EXCEPTION: $e');
+      return [];
+    }
+  }
+
+  /// Image for the top banner of a collection's product list, in order:
+  /// a `product_page_banner` metaobject entry for [handle], the collection's
+  /// `custom.app_banner_image` metafield, then the collection's own image.
+  /// Null when none exist.
+  Future<String?> getCollectionBannerUrl(String handle) => _cachedFetch(
+        'collectionBanner:$handle',
+        () async {
+          final banners = await getProductPageBanners();
+          return banners[_normalizeHandle(handle)] ??
+              await _fetchCollectionBannerUrl(handle);
+        },
+      );
+
+  /// All `product_page_banner` entries as collection handle → image URL.
+  Future<Map<String, String>> getProductPageBanners() =>
+      _cachedFetch('productPageBanners', _fetchProductPageBanners);
+
+  Future<Map<String, String>> _fetchProductPageBanners() async {
+    const String query = r'''
+      query getProductPageBanners {
+        metaobjects(type: "product_page_banner", first: 100) {
+          edges {
+            node {
+              collection_handle: field(key: "collection_handle") { value }
+              image: field(key: "image") { reference { ... on MediaImage { image { url } } } }
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final res = await ShopifyGraphQL.post(query);
+      _log('getProductPageBanners → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) return {};
+
+      final edges = (res.data!['metaobjects']['edges'] as List?) ?? [];
+      final Map<String, String> banners = {};
+      for (final e in edges) {
+        final node = e['node'] as Map<String, dynamic>;
+        final String handle = _normalizeHandle(
+            node['collection_handle']?['value'] as String? ?? '');
+        final String? url =
+            node['image']?['reference']?['image']?['url'] as String?;
+        if (handle.isNotEmpty && url != null) banners[handle] = url;
+      }
+      return banners;
+    } catch (e) {
+      _log('getProductPageBanners EXCEPTION: $e');
+      return {};
+    }
+  }
+
+  /// "SHIRTS", "shirts " or "https://…/collections/shirts?x" → "shirts".
+  static String _normalizeHandle(String raw) {
+    String value = raw.trim();
+    final int idx = value.indexOf('/collections/');
+    if (idx >= 0) value = value.substring(idx + '/collections/'.length);
+    return value.split(RegExp(r'[/?#]')).first.trim().toLowerCase();
+  }
+
+  Future<String?> _fetchCollectionBannerUrl(String handle) async {
+    const String query = r'''
+      query getCollectionBanner($handle: String!) {
+        collection(handle: $handle) {
+          image { url }
+          appBanner: metafield(namespace: "custom", key: "app_banner_image") {
+            reference { ... on MediaImage { image { url } } }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final res = await ShopifyGraphQL.post(
+        query,
+        variables: {'handle': handle},
+      );
+      _log('getCollectionBannerUrl [$handle] → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) return null;
+
+      final collection = res.data!['collection'] as Map<String, dynamic>?;
+      if (collection == null) return null;
+      return (collection['appBanner']?['reference']?['image']?['url']
+              as String?) ??
+          (collection['image']?['url'] as String?);
+    } catch (e) {
+      _log('getCollectionBannerUrl EXCEPTION: $e');
+      return null;
+    }
+  }
+
   /// The Collections tab's tab → group → card taxonomy, pinned in
   /// [ShopifyConstants.exploreMenuSections]. Each card is a collection;
   /// its image is fetched live (collection image, else first product's) in

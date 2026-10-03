@@ -312,7 +312,7 @@ class _WishlistPageState extends State<WishlistPage> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontFamily: _fBold,
+                      fontFamily: _fBody,
                       fontSize: _s(12),
                       fontWeight: FontWeight.w700,
                       color: primary,
@@ -332,7 +332,7 @@ class _WishlistPageState extends State<WishlistPage> {
 
   Widget _priceBlock(ShopifyProduct product) {
     if (!_isOnSale(product)) {
-      return PriceText(_formattedPrice(product), currencyCode: product.currencyCode, fontSize: _s(14), fontWeight: FontWeight.w800, amountFontFamily: _fBold, color: primary);
+      return PriceText(_formattedPrice(product), currencyCode: product.currencyCode, fontSize: _s(14), fontWeight: FontWeight.w800, amountFontFamily: _fBody, color: primary);
     }
 
     final saved = ((product.compareAtPrice ?? 0) - product.price).round();
@@ -345,7 +345,7 @@ class _WishlistPageState extends State<WishlistPage> {
           spacing: 6,
           children: [
             PriceText(_formattedCompareAtPrice(product), currencyCode: product.currencyCode, fontSize: _s(10), color: secondaryTxt, amountFontFamily: _fBody, decoration: TextDecoration.lineThrough),
-            PriceText(_formattedPrice(product), currencyCode: product.currencyCode, fontSize: _s(12), fontWeight: FontWeight.w800, amountFontFamily: _fBold, color: primary),
+            PriceText(_formattedPrice(product), currencyCode: product.currencyCode, fontSize: _s(12), fontWeight: FontWeight.w800, amountFontFamily: _fBody, color: primary),
           ],
         ),
         const SizedBox(height: 4),

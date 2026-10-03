@@ -1021,7 +1021,7 @@ debugPrint('==========================================');
           Text(
             p.title,
             style: TextStyle(
-              fontFamily: _fBold,
+              fontFamily: _fBody,
               fontSize: _s(22),
               color: primary,
               height: 1.3,
@@ -1333,7 +1333,7 @@ _variantMetafieldsSection(),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontFamily: _fBold,
+                fontFamily: _fBody,
                 fontSize: _s(11),
                 color: primary,
                 height: 1.3,
@@ -1349,7 +1349,7 @@ _variantMetafieldsSection(),
 
   Widget _pairingPriceText(ShopifyProduct product) {
     if (!product.isOnSale) {
-      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(12), color: primary, amountFontFamily: _fBold);
+      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(12), color: primary, amountFontFamily: _fNumber);
     }
     return Row(
       children: [
@@ -1459,7 +1459,7 @@ _variantMetafieldsSection(),
         ),
         const SizedBox(width: 5),
         Flexible(
-          child: PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: _s(11), color: secondaryTxt, amountFontFamily: _fBold, decoration: TextDecoration.lineThrough),
+          child: PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: _s(11), color: secondaryTxt, amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
         ),
       ],
     );
@@ -1762,7 +1762,7 @@ _variantMetafieldsSection(),
                       child: Text(
                         _currentTitle.toUpperCase(),
                         style: TextStyle(
-                          fontFamily: _fBold,
+                          fontFamily: _fBody,
                           fontSize: _s(12),
                           color: primary,
                         ),
@@ -1812,7 +1812,7 @@ _variantMetafieldsSection(),
           title: Text(
             _currentTitle.toUpperCase(),
             style: TextStyle(
-              fontFamily: _fBold,
+              fontFamily: _fBody,
               fontSize: _s(12),
               color: primary,
             ),

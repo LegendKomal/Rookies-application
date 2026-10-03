@@ -173,6 +173,7 @@ class _ProductsPageState extends State<ProductsPage> {
   void initState() {
     super.initState();
     _fetchInitialProducts();
+    _fetchBannerImage();
 
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
@@ -294,6 +295,18 @@ class _ProductsPageState extends State<ProductsPage> {
   List<ProductSortOption> get _availableSortOptions => ProductSortOption.values;
 
   bool get _isSearch => widget.searchQuery != null;
+
+  /// Banner image loaded from Shopify (App Banner Image metafield, falling
+  /// back to the collection image).
+  String? _bannerImageUrl;
+
+  Future<void> _fetchBannerImage() async {
+    if (_isSearch) return;
+    final String? url = await ShopifyStorefrontService.instance
+        .getCollectionBannerUrl(widget.collection!.handle);
+    if (!mounted || url == null) return;
+    setState(() => _bannerImageUrl = url);
+  }
 
   String get _pageLabel => _isSearch
       ? '"${widget.searchQuery!.trim()}"'
@@ -653,7 +666,7 @@ class _ProductsPageState extends State<ProductsPage> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontFamily: _fHead,
+                          fontFamily: _fBody,
                           fontSize: r.sp(20),
                           fontWeight: FontWeight.w600,
                           color: primary,
@@ -1031,7 +1044,9 @@ class _ProductsPageState extends State<ProductsPage> {
     final r = _Responsive(context);
     final bannerHeight = _bannerHeight(r);
     final titleSize = (r.width * 0.08).clamp(20.0, 36.0);
-    final imageUrl = widget.collection?.imageUrl;
+    // Shopify's App Banner Image (or collection image) wins over whatever
+    // image the caller passed in, which is often none.
+    final imageUrl = _bannerImageUrl ?? widget.collection?.imageUrl;
 
     // The text scrolls up and out first, over just the first slice of the
     // collapse — then, for the rest of the scroll, only the image is left
@@ -1050,7 +1065,10 @@ class _ProductsPageState extends State<ProductsPage> {
           // No transform here — the sliver itself shrinks the visible
           // extent from the bottom up as the user scrolls, so the image
           // decreases only from the bottom, never the sides or top.
-          imageUrl != null && imageUrl.isNotEmpty
+          // Search results get a plain black banner, never an image.
+          _isSearch
+              ? Container(color: Colors.black)
+              : imageUrl != null && imageUrl.isNotEmpty
               ? CachedNetworkImage(
                   imageUrl: imageUrl,
                   fit: BoxFit.cover,

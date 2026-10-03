@@ -44,7 +44,8 @@ class PriceText extends StatelessWidget {
           TextSpan(
             text: amount,
             style: TextStyle(
-              fontFamily: amountFontFamily,
+              // Archivo unless the caller picks another font.
+              fontFamily: amountFontFamily ?? ShopifyConstants.fontBody,
               fontSize: fontSize,
               fontWeight: fontWeight,
               color: color,

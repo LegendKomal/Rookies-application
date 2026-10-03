@@ -822,7 +822,7 @@ class _LineItemRow extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontFamily: ShopifyConstants.fontBodyBold,
+                      fontFamily: ShopifyConstants.fontBody,
                       fontSize: r.s(13),
                       fontWeight: FontWeight.w600,
                       height: 1.3,
@@ -858,7 +858,7 @@ class _LineItemRow extends StatelessWidget {
                         Text(
                           lineTotal,
                           style: TextStyle(
-                            fontFamily: ShopifyConstants.fontBodyBold,
+                            fontFamily: ShopifyConstants.fontBody,
                             fontSize: r.s(13),
                             fontWeight: FontWeight.w700,
                             color: AppColors.primary,

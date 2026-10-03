@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 
 class ProductPeekDialog extends StatefulWidget {
@@ -346,6 +347,7 @@ class ProductPeekDialogState extends State<ProductPeekDialog> {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
+                                  fontFamily: AppFonts.body,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                   color: widget.primary,

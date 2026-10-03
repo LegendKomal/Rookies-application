@@ -153,6 +153,15 @@ class OtpAuthService {
     Future<Map<String, dynamic>?> Function(Map<String, dynamic>) call,
     Map<String, dynamic> payload,
   ) async {
+    if (ShopifyConstants.msg91WidgetId.startsWith('YOUR_') ||
+        ShopifyConstants.msg91TokenAuth.startsWith('YOUR_') ||
+        ShopifyConstants.otpLoginUrl.contains('YOUR-SUBDOMAIN')) {
+      return (
+        body: const <String, dynamic>{},
+        error: 'Phone login is not set up yet. Please use email & password.',
+      );
+    }
+
     if (!_widgetReady) {
       OTPWidget.initializeWidget(
         ShopifyConstants.msg91WidgetId,

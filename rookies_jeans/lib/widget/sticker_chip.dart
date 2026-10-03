@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/widget/slant_chip.dart';
 
-enum StickerChipStyle { small, large, mono }
+/// [mini] is a compact version of [small] (the home Explore Collections tabs);
+/// [largeCompact] is a smaller [large] (the home Explore category chips).
+enum StickerChipStyle { small, large, mono, mini, largeCompact }
 
 /// Stand-in for black on the chips in dark theme.
 const Color _kDarkInk = Color(0xFF2A2A2A);
@@ -32,18 +34,22 @@ class StickerChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool large = style == StickerChipStyle.large;
     final bool mono = style == StickerChipStyle.mono;
-    final double height = large ? 48 : 32;
-    final double shadow = large ? 4 : 3;
+    final bool mini = style == StickerChipStyle.mini;
+    final bool largeCompact = style == StickerChipStyle.largeCompact;
+    // Red-when-selected styling shared by both large variants.
+    final bool redFill = large || largeCompact;
+    final double height = large ? 48 : (largeCompact ? 34 : (mini ? 26 : 32));
+    final double shadow = large ? 4 : (mini ? 2 : 3);
 
     // Softened to dark grey in dark theme so the black fill and shadows
     // don't disappear into the near-black background.
     final bool dark = ThemeService.instance.isDark;
     final Color fill = !selected
         ? Colors.white
-        : large
+        : redFill
             ? SlantChip.accent
             : (dark ? _kDarkInk : Colors.black);
-    final Color shadowColor = selected && !large
+    final Color shadowColor = selected && !redFill
         ? SlantChip.accent
         : (dark ? _kDarkShadow : Colors.black);
 
@@ -58,12 +64,14 @@ class StickerChip extends StatelessWidget {
           child: Container(
             height: height,
             alignment: Alignment.center,
-            padding: EdgeInsets.symmetric(horizontal: large ? 20 : 14),
+            padding: EdgeInsets.symmetric(
+              horizontal: large ? 20 : (mini ? 10 : 14),
+            ),
             decoration: BoxDecoration(
               color: fill,
               border: Border.all(
                 color: selected ? fill : Colors.black,
-                width: large ? 2 : 1.5,
+                width: large ? 2 : (mini ? 1.2 : 1.5),
               ),
               boxShadow: [
                 BoxShadow(color: shadowColor, offset: Offset(shadow, shadow)),
@@ -74,8 +82,14 @@ class StickerChip extends StatelessWidget {
               maxLines: 1,
               style: TextStyle(
                 fontFamily: mono ? AppFonts.number : AppFonts.heading,
-                fontSize: large ? 30 : (mono ? 12 : 18),
-                fontWeight: FontWeight.w700,
+                fontSize: large
+                    ? 30
+                    : largeCompact
+                        ? 20
+                        : (mono ? 12 : (mini ? 14 : 18)),
+                // Anton has one weight; w700 made Flutter fake-bold it. Only the
+                // mono (Archivo) chips get a real bold.
+                fontWeight: mono ? FontWeight.w700 : FontWeight.w400,
                 letterSpacing: mono ? 1.2 : 0.4,
                 height: 1,
                 color: selected ? Colors.white : Colors.black,

@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
-import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/banner_model.dart';
 import 'package:rookies_jeans/models/collection_model.dart';
 import 'package:rookies_jeans/models/home_content_models.dart';
@@ -478,40 +477,17 @@ class CollectionsShowcasePage extends StatefulWidget {
 
 class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
   static const String _fHead = AppFonts.heading;
-  static const String _fBold = AppFonts.bold;
+  static const String _fBody = AppFonts.body;
   static const String _fNumber = AppFonts.number;
 
   /// Looks shown at first, then how many more each "View more" tap adds.
   static const int _kLooksInitial = 6;
   static const int _kLooksStep = 4;
 
-  /// Quick links shown above the category chips.
-  static const List<Map<String, String>> _kQuickLinks = [
-    {'title': 'New Arrivals', 'handle': ShopifyConstants.latestDropHandle},
-    {'title': 'Bestsellers', 'handle': 'bestsellers'},
-    {'title': 'On Sale', 'handle': ShopifyConstants.hotDealsHandle},
-  ];
-
-  /// "Fit & fabric" chips; each one only appears when some card in the
-  /// current category scope has it in its title.
-  static const List<String> _kFabrics = [
-    'Denim',
-    'Cargo',
-    'Linen',
-    'Flatknit',
-    'Twill',
-    'Corduroy',
-    'Suede',
-    'Leather',
-  ];
-
   late Future<_CollectionsPageData> _future;
 
-  /// Index into the flattened category list; -1 = ALL.
-  int _categoryIndex = -1;
-
-  /// Selected fit & fabric chip; null = ALL.
-  String? _fabric;
+  /// Selected section tab (TOP WEAR / BOTTOM WEAR / ...).
+  int _sectionIndex = 0;
   int _looksShown = _kLooksInitial;
 
   @override
@@ -699,14 +675,12 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
   }
 
   Widget _buildContent(_CollectionsPageData data) {
-    final categories = [for (final s in data.sections) ...s.categories];
-    final int catIndex =
-        _categoryIndex < categories.length ? _categoryIndex : -1;
-    final scope = catIndex < 0 ? categories : [categories[catIndex]];
-    final fabrics = _kFabrics
-        .where((f) => scope.any((c) => c.fits.any((fit) => _hasFabric(fit, f))))
-        .toList();
-    final String? fabric = fabrics.contains(_fabric) ? _fabric : null;
+    final sections =
+        data.sections.where((s) => s.categories.isNotEmpty).toList();
+    final int sectionIndex =
+        _sectionIndex < sections.length ? _sectionIndex : 0;
+    final categories =
+        sections.isEmpty ? const <ShopMenuCategory>[] : sections[sectionIndex].categories;
 
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -719,19 +693,9 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
         ),
         if (categories.isNotEmpty) ...[
           SliverToBoxAdapter(child: _heading('SHOP BY CATEGORY')),
-          SliverToBoxAdapter(
-            child: _filterChips(categories, catIndex, fabrics, fabric),
-          ),
-          for (final c in scope)
-            if (fabric == null)
-              SliverToBoxAdapter(child: _categoryGroup(c))
-            else if (c.fits.any((fit) => _hasFabric(fit, fabric)))
-              SliverToBoxAdapter(
-                child: _categoryGroup(
-                  c,
-                  fits: c.fits.where((fit) => _hasFabric(fit, fabric)).toList(),
-                ),
-              ),
+          SliverToBoxAdapter(child: _sectionTabs(sections, sectionIndex)),
+          for (final c in categories)
+            SliverToBoxAdapter(child: _categoryGroup(c)),
         ],
         if (data.looks.isNotEmpty) ...[
           SliverToBoxAdapter(
@@ -832,76 +796,22 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
   // Shop by category
   // ---------------------------------------------------------------------
 
-  bool _hasFabric(ShopMenuFit fit, String fabric) =>
-      fit.title.toLowerCase().contains(fabric.toLowerCase());
-
-  /// Quick links, category chips (ALL / JEANS / ...) and fit & fabric chips.
-  Widget _filterChips(
-    List<ShopMenuCategory> categories,
-    int catIndex,
-    List<String> fabrics,
-    String? fabric,
-  ) {
+  /// One row of section tabs (TOP WEAR » / BOTTOM WEAR » / ...); the
+  /// selected section's categories are listed below it.
+  Widget _sectionTabs(List<ShopMenuSection> sections, int selected) {
+    if (sections.length < 2) return const SizedBox(height: 4);
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: Column(
+      child: StickerChipRow(
+        height: 34,
         children: [
-          StickerChipRow(
-            height: 42,
-            children: [
-              for (int i = 0; i < _kQuickLinks.length; i++)
-                StickerChip(
-                  label: _kQuickLinks[i]['title']!.toUpperCase(),
-                  selected: i == 0,
-                  style: StickerChipStyle.small,
-                  onTap: () => _openCollection(
-                    _kQuickLinks[i]['handle']!,
-                    _kQuickLinks[i]['title']!,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          StickerChipRow(
-            height: 60,
-            children: [
-              StickerChip(
-                label: 'ALL',
-                selected: catIndex < 0,
-                style: StickerChipStyle.large,
-                onTap: () => setState(() => _categoryIndex = -1),
-              ),
-              for (int i = 0; i < categories.length; i++)
-                StickerChip(
-                  label: categories[i].title.toUpperCase(),
-                  selected: i == catIndex,
-                  style: StickerChipStyle.large,
-                  onTap: () => setState(() => _categoryIndex = i),
-                ),
-            ],
-          ),
-          if (fabrics.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            StickerChipRow(
-              height: 40,
-              children: [
-                const StickerChipCaption('FIT & FABRIC'),
-                StickerChip(
-                  label: 'ALL',
-                  selected: fabric == null,
-                  style: StickerChipStyle.mono,
-                  onTap: () => setState(() => _fabric = null),
-                ),
-                for (final f in fabrics)
-                  StickerChip(
-                    label: f.toUpperCase(),
-                    selected: f == fabric,
-                    style: StickerChipStyle.mono,
-                    onTap: () => setState(() => _fabric = f),
-                  ),
-              ],
+          for (int i = 0; i < sections.length; i++)
+            StickerChip(
+              label: '${sections[i].title.toUpperCase()} »',
+              selected: i == selected,
+              style: StickerChipStyle.mini,
+              onTap: () => setState(() => _sectionIndex = i),
             ),
-          ],
         ],
       ),
     );
@@ -1125,7 +1035,7 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontFamily: _fBold,
+                      fontFamily: _fBody,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       height: 1.25,
@@ -1138,7 +1048,7 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
                     currencyCode: product.currencyCode,
                     fontSize: 12,
                     color: AppColors.primary,
-                    amountFontFamily: _fBold,
+                    amountFontFamily: _fBody,
                   ),
                 ],
               ),
@@ -1150,7 +1060,10 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
             child: Container(
               width: 28,
               height: 28,
-              color: AppColors.primary,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(3),
+              ),
               child: Icon(
                 Icons.add_rounded,
                 size: 18,

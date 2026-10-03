@@ -530,7 +530,7 @@ class _SearchTabPageState extends State<SearchTabPage> {
         fontSize: 13,
         fontWeight: FontWeight.w700,
         color: primary,
-        amountFontFamily: _fBold,
+        amountFontFamily: _fBody,
       );
     }
     return Wrap(
@@ -543,7 +543,7 @@ class _SearchTabPageState extends State<SearchTabPage> {
           fontSize: 13,
           fontWeight: FontWeight.w700,
           color: primary,
-          amountFontFamily: _fBold,
+          amountFontFamily: _fBody,
         ),
         PriceText(
           product.formattedCompareAtPrice,

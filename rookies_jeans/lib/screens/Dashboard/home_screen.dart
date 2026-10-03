@@ -30,7 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
   static Color get primary => AppColors.primary;
   static Color get bgColor => AppColors.bg;
   static Color get secondaryTxt => AppColors.secondaryText;
-  static const String _fHead = AppFonts.heading;
   static const String _fBody = AppFonts.body;
   static const String _fBold = AppFonts.bold;
   static const String _fNumber = AppFonts.number;
@@ -38,11 +37,13 @@ class _HomeScreenState extends State<HomeScreen> {
   // Fixed dark color for text/icons that sit on a hard-coded white
   // background (e.g. the hero CTA button). Using `primary` there breaks in
   // dark mode, where AppColors.primary becomes white -> white-on-white.
+  // ignore: unused_field
   static const Color _onLightBtn = Color(0xFF111111);
 
   static const double _kBottomNavHeight = 60.0;
   static const double _kBottomNavClearance = 84.0;
 
+  // ignore: unused_field
   static const String _heroSubtitle =
       'Renaisse redefines streetwear with bold silhouettes and clean essentials.';
 
@@ -65,11 +66,14 @@ class _HomeScreenState extends State<HomeScreen> {
   // "EXPLORE COLLECTIONS" section: a tab (its own collection) plus Shopify's
   // native "Category" and "Fit" facet filters on that collection, combinable
   // simultaneously, backed by an infinite-scrolling product grid.
-  static const List<_ExploreTabDef> _exploreTabDefs = [
+  // Tabs come from the `explore_tab` metaobjects; these are the fallback
+  // until any exist (or if the fetch fails).
+  static const List<_ExploreTabDef> _defaultExploreTabDefs = [
     _ExploreTabDef('HOT DEALS', ShopifyConstants.hotDealsHandle),
     _ExploreTabDef('SALE', 'mid-season-deals'),
     _ExploreTabDef('TRENDING NOW', ShopifyConstants.trendingNowHandle),
   ];
+  List<_ExploreTabDef> _exploreTabDefs = _defaultExploreTabDefs;
 
   int _exploreTabIndex = 0;
   ShopifyFilter? _exploreCategoryFilter;
@@ -239,6 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
   HomeBanner? get _primaryHeroBanner =>
       _heroBanners.isNotEmpty ? _heroBanners.first : null;
 
+  // ignore: unused_element
   void _openHeroCta() {
     final String? url = _primaryHeroBanner?.ctaUrl;
     if (url == null || url.isEmpty) return;
@@ -349,6 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
         .toList();
   }
 
+  // ignore: unused_element
   Widget _shopByPriceSection() {
     final r = R.of(context);
     final tiles = _priceTiles.take(_kPriceTileMax).toList();
@@ -465,9 +471,35 @@ class _HomeScreenState extends State<HomeScreen> {
       service.getOccasionTilesContent(),
       service.getFeatureBanners(),
       service.getPriceTiles(),
+      service.getExploreTabs(),
     ]);
     if (!mounted) return;
+
+    final exploreTabs = results[7] as List<ExploreTabContent>;
+    final List<_ExploreTabDef> newTabDefs = exploreTabs.isEmpty
+        ? _defaultExploreTabDefs
+        : exploreTabs
+              .map((t) => _ExploreTabDef(
+                    t.label.toUpperCase(),
+                    t.collectionHandle,
+                  ))
+              .toList();
+    // Stay on the same collection if it's still a tab; otherwise jump to the
+    // first tab and reload the grid.
+    final String activeHandle = _exploreTabDefs[_exploreTabIndex].handle;
+    final int keptIndex = newTabDefs.indexWhere((t) => t.handle == activeHandle);
+
     setState(() {
+      _exploreTabDefs = newTabDefs;
+      if (keptIndex < 0) {
+        _exploreTabIndex = 0;
+        _selectedExploreCategoryInput = null;
+        _selectedExploreFitInput = null;
+        _exploreCategoryFilter = null;
+        _exploreFitFilter = null;
+      } else {
+        _exploreTabIndex = keptIndex;
+      }
       _heroBanners = results[0] as List<HomeBanner>;
       _exploreCategories = results[1] as List<ExploreCategoryContent>;
       _promoBlocksContent = results[2] as List<PromoBlockContent>;
@@ -477,6 +509,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _priceTiles = results[6] as List<PriceTileContent>;
       _isLoading = false;
     });
+    if (keptIndex < 0) _fetchExploreProducts();
   }
 
   void _onScroll() {
@@ -643,14 +676,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       slivers: [
                         SliverToBoxAdapter(child: _heroSection()),
                         ..._promoBlockSlivers(_promoBlocksFirstHalf),
-                        SliverToBoxAdapter(
-                          child: _sliverHeadAsBox('EXPLORE CATEGORIES'),
-                        ),
                         SliverToBoxAdapter(child: _exploreCategoriesCarousel()),
                         ..._promoBlockSlivers(_promoBlocksSecondHalf),
                         ..._featureBannerSlivers(),
-                        if (_priceTiles.isNotEmpty)
-                          SliverToBoxAdapter(child: _shopByPriceSection()),
+                        // if (_priceTiles.isNotEmpty)
+                        //   SliverToBoxAdapter(child: _shopByPriceSection()),
                         SliverToBoxAdapter(child: _shopTheLookSection()),
                         SliverToBoxAdapter(child: _shopByOccasionsSection()),
                         SliverToBoxAdapter(child: _exploreCollectionsSection()),
@@ -727,7 +757,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _heroSection() {
-    final r = R.of(context);
+    // final r = R.of(context); // used by the hidden hero overlay
     return SizedBox(
       height: _fullScreenBannerHeight(context),
       width: double.infinity,
@@ -735,79 +765,83 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _heroBannerImage(),
           Positioned(top: 0, left: 0, right: 0, child: _topBar()),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: r.dp(24),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: 1),
-              duration: const Duration(milliseconds: 700),
-              curve: Curves.easeOut,
-              builder: (context, value, child) => Opacity(
-                opacity: value,
-                child: Transform.translate(
-                  offset: Offset(0, (1 - value) * 16),
-                  child: child,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: r.dp(20)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          (_primaryHeroBanner?.subtitle.isNotEmpty ?? false)
-                              ? _primaryHeroBanner!.subtitle
-                              : _heroSubtitle,
-                          style: TextStyle(
-                            fontFamily: _fBody,
-                            fontSize: r.sp(13),
-                            color: Colors.white.withOpacity(0.9),
-                          ),
-                        ),
-                        SizedBox(height: r.dp(14)),
-                        GestureDetector(
-                          onTap: _openHeroCta,
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: r.dp(22),
-                              vertical: r.dp(12),
-                            ),
-                            color: Colors.white,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _primaryHeroBanner?.ctaLabel ?? 'Shop now',
-                                  style: TextStyle(
-                                    fontFamily: _fBold,
-                                    color: _onLightBtn,
-                                    fontSize: r.sp(13),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                SizedBox(width: r.dp(6)),
-                                Icon(
-                                  Icons.arrow_forward_rounded,
-                                  size: r.dp(16),
-                                  color: _onLightBtn,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // Hero text overlay (subtitle + CTA) hidden for now.
+          // Positioned(
+          //   left: 0,
+          //   right: 0,
+          //   bottom: r.dp(24),
+          //   child: TweenAnimationBuilder<double>(
+          //     tween: Tween(begin: 0, end: 1),
+          //     duration: const Duration(milliseconds: 700),
+          //     curve: Curves.easeOut,
+          //     builder: (context, value, child) => Opacity(
+          //       opacity: value,
+          //       child: Transform.translate(
+          //         offset: Offset(0, (1 - value) * 16),
+          //         child: child,
+          //       ),
+          //     ),
+          //     child: Column(
+          //       crossAxisAlignment: CrossAxisAlignment.start,
+          //       mainAxisSize: MainAxisSize.min,
+          //       children: [
+          //         Padding(
+          //           padding: EdgeInsets.symmetric(horizontal: r.dp(20)),
+          //           child: Column(
+          //             crossAxisAlignment: CrossAxisAlignment.start,
+          //             mainAxisSize: MainAxisSize.min,
+          //             children: [
+          //               Text(
+          //                 (_primaryHeroBanner?.subtitle.isNotEmpty ?? false)
+          //                     ? _primaryHeroBanner!.subtitle
+          //                     : _heroSubtitle,
+          //                 style: TextStyle(
+          //                   fontFamily: _fBody,
+          //                   fontSize: r.sp(13),
+          //                   color: Colors.white.withOpacity(0.9),
+          //                 ),
+          //               ),
+          //               // Hero CTA hidden for now.
+          //               // SizedBox(height: r.dp(14)),
+          //               // GestureDetector(
+          //               //   onTap: _openHeroCta,
+          //               //   child: Container(
+          //               //     padding: EdgeInsets.symmetric(
+          //               //       horizontal: r.dp(22),
+          //               //       vertical: r.dp(12),
+          //               //     ),
+          //               //     color: Colors.white,
+          //               //     child: Row(
+          //               //       mainAxisSize: MainAxisSize.min,
+          //               //       children: [
+          //               //         Text(
+          //               //           (_primaryHeroBanner?.ctaLabel ?? 'Shop now')
+          //               //               .toUpperCase(),
+          //               //           style: TextStyle(
+          //               //             fontFamily: AppFonts.accent,
+          //               //             color: _onLightBtn,
+          //               //             fontSize: r.sp(13),
+          //               //             fontWeight: FontWeight.w600,
+          //               //             letterSpacing: 2.0,
+          //               //           ),
+          //               //         ),
+          //               //         SizedBox(width: r.dp(6)),
+          //               //         Icon(
+          //               //           Icons.arrow_forward_rounded,
+          //               //           size: r.dp(16),
+          //               //           color: _onLightBtn,
+          //               //         ),
+          //               //       ],
+          //               //     ),
+          //               //   ),
+          //               // ),
+          //             ],
+          //           ),
+          //         ),
+          //       ],
+          //     ),
+          //   ),
+          // ),
         ],
       ),
     );
@@ -875,15 +909,7 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: EdgeInsets.fromLTRB(r.dp(16), r.dp(26), r.dp(16), r.dp(12)),
       child: Align(
         alignment: Alignment.centerLeft,
-        child: Text(
-          title,
-          style: TextStyle(
-            fontFamily: _fHead,
-            fontSize: r.sp(28),
-            fontWeight: FontWeight.w600,
-            color: primary,
-          ),
-        ),
+        child: _tiltedHeading(title, r, color: primary),
       ),
     );
   }
@@ -892,8 +918,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final r = R.of(context);
     if (_exploreCategories.isEmpty) return _empty();
 
-    final double cardWidth = MediaQuery.of(context).size.width * 0.72;
-    final double cardHeight = (cardWidth * 1.15).clamp(260.0, 380.0);
+    // Sized so 2.5 cards are visible: left padding + two gaps + 2.5 cards.
+    final double cardWidth =
+        (MediaQuery.of(context).size.width - r.dp(16) - r.dp(10) * 2) / 2.5;
+    final double cardHeight = cardWidth * 1.3;
 
     final List<ExploreCategoryContent> topwear = _exploreCategories
         .where((c) => !c.isBottomwear)
@@ -903,7 +931,7 @@ class _HomeScreenState extends State<HomeScreen> {
         .toList();
 
     return Padding(
-      padding: EdgeInsets.only(bottom: r.dp(28)),
+      padding: EdgeInsets.only(top: r.dp(28), bottom: r.dp(28)),
       child: Column(
         children: [
           if (topwear.isNotEmpty) ...[
@@ -923,19 +951,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _categoryRowLabel(String title, R r) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(r.dp(16), 0, r.dp(16), r.dp(10)),
+      padding: EdgeInsets.fromLTRB(r.dp(16), 0, r.dp(16), r.dp(16)),
       child: Align(
         alignment: Alignment.centerLeft,
-        child: Text(
-          title,
-          style: TextStyle(
-            fontFamily: AppFonts.subheading,
-            fontSize: r.sp(18),
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
-            color: primary,
-          ),
-        ),
+        child: _tiltedHeading(title, r, color: primary),
       ),
     );
   }
@@ -947,7 +966,8 @@ class _HomeScreenState extends State<HomeScreen> {
     R r,
   ) {
     return SizedBox(
-      height: cardHeight,
+      // Card plus the label underneath it.
+      height: cardHeight + r.dp(8) + r.sp(12) * 1.4,
       child: ListView.separated(
         padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
         scrollDirection: Axis.horizontal,
@@ -991,35 +1011,23 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: onTap,
       child: SizedBox(
         width: width,
-        height: height,
-        child: Stack(
-          fit: StackFit.expand,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            image,
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.0),
-                    Colors.black.withOpacity(0.45),
-                  ],
-                  stops: const [0.5, 1.0],
-                ),
-              ),
-            ),
-            Positioned(
-              left: r.dp(12),
-              bottom: r.dp(12),
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontFamily: AppFonts.subheading,
-                  color: Colors.white,
-                  fontSize: r.sp(17),
-                  fontWeight: FontWeight.w600,
-                ),
+            SizedBox(width: width, height: height, child: image),
+            SizedBox(height: r.dp(8)),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: AppFonts.accent,
+                color: primary,
+                fontSize: r.sp(12),
+                letterSpacing: 1.0,
+                fontWeight: FontWeight.w600,
+                height: 1.2,
               ),
             ),
           ],
@@ -1164,7 +1172,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final double available = constraints.maxHeight;
         final double usable = available.clamp(0.0, available);
 
-        double heroHeight = usable * 0.55;
+        double heroHeight = usable * 0.6;
         heroHeight = heroHeight < 160.0 ? 160.0 : heroHeight;
         heroHeight = heroHeight > usable ? usable : heroHeight;
 
@@ -1187,6 +1195,9 @@ class _HomeScreenState extends State<HomeScreen> {
           height: cardHeight,
           width: double.infinity,
           child: _ShopTheLookAutoSlideCard(
+            // Rebuild the slider (and its loop start page) when the looks
+            // swap from the built-in defaults to the ones from Shopify.
+            key: ValueKey(outfits.length),
             outfits: outfits,
             heroHeight: heroHeight,
             productRowHeight: productRowHeight,
@@ -1227,15 +1238,7 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Padding(
           padding: EdgeInsets.fromLTRB(r.dp(16), r.dp(28), r.dp(16), 0),
-          child: Text(
-            'SHOP YOUR AESTHETICS',
-            style: TextStyle(
-              fontFamily: _fHead,
-              fontSize: r.sp(22),
-              fontWeight: FontWeight.w600,
-              color: primary,
-            ),
-          ),
+          child: _tiltedHeading('SHOP YOUR AESTHETICS', r, color: primary),
         ),
         SizedBox(height: r.dp(16)),
         if (pairs.isEmpty)
@@ -1315,15 +1318,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 left: r.dp(12),
                 right: r.dp(12),
                 bottom: r.dp(12),
-                child: Text(
-                  tile.label!.toUpperCase(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: AppFonts.subheading,
-                    fontSize: r.sp(18),
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                // Bebas Neue has no italic face, so skew it for the tilt.
+                child: Transform(
+                  transform: Matrix4.skewX(-0.2),
+                  alignment: Alignment.bottomLeft,
+                  child: Text(
+                    tile.label!.toUpperCase(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: AppFonts.subheading,
+                      fontSize: r.sp(18),
+                      fontWeight: FontWeight.w400,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -1357,13 +1365,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _exploreTabsRow(R r) {
     return StickerChipRow(
-      height: 42,
+      height: 34,
       children: [
         for (int i = 0; i < _exploreTabDefs.length; i++)
           StickerChip(
             label: _exploreTabDefs[i].label,
             selected: i == _exploreTabIndex,
-            style: StickerChipStyle.small,
+            style: StickerChipStyle.mini,
             onTap: () => _selectExploreTab(i),
           ),
       ],
@@ -1375,19 +1383,19 @@ class _HomeScreenState extends State<HomeScreen> {
     if (values.isEmpty) return const SizedBox.shrink();
 
     return StickerChipRow(
-      height: 60,
+      height: 44,
       children: [
         StickerChip(
           label: 'ALL',
           selected: _selectedExploreCategoryInput == null,
-          style: StickerChipStyle.large,
+          style: StickerChipStyle.largeCompact,
           onTap: () => _selectExploreCategory(null),
         ),
         for (final value in values)
           StickerChip(
             label: value.label.toUpperCase(),
             selected: _selectedExploreCategoryInput == value.input,
-            style: StickerChipStyle.large,
+            style: StickerChipStyle.largeCompact,
             onTap: () => _selectExploreCategory(value),
           ),
       ],
@@ -1609,14 +1617,10 @@ class _PromoBlockCardState extends State<_PromoBlockCard> {
               Positioned(
                 left: r.dp(18),
                 top: r.dp(20),
-                child: Text(
-                  widget.label.toUpperCase(),
-                  style: TextStyle(
-                    fontFamily: AppFonts.heading,
-                    color: Colors.white,
-                    fontSize: r.sp(32),
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: _tiltedHeading(
+                  _twoLineLabel(widget.label.toUpperCase()),
+                  r,
+                  color: Colors.white,
                 ),
               ),
               if (widget.buttonLabel.isNotEmpty)
@@ -1628,15 +1632,18 @@ class _PromoBlockCardState extends State<_PromoBlockCard> {
                     horizontal: r.dp(18),
                     vertical: r.dp(11),
                   ),
-                  color: Colors.white,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(r.dp(3)),
+                  ),
                   child: Text(
                     widget.buttonLabel.toUpperCase(),
                     style: TextStyle(
-                      fontFamily: AppFonts.bold,
+                      fontFamily: AppFonts.accent,
                       color: const Color(0xFF111111),
                       fontSize: r.sp(12),
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
+                      letterSpacing: 2.0,
                     ),
                   ),
                 ),
@@ -1690,6 +1697,7 @@ class _ShopTheLookAutoSlideCard extends StatefulWidget {
   final double productRowHeight;
   final Duration interval;
   const _ShopTheLookAutoSlideCard({
+    super.key,
     required this.outfits,
     required this.heroHeight,
     required this.productRowHeight,
@@ -1710,12 +1718,21 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
 
   late final PageController _controller;
   Timer? _timer;
-  int _index = 0;
+
+  /// How many full cycles of looks sit before the starting page, i.e. how far
+  /// back the user can swipe. Large enough that nobody reaches the start.
+  static const int _kLoopStartCycles = 1000;
 
   @override
   void initState() {
     super.initState();
-    _controller = PageController();
+    // Start deep into the endless page list so the user can swipe backwards
+    // from the first look straight to the last one.
+    _controller = PageController(
+      initialPage: widget.outfits.length > 1
+          ? widget.outfits.length * _kLoopStartCycles
+          : 0,
+    );
     if (widget.outfits.length > 1) {
       _startAutoSlide();
     }
@@ -1742,9 +1759,8 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
     _timer?.cancel();
     _timer = Timer.periodic(widget.interval, (_) {
       if (!mounted || !_controller.hasClients) return;
-      _index = (_index + 1) % widget.outfits.length;
-      _controller.animateToPage(
-        _index,
+      // Always move forward; the endless PageView wraps back to look 1.
+      _controller.nextPage(
         duration: const Duration(milliseconds: 600),
         curve: Curves.easeInOut,
       );
@@ -1854,14 +1870,19 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
   }
 
   Widget _buildPages(R r) {
+    final int count = widget.outfits.length;
     return PageView.builder(
       controller: _controller,
-      itemCount: widget.outfits.length,
-      onPageChanged: (i) => _index = i,
+      // Endless when there's more than one look: page i shows look i % count,
+      // so swiping past the last look wraps to the first and vice versa.
+      itemCount: count > 1 ? null : count,
       itemBuilder: (_, i) {
-        final outfit = widget.outfits[i];
+        final outfit = widget.outfits[i % count];
         return Container(
           decoration: BoxDecoration(color: _cardBg),
+          // Same side margin for the photo and the product rows, so the rows
+          // start and end exactly where the photo does.
+          padding: EdgeInsets.symmetric(horizontal: r.dp(16)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1879,7 +1900,8 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                           // photo loads.
                           ? CachedNetworkImage(
                               imageUrl: outfit.imageUrl!,
-                              fit: BoxFit.contain,
+                              fit: BoxFit.cover,
+                              alignment: Alignment.topCenter,
                               fadeInDuration: Duration.zero,
                               fadeOutDuration: Duration.zero,
                               placeholder: (_, __) => const SizedBox.expand(),
@@ -1888,7 +1910,8 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                             )
                           : Image.asset(
                               outfit.imageAsset,
-                              fit: BoxFit.contain,
+                              fit: BoxFit.cover,
+                              alignment: Alignment.topCenter,
                               errorBuilder: (_, __, ___) =>
                                   const SizedBox.expand(),
                             ),
@@ -1931,12 +1954,12 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                           top: BorderSide(color: _cardBorder, width: 1),
                         ),
                       ),
-                      padding: EdgeInsets.symmetric(horizontal: r.dp(12)),
+                      padding: EdgeInsets.zero,
                       child: Row(
                         children: [
                           Container(
-                            width: r.dp(100),
-                            height: r.dp(100),
+                            width: r.dp(72),
+                            height: r.dp(72),
                             color: const Color(0xFFECECEC),
                             child: item.imageUrl != null
                                 ? CachedNetworkImage(
@@ -1959,14 +1982,16 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Wraps onto a second line instead of "...".
                                 Text(
                                   item.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 2,
+                                  softWrap: true,
                                   style: TextStyle(
-                                    fontFamily: AppFonts.bold,
+                                    fontFamily: AppFonts.body,
                                     fontSize: r.sp(12),
                                     color: _cardTextColor,
+                                    height: 1.25,
                                   ),
                                 ),
                                 SizedBox(height: r.dp(2)),
@@ -1983,18 +2008,23 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                               ],
                             ),
                           ),
+                          SizedBox(width: r.dp(12)),
                           GestureDetector(
                             onTap: product != null
                                 ? () => _showQuickAddToCart(context, product)
                                 : null,
+                            // White box / black plus in dark theme, inverted in light.
                             child: Container(
                               width: r.dp(26),
                               height: r.dp(26),
-                              color: _cardTextColor.withOpacity(0.08),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(r.dp(3)),
+                              ),
                               child: Icon(
                                 Icons.add_rounded,
                                 size: r.dp(15),
-                                color: _cardTextColor,
+                                color: AppColors.onPrimary,
                               ),
                             ),
                           ),
@@ -2209,4 +2239,34 @@ class _AutoScrollHorizontalListState extends State<_AutoScrollHorizontalList> {
       itemBuilder: widget.itemBuilder,
     );
   }
+}
+
+/// Section/banner heading style shared across the home screen: Anton at the
+/// Denim / Cargos size, skewed for an italic tilt (Anton has no italic face).
+Widget _tiltedHeading(String text, R r, {required Color color}) {
+  return Transform(
+    transform: Matrix4.skewX(-0.2),
+    alignment: Alignment.bottomLeft,
+    child: Text(
+      text,
+      style: TextStyle(
+        fontFamily: AppFonts.heading,
+        color: color,
+        fontSize: r.sp(26),
+        // Anton has a single (regular) weight; asking for w600 made Flutter
+        // fake a bold by thickening the strokes.
+        fontWeight: FontWeight.w400,
+        height: 1.05,
+      ),
+    ),
+  );
+}
+
+/// Puts the last word of a promo label on its own line:
+/// "SIGNATURE DENIM" -> "SIGNATURE\nDENIM", "CARGOS & UTILITY" -> "CARGOS &\nUTILITY".
+String _twoLineLabel(String label) {
+  final String text = label.trim();
+  final int split = text.lastIndexOf(' ');
+  if (split <= 0) return text;
+  return '${text.substring(0, split)}\n${text.substring(split + 1)}';
 }

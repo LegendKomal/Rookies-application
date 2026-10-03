@@ -295,7 +295,7 @@ class _CartScreenState extends State<CartScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontFamily: _fBold,
+                    fontFamily: _fBody,
                     fontSize: _s(12),
                     fontWeight: FontWeight.w700,
                     color: primary,
@@ -318,7 +318,7 @@ class _CartScreenState extends State<CartScreen> {
                 Text(
                   line.formattedPrice,
                   style: TextStyle(
-                    fontFamily: _fBold,
+                    fontFamily: _fBody,
                     fontSize: _s(13),
                     fontWeight: FontWeight.w800,
                     color: primary,
