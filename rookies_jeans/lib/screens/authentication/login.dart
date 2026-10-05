@@ -81,7 +81,7 @@ class _LoginState extends State<Login> {
     required String hintText,
     required IconData icon,
     Widget? suffixIcon,
-    Widget? prefix,
+    String? leadingText,
   }) {
     return InputDecoration(
       hintText: hintText,
@@ -90,8 +90,28 @@ class _LoginState extends State<Login> {
         fontSize: _s(14.5),
         fontWeight: FontWeight.w400,
       ),
-      prefixIcon: Icon(icon, color: secondaryText, size: _s(20)),
-      prefix: prefix,
+      // leadingText (e.g. "+91") sits beside the icon so it shows even when
+      // the field is empty and unfocused, unlike InputDecoration.prefix.
+      prefixIcon: leadingText == null
+          ? Icon(icon, color: secondaryText, size: _s(20))
+          : Padding(
+              padding: EdgeInsets.only(left: _s(12), right: _s(8)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: secondaryText, size: _s(20)),
+                  SizedBox(width: _s(8)),
+                  Text(
+                    leadingText,
+                    style: TextStyle(
+                      fontSize: _s(14.5),
+                      color: primary,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
       suffixIcon: suffixIcon,
       counterText: '',
       filled: true,
@@ -333,7 +353,7 @@ class _LoginState extends State<Login> {
         child: Text(text,
             style: TextStyle(
                 fontSize: _s(14),
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w400,
                 color: primary)),
       );
 
@@ -361,7 +381,7 @@ class _LoginState extends State<Login> {
             : Text(text,
                 style: TextStyle(
                     fontSize: _s(16),
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w400,
                     // letterSpacing: 0.2
                     )),
       ),
@@ -376,7 +396,7 @@ class _LoginState extends State<Login> {
         padding: EdgeInsets.zero,
       ),
       child: Text(text,
-          style: TextStyle(fontSize: _s(13.5), fontWeight: FontWeight.w600)),
+          style: TextStyle(fontSize: _s(13.5), fontWeight: FontWeight.w400)),
     );
   }
 
@@ -404,11 +424,7 @@ class _LoginState extends State<Login> {
           decoration: inputDecoration(
             hintText: "Enter your mobile number",
             icon: Icons.phone_iphone_rounded,
-            prefix: Text("+91  ",
-                style: TextStyle(
-                    fontSize: _s(14.5),
-                    color: primary,
-                    fontWeight: FontWeight.w600)),
+            leadingText: "+91",
           ),
         ),
         SizedBox(height: _s(24)),
@@ -437,7 +453,7 @@ class _LoginState extends State<Login> {
           textAlign: TextAlign.center,
           style: TextStyle(
               fontSize: _s(20),
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w400,
               letterSpacing: _s(10)),
           onChanged: (v) {
             if (v.length == _otpLength && !isLoading) _handleVerifyOtp();
@@ -467,7 +483,7 @@ class _LoginState extends State<Login> {
                 ),
         ),
         SizedBox(height: _s(12)),
-        _primaryButton("Verify & Sign In", _handleVerifyOtp),
+        _primaryButton("Sign In", _handleVerifyOtp),
       ];
 
   List<Widget> _profileStep() => [
@@ -570,7 +586,13 @@ class _LoginState extends State<Login> {
             _OtpStep.completeProfile => _profileStep(),
           };
 
-    return Scaffold(
+    final theme = Theme.of(context);
+    // Every text on this screen, incl. fields, hints and buttons, in Archivo.
+    return Theme(
+      data: theme.copyWith(
+        textTheme: theme.textTheme.apply(fontFamily: AppFonts.body),
+      ),
+      child: Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
         child: Center(
@@ -606,7 +628,7 @@ class _LoginState extends State<Login> {
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: _s(30),
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w400,
                               color: primary,
                               // letterSpacing: -0.5,
                             ),
@@ -656,7 +678,7 @@ class _LoginState extends State<Login> {
                               style: TextStyle(
                                   color: primary,
                                   fontSize: _s(14),
-                                  fontWeight: FontWeight.w700)),
+                                  fontWeight: FontWeight.w400)),
                         ),
                       ],
                     ),
@@ -667,6 +689,7 @@ class _LoginState extends State<Login> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

@@ -26,38 +26,60 @@
 const TICKET_TTL_MS = 10 * 60 * 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Cloudflare Workers entry point. Vercel uses api/[action].js, which calls
+// the same handleRequest with process.env.
 export default {
-  async fetch(request, env) {
-    if (request.method !== 'POST') return json({ error: 'Not found' }, 404);
-
-    const missing = ['SHOPIFY_SHOP_DOMAIN', 'SHOPIFY_ADMIN_API_TOKEN', 'SHOPIFY_STOREFRONT_TOKEN',
-      'MSG91_AUTH_KEY', 'SESSION_SECRET'].filter((k) => !env[k]);
-    if (missing.length > 0) {
-      console.error('Missing configuration:', missing.join(', '));
-      return json({ error: 'OTP login is not configured yet.' }, 503);
-    }
-
-    let body;
-    try {
-      body = await request.json();
-    } catch {
-      return json({ error: 'Invalid request.' }, 400);
-    }
-
-    try {
-      const { pathname } = new URL(request.url);
-      if (pathname === '/login') return await login(body, env);
-      if (pathname === '/complete') return await complete(body, env);
-      return json({ error: 'Not found' }, 404);
-    } catch (e) {
-      console.error(e);
-      return json({ error: 'Could not complete sign in. Please try again.' }, 502);
-    }
-  },
+  fetch: (request, env) => handleRequest(request, env),
 };
+
+export async function handleRequest(request, env) {
+  // Last path segment: "/login" on Cloudflare, "/api/login" on Vercel.
+  const action = new URL(request.url).pathname.split('/').filter(Boolean).pop();
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS_HEADERS });
+  if (request.method === 'GET' && action === 'health') return health(env);
+  if (request.method !== 'POST') return json({ error: 'Not found' }, 404);
+
+  const missing = ['SHOPIFY_SHOP_DOMAIN', 'SHOPIFY_STOREFRONT_TOKEN',
+    'MSG91_AUTH_KEY', 'SESSION_SECRET'].filter((k) => !env[k]);
+  if (!env.SHOPIFY_ADMIN_API_TOKEN && !(env.SHOPIFY_CLIENT_ID && env.SHOPIFY_CLIENT_SECRET)) {
+    missing.push('SHOPIFY_CLIENT_ID + SHOPIFY_CLIENT_SECRET');
+  }
+  if (missing.length > 0) {
+    console.error('Missing configuration:', missing.join(', '));
+    return json({ error: 'OTP login is not configured yet.' }, 503);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Invalid request.' }, 400);
+  }
+
+  try {
+    if (action === 'login') return await login(body, env);
+    if (action === 'complete') return await complete(body, env);
+    return json({ error: 'Not found' }, 404);
+  } catch (e) {
+    console.error(e);
+    return json({ error: 'Could not complete sign in. Please try again.' }, 502);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Endpoints
+
+// GET /health: can this deployment reach the Shopify Admin API? Reports only
+// ok / failed, never tokens or customer data.
+async function health(env) {
+  try {
+    const data = await adminGraphql('{ shop { name } }', {}, env);
+    return json({ ok: true, shop: data.shop.name });
+  } catch (e) {
+    console.error('health:', e);
+    return json({ ok: false, error: 'Shopify Admin API not reachable; see logs.' }, 503);
+  }
+}
 
 async function login(body, env) {
   const claimed = normalizePhone(body?.phone);
@@ -233,6 +255,40 @@ async function readTicket(ticket, env) {
 
 const CUSTOMER_FIELDS = 'id email phone firstName lastName';
 
+// Admin API token. Dev Dashboard apps (Shopify no longer allows new
+// admin-created custom apps) get one from the client credentials grant; it
+// lasts 24h, so it's cached per worker instance and renewed a few minutes
+// early. A legacy permanent SHOPIFY_ADMIN_API_TOKEN (shpat_...) still wins.
+let cachedAdminToken = null; // { token, expiresAt }
+
+async function adminToken(env) {
+  if (env.SHOPIFY_ADMIN_API_TOKEN) return env.SHOPIFY_ADMIN_API_TOKEN;
+  if (cachedAdminToken && Date.now() < cachedAdminToken.expiresAt) {
+    return cachedAdminToken.token;
+  }
+
+  const res = await fetch(`https://${env.SHOPIFY_SHOP_DOMAIN}/admin/oauth/access_token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: env.SHOPIFY_CLIENT_ID,
+      client_secret: env.SHOPIFY_CLIENT_SECRET,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.access_token) {
+    throw new Error(`Shopify client credentials grant failed (${res.status}): ${JSON.stringify(data)}`);
+  }
+
+  const lifetimeMs = (Number(data.expires_in) || 86399) * 1000;
+  cachedAdminToken = {
+    token: data.access_token,
+    expiresAt: Date.now() + lifetimeMs - 5 * 60 * 1000,
+  };
+  return cachedAdminToken.token;
+}
+
 async function adminGraphql(query, variables, env) {
   const res = await fetch(
     `https://${env.SHOPIFY_SHOP_DOMAIN}/admin/api/${apiVersion(env)}/graphql.json`,
@@ -240,7 +296,7 @@ async function adminGraphql(query, variables, env) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': env.SHOPIFY_ADMIN_API_TOKEN,
+        'X-Shopify-Access-Token': await adminToken(env),
       },
       body: JSON.stringify({ query, variables }),
     },
@@ -362,7 +418,7 @@ async function issueCustomerAccessToken(customer, env) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': env.SHOPIFY_ADMIN_API_TOKEN,
+        'X-Shopify-Access-Token': await adminToken(env),
       },
       body: JSON.stringify({
         customer: { id: Number(numericId), password, password_confirmation: password },
@@ -415,10 +471,19 @@ async function multipassToken(customer, secret) {
 // ---------------------------------------------------------------------------
 // Bytes & crypto helpers
 
+// The Flutter web build calls this from a browser, which needs CORS. Any
+// origin is fine: no cookies are used and every call is gated by the OTP.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Accept',
+  'Access-Control-Max-Age': '86400',
+};
+
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   });
 }
 

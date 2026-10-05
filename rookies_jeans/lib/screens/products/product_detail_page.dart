@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -7,13 +8,14 @@ import 'package:share_plus/share_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
+import 'package:rookies_jeans/models/cart_model.dart';
 import 'package:rookies_jeans/models/product_detail_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/products/size_chart_view.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/services/wishlist_service.dart';
+import 'package:rookies_jeans/services/recently_viewed_service.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
-import 'package:rookies_jeans/models/cart_model.dart';
 import 'package:rookies_jeans/screens/cart/cart.dart';
 import 'package:rookies_jeans/screens/cart/checkout_flow.dart';
 import 'package:rookies_jeans/widget/price_text.dart';
@@ -45,11 +47,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   static Color get fieldFill    => AppColors.fieldFill;
   static Color get hintColor    => AppColors.hint;
 
-  static const String _fHead = AppFonts.heading;
+  static const String _fHeading = AppFonts.heading;
   static const String _fBody = AppFonts.body;
-  static const String _fBold = AppFonts.bold;
-  static const String _fBodyBold = AppFonts.alteBold;
-  static const String _fNumber = AppFonts.number;
+  static const String _fAccent = AppFonts.accent;
 
   String _numericProductId(String gid) => gid.split('/').last;
 
@@ -64,6 +64,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   bool _isWishlistLoading = false;
   bool _isAddingToCart = false;
   bool _isBuyingNow = false;
+  int _quantity = 1;
+  static const int _maxQuantity = 10;
 
   // Mirrors widget.handle/title/heroImageUrl but is mutable, so tapping a
   // color swatch can swap the product shown on THIS page instead of
@@ -287,6 +289,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         _isWishlisted = WishlistService.instance.isWishlisted(product.id);
         _isLoading = false;
       });
+      RecentlyViewedService.instance.record(_asListProduct(product));
 
 debugPrint('=== PRODUCT DEBUG (${product.handle}) ===');
 debugPrint('Options: ${product.options.length}');
@@ -396,25 +399,30 @@ debugPrint('==========================================');
       ),
       orElse: () => _product!.variants.first,
     );
-    setState(() => _selectedVariant = match);
+    setState(() {
+      if (match.id != _selectedVariant?.id) _quantity = 1;
+      _selectedVariant = match;
+    });
   }
+
+  /// Card-sized copy of the detail product, for wishlist / recently viewed.
+  ShopifyProduct _asListProduct(ShopifyProductDetail p) => ShopifyProduct(
+        id: p.id,
+        title: p.title,
+        handle: p.handle,
+        price: p.price,
+        compareAtPrice: p.compareAtPrice,
+        currencyCode: p.currencyCode,
+        imageUrls: List<String>.from(p.imageUrls),
+        variants: const [],
+        options: const [],
+      );
 
   Future<void> _toggleWishlist() async {
     if (_product == null || _isWishlistLoading) return;
     setState(() => _isWishlistLoading = true);
     try {
-      final wishlistProduct = ShopifyProduct(
-        id: _product!.id,
-        title: _product!.title,
-        handle: _product!.handle,
-        price: _product!.price,
-        compareAtPrice: _product!.compareAtPrice,
-        currencyCode: _product!.currencyCode,
-        imageUrls: List<String>.from(_product!.imageUrls),
-        variants: const [],
-        options: const [],
-      );
-      WishlistService.instance.toggleProduct(wishlistProduct);
+      WishlistService.instance.toggleProduct(_asListProduct(_product!));
       if (!mounted) return;
       setState(() =>
           _isWishlisted = WishlistService.instance.isWishlisted(_product!.id));
@@ -438,10 +446,15 @@ debugPrint('==========================================');
     final p = _product;
     if (p == null) return;
     final link = '${ShopifyConstants.storeUrl}/products/${p.handle}';
+    // iPad shows the share sheet as a popover and needs an anchor rect, or
+    // sharing fails there. Ignored on iPhone and Android.
+    final box = context.findRenderObject() as RenderBox?;
     await SharePlus.instance.share(
       ShareParams(
         text: 'Check out ${p.title} on Rookies Jeans\n$link',
         subject: p.title,
+        sharePositionOrigin:
+            box == null ? null : box.localToGlobal(Offset.zero) & box.size,
       ),
     );
   }
@@ -460,7 +473,8 @@ debugPrint('==========================================');
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
 
-    final success = await CartService.instance.addLine(variantId: variant.id);
+    final success = await CartService.instance
+        .addLine(variantId: variant.id, quantity: _quantity);
 
     if (!mounted) return;
     setState(() => _isAddingToCart = false);
@@ -476,7 +490,7 @@ debugPrint('==========================================');
     ));
   }
 
-  /// Checks out only the selected variant (qty 1), leaving the app cart
+  /// Checks out only the selected variant (at the chosen qty), leaving the app cart
   /// untouched — the checkout replaces the website cart with these lines.
   Future<void> _handleBuyNow() async {
     final product = _product;
@@ -496,7 +510,7 @@ debugPrint('==========================================');
           imageUrl: product.imageUrls.isNotEmpty ? product.imageUrls.first : null,
           price: variant.price ?? product.price,
           currencyCode: product.currencyCode,
-          quantity: 1,
+          quantity: _quantity,
         ),
       ]);
       if (!mounted || !placed) return;
@@ -607,12 +621,13 @@ debugPrint('==========================================');
                   _infoSection(p),
                   if (_goesWellWith.isNotEmpty) ...[
                     const Divider(height: 1),
-                    _goesWellWithSection(),
+                    _productRowSection('GOES WELL WITH', _goesWellWith),
                   ],
                   if (_youMayAlsoLike.isNotEmpty) ...[
                     const Divider(height: 1),
-                    _youMayAlsoLikeSection(),
+                    _productRowSection('YOU MAY ALSO LIKE', _youMayAlsoLike),
                   ],
+                  _recentlyViewedSection(p.id),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -699,11 +714,17 @@ debugPrint('==========================================');
     );
   }
 
+  /// Top of the overlay buttons. Follows the status bar / notch height so
+  /// they never sit under the iPhone notch or Dynamic Island, which is
+  /// taller than the Android status bar the old fixed offsets assumed.
+  double get _overlayTop =>
+      math.max(MediaQuery.paddingOf(context).top, 32.0) + 8;
+
   Widget _backButton() => Positioned(
-        top: 40,
+        top: _overlayTop,
         left: 12,
         child: GestureDetector(
-          onTap: () => Navigator.pop(context),
+          onTap: () => Navigator.maybePop(context),
           child: SizedBox(
             width: 34,
             height: 34,
@@ -714,7 +735,7 @@ debugPrint('==========================================');
       );
 
   Widget _wishlistButton() => Positioned(
-        top: 48,
+        top: _overlayTop + 8,
         right: 12,
         child: GestureDetector(
           onTap: _toggleWishlist,
@@ -737,7 +758,7 @@ debugPrint('==========================================');
                           : Icons.favorite_border_rounded,
                       key: ValueKey(_isWishlisted),
                       size: 20,
-                      color: _isWishlisted ? Colors.red : primary,
+                      color: _isWishlisted ? Colors.red : Colors.white,
                     ),
                   ),
           ),
@@ -745,7 +766,7 @@ debugPrint('==========================================');
       );
 
   Widget _shareButton() => Positioned(
-        top: 90,
+        top: _overlayTop + 50,
         right: 12,
         child: GestureDetector(
           onTap: _shareProduct,
@@ -783,7 +804,7 @@ debugPrint('==========================================');
                 children: [
                   TextSpan(
                     text: '${m.label}: ',
-                    style: TextStyle(fontFamily: _fBold, color: primary),
+                    style: TextStyle(fontFamily: _fAccent, color: primary),
                   ),
                   TextSpan(text: m.formattedValue),
                 ],
@@ -915,7 +936,7 @@ debugPrint('==========================================');
           Text(
             'AVAILABLE COLORS',
             style: TextStyle(
-              fontFamily: _fBold,
+              fontFamily: _fAccent,
               fontSize: _s(11),
               color: primary,
             ),
@@ -1063,36 +1084,6 @@ _variantMetafieldsSection(),
           ),
           // const Divider(height: 1),
           const SizedBox(height: 16),
-          ValueListenableBuilder<bool>(
-            valueListenable: _sizeChartAvailable,
-            builder: (context, available, _) => available
-                ? Column(
-                    children: [
-                      GestureDetector(
-                        onTap: _openSizeChart,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Size Chart',
-                                style: TextStyle(
-                                    fontFamily: _fBold,
-                                    fontSize: _s(14),
-                                    color: primary),
-                              ),
-                              Icon(Icons.straighten_rounded,
-                                  size: 18, color: primary),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const Divider(height: 1),
-                    ],
-                  )
-                : const SizedBox.shrink(),
-          ),
         ],
       ),
     );
@@ -1155,7 +1146,7 @@ _variantMetafieldsSection(),
                       TextSpan(
                         text: '$label ',
                         style: TextStyle(
-                          fontFamily: _fBold,
+                          fontFamily: _fAccent,
                           color: primary,
                         ),
                       ),
@@ -1197,7 +1188,7 @@ _variantMetafieldsSection(),
         title: Text(
           'Description',
           style: TextStyle(
-            fontFamily: _fBold,
+            fontFamily: _fAccent,
             fontSize: _s(14),
             color: primary,
           ),
@@ -1230,7 +1221,7 @@ _variantMetafieldsSection(),
         title: Text(
           label,
           style: TextStyle(
-            fontFamily: _fBold,
+            fontFamily: _fAccent,
             fontSize: _s(14),
             color: primary,
           ),
@@ -1256,7 +1247,41 @@ _variantMetafieldsSection(),
     );
   }
 
-  Widget _goesWellWithSection() {
+  /// Anton has no italic face, so the tilt is a skew (same as the home screen).
+  Widget _italicHeading(String text) => Transform(
+        transform: Matrix4.skewX(-0.2),
+        alignment: Alignment.bottomLeft,
+        child: Text(
+          text,
+          style: TextStyle(
+            fontFamily: _fHeading,
+            fontSize: _s(22).clamp(20.0, 28.0),
+            color: primary,
+          ),
+        ),
+      );
+
+  /// Every product the customer has opened this session except this one,
+  /// newest first.
+  Widget _recentlyViewedSection(String currentProductId) => ListenableBuilder(
+        listenable: RecentlyViewedService.instance,
+        builder: (context, _) {
+          final items = RecentlyViewedService.instance.items
+              .where((item) => item.id != currentProductId)
+              .toList();
+          if (items.isEmpty) return const SizedBox.shrink();
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Divider(height: 1),
+              _productRowSection('RECENTLY VIEWED', items),
+            ],
+          );
+        },
+      );
+
+  /// Heading + horizontally scrolling product cards.
+  Widget _productRowSection(String title, List<ShopifyProduct> products) {
     final cardWidth = _s(140).clamp(120.0, 180.0);
     final imgHeight = _s(150).clamp(130.0, 200.0);
     final listHeight = imgHeight + _s(70).clamp(60.0, 90.0);
@@ -1267,24 +1292,17 @@ _variantMetafieldsSection(),
         children: [
           Padding(
             padding: const EdgeInsets.only(right: 16, bottom: 14),
-            child: Text(
-              'GOES WELL WITH',
-              style: TextStyle(
-                fontFamily: _fBold,
-                fontSize: _s(22).clamp(20.0, 28.0),
-                color: primary,
-              ),
-            ),
+            child: _italicHeading(title),
           ),
           SizedBox(
             height: listHeight,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.only(right: 16),
-              itemCount: _goesWellWith.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemCount: products.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
               itemBuilder: (_, i) =>
-                  _pairingCard(_goesWellWith[i], cardWidth, imgHeight),
+                  _pairingCard(products[i], cardWidth, imgHeight),
             ),
           ),
           const SizedBox(height: 16),
@@ -1321,7 +1339,7 @@ _variantMetafieldsSection(),
                     Positioned(
                       top: 2,
                       right: 2,
-                      child: WishlistHeartButton(product: product, size: 18),
+                      child: WishlistHeartButton(product: product, size: 18, idleColor: Colors.black),
                     ),
                   ],
                 ),
@@ -1349,117 +1367,16 @@ _variantMetafieldsSection(),
 
   Widget _pairingPriceText(ShopifyProduct product) {
     if (!product.isOnSale) {
-      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(12), color: primary, amountFontFamily: _fNumber);
+      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(11), color: primary, amountFontFamily: _fBody);
     }
     return Row(
       children: [
         Flexible(
-          child: PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(15), color: primary),
+          child: PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(11), color: primary),
         ),
         const SizedBox(width: 5),
         Flexible(
-          child: PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: _s(15), color: secondaryTxt, decoration: TextDecoration.lineThrough),
-        ),
-      ],
-    );
-  }
-
-  Widget _youMayAlsoLikeSection() {
-    final width = MediaQuery.of(context).size.width;
-    final maxTileExtent = width >= 900 ? 240.0 : width >= 600 ? 220.0 : 200.0;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'YOU MAY ALSO LIKE',
-            style: TextStyle(
-              fontFamily: _fBold,
-              fontSize: _s(22).clamp(20.0, 28.0),
-              color: primary,
-            ),
-          ),
-          const SizedBox(height: 14),
-          GridView.builder(
-            physics: const NeverScrollableScrollPhysics(),
-            shrinkWrap: true,
-            itemCount: _youMayAlsoLike.length,
-            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: maxTileExtent,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 12,
-              childAspectRatio: 0.58,
-            ),
-            itemBuilder: (_, i) => _alsoLikeCard(_youMayAlsoLike[i]),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _alsoLikeCard(ShopifyProduct product) {
-    return GestureDetector(
-      onTap: () => _openProductDetail(product),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AspectRatio(
-            aspectRatio: 0.78,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: product.primaryImageUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: product.primaryImageUrl!,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) =>
-                              Container(color: fieldFill),
-                          errorWidget: (_, __, ___) =>
-                              Container(color: fieldFill),
-                        )
-                      : Container(color: fieldFill),
-                ),
-                Positioned(
-                  top: 2,
-                  right: 2,
-                  child: WishlistHeartButton(product: product, size: 18),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            product.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontFamily: _fBodyBold,
-              fontSize: _s(12),
-              color: primary,
-              height: 1.3,
-            ),
-          ),
-          const SizedBox(height: 4),
-          _alsoLikePriceRow(product),
-        ],
-      ),
-    );
-  }
-
-  Widget _alsoLikePriceRow(ShopifyProduct product) {
-    if (!product.isOnSale) {
-      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(15), color: primary);
-    }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Flexible(
-          child: PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(15), color: primary),
-        ),
-        const SizedBox(width: 5),
-        Flexible(
-          child: PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: _s(11), color: secondaryTxt, amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
+          child: PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: _s(10), color: secondaryTxt, decoration: TextDecoration.lineThrough),
         ),
       ],
     );
@@ -1467,7 +1384,7 @@ _variantMetafieldsSection(),
 
   Widget _priceBlock(ShopifyProductDetail p) {
     if (!p.isOnSale) {
-      return PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: _s(20), color: primary, amountFontFamily: _fNumber);
+      return PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: _s(20), color: primary, amountFontFamily: _fBody);
     }
     final saved = (p.compareAtPrice! - p.price).round();
     return Column(
@@ -1477,15 +1394,15 @@ _variantMetafieldsSection(),
           crossAxisAlignment: WrapCrossAlignment.center,
           spacing: 10,
           children: [
-            PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: _s(20), color: primary, amountFontFamily: _fNumber),
-            PriceText(p.formattedCompareAtPrice, currencyCode: p.currencyCode, fontSize: _s(14), color: secondaryTxt, amountFontFamily: _fNumber, decoration: TextDecoration.lineThrough),
+            PriceText(p.formattedPrice, currencyCode: p.currencyCode, fontSize: _s(20), color: primary, amountFontFamily: _fBody),
+            PriceText(p.formattedCompareAtPrice, currencyCode: p.currencyCode, fontSize: _s(14), color: secondaryTxt, amountFontFamily: _fBody, decoration: TextDecoration.lineThrough),
           ],
         ),
         const SizedBox(height: 4),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(color: const Color(0xFF2E7D32).withOpacity(0.1)),
-          child: SavedAmountText(saved.toString(), currencyCode: p.currencyCode, fontSize: _s(11), color: const Color(0xFF2E7D32), fontFamily: _fNumber),
+          child: SavedAmountText(saved.toString(), currencyCode: p.currencyCode, fontSize: _s(11), color: const Color(0xFF2E7D32), fontFamily: _fBody),
         ),
       ],
     );
@@ -1495,24 +1412,31 @@ _variantMetafieldsSection(),
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        RichText(
-          text: TextSpan(
-            style: TextStyle(
-              fontFamily: _fBold,
-              fontSize: _s(11),
-              color: primary,
-            ),
-            children: [
-              TextSpan(text: opt.name.toUpperCase()),
-              TextSpan(
-                text: ' ${_selectedOptions[opt.name] ?? ''}',
-                style: TextStyle(
-                  fontFamily: _fBody,
-                  color: secondaryTxt,
+        Row(
+          children: [
+            Expanded(
+              child: RichText(
+                text: TextSpan(
+                  style: TextStyle(
+                    fontFamily: _fAccent,
+                    fontSize: _s(11),
+                    color: primary,
+                  ),
+                  children: [
+                    TextSpan(text: opt.name.toUpperCase()),
+                    TextSpan(
+                      text: ' ${_selectedOptions[opt.name] ?? ''}',
+                      style: TextStyle(
+                        fontFamily: _fBody,
+                        color: secondaryTxt,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+            if (opt.name.toLowerCase().contains('size')) _sizeChartLink(),
+          ],
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -1529,6 +1453,35 @@ _variantMetafieldsSection(),
       ],
     );
   }
+
+  /// Ruler icon + underlined "Size Chart", shown beside the size label
+  /// only when Kiwi has a chart for this product.
+  Widget _sizeChartLink() => ValueListenableBuilder<bool>(
+        valueListenable: _sizeChartAvailable,
+        builder: (context, available, _) => !available
+            ? const SizedBox.shrink()
+            : GestureDetector(
+                onTap: _openSizeChart,
+                behavior: HitTestBehavior.opaque,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.straighten_rounded, size: 16, color: primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Size Chart',
+                      style: TextStyle(
+                        fontFamily: _fBody,
+                        fontSize: _s(12),
+                        color: primary,
+                        decoration: TextDecoration.underline,
+                        decorationColor: primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+      );
 
   Widget _textOptionChip(ProductDetailOption opt, String val, bool isSelected) {
     return GestureDetector(
@@ -1665,7 +1618,7 @@ _variantMetafieldsSection(),
     final variant = _selectedVariant;
     final inStock = variant?.availableForSale ?? false;
     final height = _s(50).clamp(46.0, 60.0);
-    final label = TextStyle(fontFamily: _fBold, fontSize: _s(13));
+    final label = TextStyle(fontFamily: _fAccent, fontSize: _s(13));
 
     Widget spinner(Color color) => SizedBox(
           width: 20,
@@ -1682,6 +1635,7 @@ _variantMetafieldsSection(),
           style: ElevatedButton.styleFrom(
             disabledBackgroundColor: borderColor,
             elevation: 0,
+            shape: const RoundedRectangleBorder(),
           ),
           child: Text('SOLD OUT', style: label.copyWith(color: onPrimary)),
         ),
@@ -1694,50 +1648,109 @@ _variantMetafieldsSection(),
       builder: (context, _) {
         final alreadyInCart =
             variant != null && CartService.instance.isInCart(variant.id);
-        return SizedBox(
-          height: height,
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
+        return Column(
+          children: [
+            SizedBox(
+              height: height,
+              child: Row(
+                children: [
+                  _quantityStepper(height, enabled: !busy),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton(
                   onPressed: busy
                       ? null
                       : alreadyInCart
                           ? _goToCart
                           : _handleAddToCart,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: primary,
-                    side: BorderSide(color: primary, width: 1.2),
-                    minimumSize: Size.fromHeight(height),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: primary,
+                        side: BorderSide(color: primary, width: 1.2),
+                        shape: const RoundedRectangleBorder(),
+                        minimumSize: Size.fromHeight(height),
+                      ),
+                      child: _isAddingToCart
+                          ? spinner(primary)
+                          : Text(
+                              alreadyInCart ? 'GO TO CART' : 'ADD TO CART',
+                              style: label.copyWith(color: primary),
+                            ),
+                    ),
                   ),
-                  child: _isAddingToCart
-                      ? spinner(primary)
-                      : Text(
-                          alreadyInCart ? 'GO TO CART' : 'ADD TO CART',
-                          style: label.copyWith(color: primary),
-                        ),
-                ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: busy ? null : _handleBuyNow,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primary,
-                    foregroundColor: onPrimary,
-                    disabledBackgroundColor: primary.withValues(alpha: 0.6),
-                    elevation: 0,
-                    minimumSize: Size.fromHeight(height),
-                  ),
-                  child: _isBuyingNow
-                      ? spinner(onPrimary)
-                      : Text('BUY NOW', style: label.copyWith(color: onPrimary)),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: height,
+              child: ElevatedButton(
+                onPressed: busy ? null : _handleBuyNow,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primary,
+                  foregroundColor: onPrimary,
+                  disabledBackgroundColor: primary.withValues(alpha: 0.6),
+                  elevation: 0,
+                  shape: const RoundedRectangleBorder(),
+                  minimumSize: Size.fromHeight(height),
                 ),
+                child: _isBuyingNow
+                    ? spinner(onPrimary)
+                    : Text('BUY NOW', style: label.copyWith(color: onPrimary)),
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
+    );
+  }
+
+  /// "−  1  +" box beside Add to Cart; the chosen quantity is used by both
+  /// Add to Cart and Buy Now.
+  Widget _quantityStepper(double height, {required bool enabled}) {
+    Widget step(IconData icon, VoidCallback? onTap) => InkWell(
+          onTap: enabled ? onTap : null,
+          child: SizedBox(
+            width: height * 0.8,
+            height: height,
+            child: Icon(
+              icon,
+              size: 18,
+              color: onTap == null ? secondaryTxt : primary,
+            ),
+          ),
+        );
+
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        border: Border.all(color: primary, width: 1.2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          step(
+            Icons.remove_rounded,
+            _quantity > 1 ? () => setState(() => _quantity--) : null,
+          ),
+          SizedBox(
+            width: _s(24),
+            child: Text(
+              '$_quantity',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: _fAccent,
+                fontSize: _s(14),
+                color: primary,
+              ),
+            ),
+          ),
+          step(
+            Icons.add_rounded,
+            _quantity < _maxQuantity ? () => setState(() => _quantity++) : null,
+          ),
+        ],
+      ),
     );
   }
 
@@ -1756,7 +1769,7 @@ _variantMetafieldsSection(),
                       icon: const Icon(Icons.arrow_back_ios_new_rounded,
                           size: 18),
                       color: primary,
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => Navigator.maybePop(context),
                     ),
                     Expanded(
                       child: Text(
@@ -1807,7 +1820,7 @@ _variantMetafieldsSection(),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
             color: primary,
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.maybePop(context),
           ),
           title: Text(
             _currentTitle.toUpperCase(),
@@ -1842,7 +1855,7 @@ _variantMetafieldsSection(),
                   icon: const Icon(Icons.refresh_rounded, size: 16),
                   label: const Text(
                     'RETRY',
-                    style: TextStyle(fontFamily: _fBold),
+                    style: TextStyle(fontFamily: _fAccent),
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: primary,

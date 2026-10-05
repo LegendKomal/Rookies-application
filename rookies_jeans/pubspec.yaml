@@ -23,7 +23,6 @@ dependencies:
   webview_flutter: ^4.14.0
   flutter_launcher_icons: ^0.14.4
   share_plus: ^11.0.0
-  sendotp_flutter_sdk: ^0.0.2
 
 dev_dependencies:
   flutter_test:

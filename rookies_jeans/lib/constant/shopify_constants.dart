@@ -15,16 +15,18 @@ class ShopifyConstants {
         'X-Shopify-Storefront-Access-Token': storefrontAccessToken,
       };
 
-  /// The APP's own MSG91 OTP widget (e.g. "OTPLOGIN_APP", Mobile Integration
-  /// ON) — not the website's OTPLOGIN widget, which stays web-only so the
-  /// site is unaffected. The widget ID and token are meant to live in the
-  /// app; the MSG91 authkey must NOT — it stays in the otp_login_worker.
-  static const String msg91WidgetId  = 'YOUR_MSG91_WIDGET_ID';
-  static const String msg91TokenAuth = 'YOUR_MSG91_WIDGET_TOKEN';
+  /// The website's existing MSG91 "OTPLOGIN" widget (Mobile Integration OFF),
+  /// shared with the app — the app calls the same web widget endpoints the
+  /// site's script does, so nothing on MSG91 or the website changes. Both
+  /// values are public (Flits prints them on every storefront page). The
+  /// MSG91 authkey must NOT live here — it stays in the otp_login_worker.
+  static const String msg91WidgetId  = '346745666e47313436363133';
+  static const String msg91TokenAuth = '427260TfO1MVHhWyvx66a9d56bP1';
 
-  /// URL printed by `npm run deploy` in otp_login_worker/.
+  /// OTP login backend (otp_login_worker/): on Vercel
+  /// "https://<project>.vercel.app/api", on Cloudflare the worker URL.
   static const String otpLoginUrl =
-      'https://rookies-otp-login.YOUR-SUBDOMAIN.workers.dev';
+      'https://otploginworker.vercel.app/api';
 
   static const String storeUrl      = 'https://rookiesjeans.com';
   static const String shiprocketUrl  = 'https://rookiesjeans.shiprocket.co/';
@@ -66,11 +68,16 @@ class ShopifyConstants {
   static const String balloonCargosHandle    = 'BALLOON FIT CARGO';
   static const String oversizedShirtsHandle  = 'oversized-shirts';
 
-  /// The Collections tab's "Shop by category" taxonomy: tab → group → card.
-  /// Every card is a real Shopify collection (by handle); images come live
-  /// from each collection (its image, else its first product's). The
-  /// Storefront API can't list menus, so the grouping/order is pinned here.
-  /// A group's own `handle` is opened when its title is tapped ('' = none).
+  /// Shopify navigation menus (Online Store → Menus) that drive Explore
+  /// Categories and the Collections tab, in display order. Each item links
+  /// to a collection; its sub-items are its nested items, or else the menu
+  /// handled like that collection (e.g. "shirts", "tshirts-1").
+  static const List<String> exploreMenuHandles = ['top-wear', 'bottom-wear'];
+
+  /// Offline fallback for [exploreMenuHandles] — only used when those menus
+  /// can't be loaded. Same shape: tab → group → card, every card a Shopify
+  /// collection handle. A group's own `handle` is opened when its title is
+  /// tapped ('' = none).
   static const List<Map<String, Object>> exploreMenuSections = [
     {
       'title': 'Top Wear',

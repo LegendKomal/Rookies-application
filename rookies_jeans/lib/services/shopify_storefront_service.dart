@@ -1537,14 +1537,174 @@ for (final e in rawVariantEdges) {
     }
   }
 
-  /// The Collections tab's tab → group → card taxonomy, pinned in
-  /// [ShopifyConstants.exploreMenuSections]. Each card is a collection;
-  /// its image is fetched live (collection image, else first product's) in
-  /// one batched request, so swapping photos in Shopify needs no app update.
+  /// The Explore Categories / Collections tab taxonomy: section → group →
+  /// item. Built live from the Shopify navigation menus
+  /// [ShopifyConstants.exploreMenuHandles] ("top-wear", "bottom-wear"), so
+  /// editing those menus in Shopify admin updates the app on the next
+  /// launch or pull-to-refresh. Falls back to the pinned
+  /// [ShopifyConstants.exploreMenuSections] if the menus can't be loaded.
   Future<List<ShopMenuSection>> getExploreMenuSections() => _cachedFetch(
         'exploreMenuSections',
-        _fetchExploreMenuSections,
+        () async {
+          final live = await _fetchExploreMenuSectionsFromMenus();
+          return live.isNotEmpty ? live : _fetchExploreMenuSections();
+        },
       );
+
+  /// Menu item fields shared by every menu query below.
+  static const String _menuItemFields =
+      'title url resource { ... on Collection { handle } }';
+
+  /// Each section menu (e.g. TOP WEAR) lists groups (SHIRTS, T-SHIRTS, ...)
+  /// that link to collections. A group's items come from its own nested
+  /// items in that menu when it has any; otherwise from the separate menu
+  /// whose handle is the group's collection handle (Shopify suffixes
+  /// duplicates, so "<handle>-1" is tried too — e.g. "tshirts-1").
+  Future<List<ShopMenuSection>> _fetchExploreMenuSectionsFromMenus() async {
+    final handles = ShopifyConstants.exploreMenuHandles;
+    final sectionQuery = StringBuffer('query getExploreMenus {\n');
+    for (int i = 0; i < handles.length; i++) {
+      sectionQuery.write('  s$i: menu(handle: "${handles[i]}") {\n'
+          '    title handle\n'
+          '    items { $_menuItemFields items { $_menuItemFields } }\n'
+          '  }\n');
+    }
+    sectionQuery.write('}');
+
+    try {
+      final res = await ShopifyGraphQL.post(sectionQuery.toString());
+      _log('getExploreMenuSections (menus) → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) return [];
+
+      final sectionMenus = <Map<String, dynamic>>[
+        for (int i = 0; i < handles.length; i++)
+          if (res.data!['s$i'] is Map<String, dynamic>)
+            res.data!['s$i'] as Map<String, dynamic>,
+      ];
+      if (sectionMenus.isEmpty) return [];
+
+      // Groups without nested items → look up their own menus in one call.
+      final lookupHandles = <String>{};
+      for (final menu in sectionMenus) {
+        for (final group in (menu['items'] as List? ?? const [])) {
+          if (((group as Map)['items'] as List? ?? const []).isNotEmpty) {
+            continue;
+          }
+          final h = _menuItemHandle(group);
+          if (h != null) lookupHandles.addAll([h, '$h-1']);
+        }
+      }
+      final subMenus = await _fetchMenusByHandle(lookupHandles.toList());
+
+      List<Map> groupItems(Map group) {
+        final nested = (group['items'] as List? ?? const []).cast<Map>();
+        if (nested.isNotEmpty) return nested;
+        final h = _menuItemHandle(group);
+        if (h == null) return const [];
+        return subMenus[h] ?? subMenus['$h-1'] ?? const [];
+      }
+
+      final sections = sectionMenus.map((menu) {
+        final groups = (menu['items'] as List? ?? const []).cast<Map>();
+        return (
+          title: _menuTitleCase(menu['title'] as String? ?? ''),
+          handle: menu['handle'] as String? ?? '',
+          groups: [for (final g in groups) (group: g, items: groupItems(g))],
+        );
+      }).toList();
+
+      final imagesByHandle = await _fetchCollectionImagesByHandle({
+        for (final s in sections)
+          for (final g in s.groups) ...[
+            _menuItemHandle(g.group),
+            for (final item in g.items) _menuItemHandle(item),
+          ],
+      }.whereType<String>().toList());
+
+      return sections.map((s) {
+        return ShopMenuSection(
+          title: s.title,
+          handle: s.handle,
+          categories: s.groups.map((g) {
+            final groupHandle = _menuItemHandle(g.group) ?? '';
+            return ShopMenuCategory(
+              title: _menuTitleCase(g.group['title'] as String? ?? ''),
+              collectionHandle: groupHandle,
+              imageUrl: imagesByHandle[groupHandle],
+              fits: g.items.map((item) {
+                final itemHandle = _menuItemHandle(item);
+                // Items like "/collections/chinos?fit=…" point back at the
+                // group's own collection; leave the handle empty so the
+                // screen filters the group by this item's title instead.
+                final ownCollection =
+                    itemHandle != null && itemHandle != groupHandle;
+                return ShopMenuFit(
+                  title: _menuTitleCase(item['title'] as String? ?? ''),
+                  url: item['url'] as String? ?? '',
+                  collectionHandle: ownCollection ? itemHandle : null,
+                  imageUrl: ownCollection ? imagesByHandle[itemHandle] : null,
+                );
+              }).toList(),
+            );
+          }).toList(),
+        );
+      }).toList();
+    } catch (e) {
+      _log('_fetchExploreMenuSectionsFromMenus EXCEPTION: $e');
+      return [];
+    }
+  }
+
+  /// Items of each existing menu, keyed by handle, in one aliased request.
+  Future<Map<String, List<Map>>> _fetchMenusByHandle(
+      List<String> handles) async {
+    if (handles.isEmpty) return {};
+    final buffer = StringBuffer('query getSubMenus {\n');
+    for (int i = 0; i < handles.length; i++) {
+      final safeHandle = handles[i].replaceAll('"', r'\"');
+      buffer.write(
+          '  m$i: menu(handle: "$safeHandle") { items { $_menuItemFields } }\n');
+    }
+    buffer.write('}');
+
+    try {
+      final res = await ShopifyGraphQL.post(buffer.toString());
+      if (res.hasErrors || res.data == null) return {};
+      return {
+        for (int i = 0; i < handles.length; i++)
+          if (res.data!['m$i'] is Map)
+            handles[i]:
+                ((res.data!['m$i'] as Map)['items'] as List? ?? const [])
+                    .cast<Map>(),
+      };
+    } catch (e) {
+      _log('_fetchMenusByHandle EXCEPTION: $e');
+      return {};
+    }
+  }
+
+  /// Collection handle a menu item points at, from its linked resource or
+  /// its "/collections/<handle>" URL; null for non-collection links.
+  static String? _menuItemHandle(Map item) {
+    final resourceHandle = (item['resource'] as Map?)?['handle'] as String?;
+    if (resourceHandle != null && resourceHandle.isNotEmpty) {
+      return resourceHandle;
+    }
+    final url = item['url'] as String? ?? '';
+    if (!url.contains('/collections/')) return null;
+    final handle = _normalizeHandle(url);
+    return handle.isEmpty ? null : handle;
+  }
+
+  /// Menu titles are typed in caps in Shopify ("CARGO SHIRTS"); the app
+  /// shows them as "Cargo Shirts" / "T-Shirts" / "Jann (Loose Stretch)".
+  static String _menuTitleCase(String raw) {
+    final lower = raw.trim().toLowerCase();
+    return lower.replaceAllMapped(
+      RegExp(r'(^|[\s\-(/&])([a-z])'),
+      (m) => '${m[1]}${m[2]!.toUpperCase()}',
+    );
+  }
 
   Future<List<ShopMenuSection>> _fetchExploreMenuSections() async {
     final sectionDefs = ShopifyConstants.exploreMenuSections;

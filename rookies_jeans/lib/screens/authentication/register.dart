@@ -36,9 +36,7 @@ class _RegisterState extends State<Register> {
   static Color get fieldFill     => AppColors.fieldFill;
   static Color get hintColor     => AppColors.hint;
 
-  static const String _fHead = AppFonts.heading;
   static const String _fBody = AppFonts.body;
-  static const String _fBold = AppFonts.bold;
 
   double _s(double base) =>
       Responsive.of(context, baseW: 400, maxScale: 1.3).s(base);
@@ -93,9 +91,9 @@ class _RegisterState extends State<Register> {
   Widget _fieldLabel(String text) => Text(
         text,
         style: TextStyle(
-          fontFamily: _fBold,
+          fontFamily: _fBody,
           fontSize: _s(14),
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w400,
           color: primary,
         ),
       );
@@ -272,9 +270,9 @@ class _RegisterState extends State<Register> {
                             "Create Account",
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontFamily: _fHead,
+                              fontFamily: _fBody,
                               fontSize: _s(30),
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w400,
                               color: primary,
                             ),
                           ),
@@ -450,9 +448,9 @@ class _RegisterState extends State<Register> {
                             : Text(
                                 "Create Account",
                                 style: TextStyle(
-                                  fontFamily: _fBold,
+                                  fontFamily: _fBody,
                                   fontSize: _s(16),
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w400,
                                 ),
                               ),
                       ),
@@ -484,10 +482,10 @@ class _RegisterState extends State<Register> {
                             child: Text(
                               "Sign In",
                               style: TextStyle(
-                                fontFamily: _fBold,
+                                fontFamily: _fBody,
                                 color: primary,
                                 fontSize: _s(14),
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w400,
                               ),
                             ),
                           ),

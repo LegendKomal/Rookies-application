@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
 import 'package:rookies_jeans/screens/products/product_detail_page.dart';
@@ -74,7 +73,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
         shadowColor: AppColors.border,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: _primary),
-          onPressed: () => context.pop(),
+          // maybePop goes through the route's PopScope, so when this is the
+          // only page (iOS has no system back) it falls back to Home.
+          onPressed: () => Navigator.maybePop(context),
         ),
         title: Text(
           'Order History',

@@ -30,8 +30,6 @@ class _SearchTabPageState extends State<SearchTabPage> {
   static Color get borderColor => AppColors.border;
 
   static const String _fBody = AppFonts.body;
-  static const String _fBold = AppFonts.bold;
-  static const String _fBodyBold = AppFonts.alteBold;
 
   static const int _kMinLiveSearchLength = 3;
   static const int _kResultCount = 20;
@@ -310,9 +308,9 @@ class _SearchTabPageState extends State<SearchTabPage> {
               Text(
                 'RECENT SEARCHES',
                 style: TextStyle(
-                  fontFamily: _fBold,
+                  fontFamily: _fBody,
                   fontSize: 12,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: 1.0,
                   color: secondaryTxt,
                 ),
@@ -323,9 +321,9 @@ class _SearchTabPageState extends State<SearchTabPage> {
                 child: Text(
                   'CLEAR ALL',
                   style: TextStyle(
-                    fontFamily: _fBold,
+                    fontFamily: _fBody,
                     fontSize: 11,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w900,
                     letterSpacing: 0.6,
                     color: primary,
                   ),
@@ -372,8 +370,9 @@ class _SearchTabPageState extends State<SearchTabPage> {
             Text(
               'SEARCH PRODUCTS',
               style: TextStyle(
+                fontFamily: _fBody,
                 fontSize: 13,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w900,
                 letterSpacing: 0.5,
                 color: primary.withOpacity(0.5),
               ),
@@ -382,7 +381,7 @@ class _SearchTabPageState extends State<SearchTabPage> {
             Text(
               'Start typing to find what you\'re looking for',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: secondaryTxt),
+              style: TextStyle(fontFamily: _fBody, fontSize: 12, color: secondaryTxt),
             ),
           ],
         ),
@@ -399,7 +398,7 @@ class _SearchTabPageState extends State<SearchTabPage> {
               Text(
                 'No results for "$_activeQuery"',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontFamily: _fBold, fontSize: 14, fontWeight: FontWeight.w700, color: primary),
+                style: TextStyle(fontFamily: _fBody, fontSize: 14, fontWeight: FontWeight.w900, color: primary),
               ),
               const SizedBox(height: 6),
               Text(
@@ -423,13 +422,16 @@ class _SearchTabPageState extends State<SearchTabPage> {
               Text(
                 _error ?? 'Something went wrong.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: secondaryTxt),
+                style: TextStyle(fontFamily: _fBody, fontSize: 13, color: secondaryTxt),
               ),
               const SizedBox(height: 20),
               OutlinedButton.icon(
                 onPressed: () => _fetchSuggestions(_activeQuery),
                 icon: const Icon(Icons.refresh_rounded, size: 16),
-                label: const Text('RETRY'),
+                label: const Text(
+                  'RETRY',
+                  style: TextStyle(fontFamily: _fBody, fontWeight: FontWeight.w900),
+                ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: primary,
                   side: BorderSide(color: primary),
@@ -497,7 +499,7 @@ class _SearchTabPageState extends State<SearchTabPage> {
         product.title,
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontFamily: _fBodyBold, fontSize: 13, fontWeight: FontWeight.w700, color: primary),
+        style: TextStyle(fontFamily: _fBody, fontSize: 13, fontWeight: FontWeight.w600, color: primary),
       ),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 4),

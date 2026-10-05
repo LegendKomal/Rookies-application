@@ -55,7 +55,6 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
   late Future<List<ShopMenuSection>> _future;
   static const String _fHead = AppFonts.heading;
   static const String _fBody = AppFonts.body;
-  static const String _fBold = AppFonts.bold;
 
   _MenuPanel? _expandedPanel;
 
@@ -197,14 +196,16 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
                         color: AppColors.primary,
                       ),
                       onTap: _openCollections,
-                      fontFamily: _fBold,
+                      fontFamily: _fBody,
+                      fontWeight: FontWeight.w900,
                     ),
                     _divider(),
                     _MenuRow(
                       title: (topWear?.title ?? 'TOP WEAR').toUpperCase(),
                       trailing: _panelIcon(_expandedPanel == _MenuPanel.topWear),
                       onTap: () => _togglePanel(_MenuPanel.topWear),
-                      fontFamily: _fBold,
+                      fontFamily: _fBody,
+                      fontWeight: FontWeight.w900,
                     ),
                     AnimatedCrossFade(
                       duration: const Duration(milliseconds: 200),
@@ -213,8 +214,8 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
                           : CrossFadeState.showSecond,
                       firstChild: _CategoriesGrid(
                         categories: topWear?.categories ?? const [],
-                        headFont: _fBold,
-                        bodyFont: _fBody,
+                        headFont: _fBody,
+                        bodyFont: AppFonts.accent,
                         onCategoryTap: _openCategory,
                         onFitTap: _openFit,
                       ),
@@ -226,7 +227,8 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
                       trailing:
                           _panelIcon(_expandedPanel == _MenuPanel.bottomWear),
                       onTap: () => _togglePanel(_MenuPanel.bottomWear),
-                      fontFamily: _fBold,
+                      fontFamily: _fBody,
+                      fontWeight: FontWeight.w900,
                     ),
                     AnimatedCrossFade(
                       duration: const Duration(milliseconds: 200),
@@ -235,8 +237,8 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
                           : CrossFadeState.showSecond,
                       firstChild: _CategoriesGrid(
                         categories: bottomWear?.categories ?? const [],
-                        headFont: _fBold,
-                        bodyFont: _fBody,
+                        headFont: _fBody,
+                        bodyFont: AppFonts.accent,
                         onCategoryTap: _openCategory,
                         onFitTap: _openFit,
                       ),
@@ -278,12 +280,14 @@ class _MenuRow extends StatelessWidget {
     required this.trailing,
     required this.onTap,
     required this.fontFamily,
+    this.fontWeight = FontWeight.w600,
   });
 
   final String title;
   final Widget trailing;
   final VoidCallback onTap;
   final String fontFamily;
+  final FontWeight fontWeight;
 
   @override
   Widget build(BuildContext context) {
@@ -299,7 +303,7 @@ class _MenuRow extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: fontFamily,
                   fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: fontWeight,
                   letterSpacing: 0.5,
                   color: AppColors.primary,
                 ),
@@ -390,7 +394,7 @@ class _CategoriesGrid extends StatelessWidget {
               style: TextStyle(
                 fontFamily: headFont,
                 fontSize: 14,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w400,
                 color: AppColors.primary,
               ),
             ),

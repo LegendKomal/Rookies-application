@@ -244,8 +244,15 @@ class _CheckoutWebViewState extends State<CheckoutWebView> {
 
     final scheme      = uri.scheme.toLowerCase();
     final isWebScheme = scheme == 'http' || scheme == 'https';
+    // iOS (WKWebView) also reports iframe loads here, and GoKwik's payment
+    // sheet creates about:blank / about:srcdoc / blob: frames. These must
+    // load in the web view, not be handed to launchUrl as a "payment app".
+    final isInternalScheme = scheme == 'about' ||
+        scheme == 'data' ||
+        scheme == 'blob' ||
+        scheme == 'javascript';
 
-    if (isWebScheme) return NavigationDecision.navigate;
+    if (isWebScheme || isInternalScheme) return NavigationDecision.navigate;
 
     final launched =
         await launchUrl(uri, mode: LaunchMode.externalApplication);

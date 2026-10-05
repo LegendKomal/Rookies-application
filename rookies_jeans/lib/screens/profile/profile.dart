@@ -114,7 +114,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         elevation: 0,
                         shape: const RoundedRectangleBorder(),
                       ),
-                      child: const Text('Retry'),
+                      child: const Text(
+                        'Retry',
+                        style: TextStyle(
+                          fontFamily: ShopifyConstants.fontBody,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -217,7 +223,6 @@ class _LoggedOutProfile extends StatelessWidget {
 
   static const String _fHead = AppFonts.heading;
   static const String _fBody = AppFonts.body;
-  static const String _fBold = AppFonts.bold;
 
   @override
   Widget build(BuildContext context) {
@@ -282,9 +287,9 @@ class _LoggedOutProfile extends StatelessWidget {
                               child: Text(
                                 'Sign In',
                                 style: TextStyle(
-                                  fontFamily: _fBold,
+                                  fontFamily: _fBody,
                                   fontSize: _s(context, 16).clamp(14.0, 20.0),
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
                             ),
@@ -308,11 +313,11 @@ class _LoggedOutProfile extends StatelessWidget {
                                       child: Text(
                                         'Create Account',
                                         style: TextStyle(
-                                          fontFamily: _fBold,
+                                          fontFamily: _fBody,
                                           fontSize: _s(context, 13).clamp(12.0, 17.0),
                                           color: _primary,
                                           decoration: TextDecoration.underline,
-                                          fontWeight: FontWeight.w500,
+                                          fontWeight: FontWeight.w900,
                                         ),
                                       ),
                                     ),
@@ -347,7 +352,6 @@ class _LoggedInProfile extends StatelessWidget {
   static Color get _fieldFill => AppColors.fieldFill;
 
   static const String _fHead = AppFonts.heading;
-  static const String _fBold = AppFonts.bold;
 
   @override
   Widget build(BuildContext context) {
@@ -381,9 +385,9 @@ class _LoggedInProfile extends StatelessWidget {
                           child: Text(
                             auth.initials,
                             style: TextStyle(
-                              fontFamily: _fBold,
+                              fontFamily: AppFonts.body,
                               fontSize: _s(context, 24).clamp(20.0, 32.0),
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w900,
                               color: _primary,
                             ),
                           ),

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:sendotp_flutter_sdk/sendotp_flutter_sdk.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/auth_model.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
@@ -32,9 +31,10 @@ class OtpVerifyResult {
 
 /// Phone OTP login.
 ///
-/// 1. Send / resend / verify the OTP with MSG91's Flutter SDK, using the app's
-///    own mobile-only OTP widget (the website keeps its separate OTPLOGIN one)
-///    — widget ID + token are safe to ship in the app.
+/// 1. Send / resend / verify the OTP through the website's existing MSG91
+///    OTPLOGIN widget, calling the same web widget endpoints its script uses
+///    (no separate mobile widget; nothing on the site changes) — widget ID +
+///    token are public and safe to ship in the app.
 /// 2. Hand MSG91's access token to the otp_login_worker, which checks it with
 ///    MSG91 and returns a Shopify customer access token — stored exactly like
 ///    an email/password login.
@@ -44,11 +44,12 @@ class OtpAuthService {
 
   static const Duration _timeout = Duration(seconds: 20);
 
-  // MSG91 retry channel codes.
-  static const int _channelSms   = 11;
-  static const int _channelWhatsApp = 12;
+  // MSG91 retry channel codes — sent as strings, exactly like the website's
+  // widget script does.
+  static const String _channelSms      = '11';
+  static const String _channelWhatsApp = '12';
 
-  bool _widgetReady = false;
+  static const String _msg91WidgetApi = 'https://control.msg91.com/api/v5/widget';
 
   /// MSG91 request id for the OTP currently in flight.
   String? _reqId;
@@ -63,7 +64,7 @@ class OtpAuthService {
   /// Returns null on success, otherwise a user-facing error message.
   Future<String?> sendOtp(String phone) async {
     _reqId = null;
-    final res = await _msg91(OTPWidget.sendOTP, {
+    final res = await _msg91('sendOtp', {
       'identifier': _msg91Identifier(phone),
     });
     if (res.error != null) return res.error;
@@ -76,7 +77,7 @@ class OtpAuthService {
   /// [channel] is 'text' (SMS) or 'whatsapp'.
   Future<String?> resendOtp(String phone, {String channel = 'text'}) async {
     if (_reqId == null) return sendOtp(phone);
-    final res = await _msg91(OTPWidget.retryOTP, {
+    final res = await _msg91('retryOtp', {
       'reqId': _reqId,
       'retryChannel': channel == 'whatsapp' ? _channelWhatsApp : _channelSms,
     });
@@ -91,7 +92,7 @@ class OtpAuthService {
       return const OtpVerifyResult(error: 'Please request an OTP first.');
     }
 
-    final verified = await _msg91(OTPWidget.verifyOTP, {'reqId': _reqId, 'otp': otp});
+    final verified = await _msg91('verifyOtp', {'reqId': _reqId, 'otp': otp});
     if (verified.error != null) return OtpVerifyResult(error: verified.error);
 
     final msg91Token = verified.body['message']?.toString() ??
@@ -146,69 +147,43 @@ class OtpAuthService {
   // ---------------------------------------------------------------------------
   // HTTP
 
-  /// MSG91 OTP widget, through MSG91's Flutter SDK. Success is
-  /// `{"type": "success", "message": ...}`; failures come back as
-  /// `{"type": "error", "message": "..."}` (the SDK throws on non-2xx).
+  /// MSG91 web OTP widget endpoint ([action] is sendOtp / retryOtp /
+  /// verifyOtp) — the same requests the website's widget script sends.
+  /// Success is `{"type": "success", "message": ...}` (sendOtp: the request
+  /// id; verifyOtp: the access token); failures are
+  /// `{"type": "error", "message": "..."}`.
   Future<({Map<String, dynamic> body, String? error})> _msg91(
-    Future<Map<String, dynamic>?> Function(Map<String, dynamic>) call,
+    String action,
     Map<String, dynamic> payload,
   ) async {
-    if (ShopifyConstants.msg91WidgetId.startsWith('YOUR_') ||
-        ShopifyConstants.msg91TokenAuth.startsWith('YOUR_') ||
-        ShopifyConstants.otpLoginUrl.contains('YOUR-SUBDOMAIN')) {
+    // The OTP is only useful once the worker can turn it into a login, so
+    // don't text anyone a code until it's deployed.
+    if (ShopifyConstants.otpLoginUrl.contains('YOUR-SUBDOMAIN')) {
       return (
         body: const <String, dynamic>{},
         error: 'Phone login is not set up yet. Please use email & password.',
       );
     }
 
-    if (!_widgetReady) {
-      OTPWidget.initializeWidget(
-        ShopifyConstants.msg91WidgetId,
-        ShopifyConstants.msg91TokenAuth,
-      );
-      _widgetReady = true;
-    }
+    final res = await _post(
+      '$_msg91WidgetApi/$action',
+      {
+        'widgetId': ShopifyConstants.msg91WidgetId,
+        'tokenAuth': ShopifyConstants.msg91TokenAuth,
+        ...payload,
+      },
+      headers: {'tokenAuth': ShopifyConstants.msg91TokenAuth},
+    );
+    _log('MSG91 $action -> ${res.body['type']}: ${res.body['message']}');
+    if (res.error != null) return res;
 
-    Map<String, dynamic> body;
-    try {
-      body = await call(payload).timeout(_timeout) ?? const {};
-    } on TimeoutException {
+    if (res.body['type'] != 'success') {
       return (
-        body: const <String, dynamic>{},
-        error: 'The request timed out. Please try again.',
-      );
-    } catch (e) {
-      _log('MSG91 EXCEPTION -> $e');
-      body = _jsonIn(e.toString());
-      if (body.isEmpty) {
-        return (
-          body: body,
-          error: 'Could not reach the server. Check your connection.',
-        );
-      }
-    }
-
-    if (body['type'] != 'success') {
-      return (
-        body: body,
-        error: body['message']?.toString() ?? 'OTP request failed.',
+        body: res.body,
+        error: res.body['message']?.toString() ?? 'OTP request failed.',
       );
     }
-    return (body: body, error: null);
-  }
-
-  /// The SDK reports HTTP errors as "Failed to post data: 400, {...}";
-  /// pull MSG91's JSON back out so its message reaches the user.
-  Map<String, dynamic> _jsonIn(String text) {
-    final start = text.indexOf('{');
-    final end = text.lastIndexOf('}');
-    if (start < 0 || end <= start) return const {};
-    try {
-      return jsonDecode(text.substring(start, end + 1)) as Map<String, dynamic>;
-    } catch (_) {
-      return const {};
-    }
+    return res;
   }
 
   Future<({Map<String, dynamic> body, String? error})> _worker(
@@ -219,8 +194,9 @@ class OtpAuthService {
 
   Future<({Map<String, dynamic> body, String? error})> _post(
     String url,
-    Map<String, dynamic> payload,
-  ) async {
+    Map<String, dynamic> payload, {
+    Map<String, String> headers = const {},
+  }) async {
     final uri = Uri.parse(url);
     _log('OTP ${uri.path} START');
 
@@ -228,9 +204,10 @@ class OtpAuthService {
       final response = await http
           .post(
             uri,
-            headers: const {
+            headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
+              ...headers,
             },
             body: jsonEncode(payload),
           )

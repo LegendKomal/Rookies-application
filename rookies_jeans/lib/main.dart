@@ -16,11 +16,13 @@ import 'package:rookies_jeans/screens/products/product_detail_page.dart';
 import 'package:rookies_jeans/screens/search/search_tab_page.dart';
 import 'package:rookies_jeans/screens/splashscreen/splashscreen.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
+import 'package:rookies_jeans/services/recently_viewed_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   CartService.instance.initialize();
+  RecentlyViewedService.instance.initialize();
 
   await AuthService.instance.initialize();
   await ThemeService.instance.initialize();
