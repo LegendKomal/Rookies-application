@@ -483,7 +483,7 @@ debugPrint('==========================================');
         success
             ? '${_product?.title ?? 'Item'} added to cart'
             : 'Failed to add item to cart',
-        style: const TextStyle(fontFamily: _fBody),
+        style: const TextStyle(fontFamily: AppFonts.accent),
       ),
       duration: const Duration(seconds: 2),
       behavior: SnackBarBehavior.floating,
@@ -1261,8 +1261,8 @@ _variantMetafieldsSection(),
         ),
       );
 
-  /// Every product the customer has opened this session except this one,
-  /// newest first.
+  /// Every product the customer has opened (saved across app restarts)
+  /// except this one, newest first.
   Widget _recentlyViewedSection(String currentProductId) => ListenableBuilder(
         listenable: RecentlyViewedService.instance,
         builder: (context, _) {
@@ -1822,11 +1822,19 @@ _variantMetafieldsSection(),
             color: primary,
             onPressed: () => Navigator.maybePop(context),
           ),
+          leadingWidth: 44,
+          titleSpacing: 0,
+          centerTitle: false,
           title: Text(
             _currentTitle.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontFamily: _fBody,
-              fontSize: _s(12),
+              fontFamily: _fHeading,
+              fontSize: (MediaQuery.of(context).size.width * 0.09)
+                  .clamp(20.0, 40.0),
+              fontStyle: FontStyle.italic,
+              height: 1,
               color: primary,
             ),
           ),

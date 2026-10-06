@@ -77,16 +77,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
           // only page (iOS has no system back) it falls back to Home.
           onPressed: () => Navigator.maybePop(context),
         ),
+        leadingWidth: 44,
+        titleSpacing: 0,
         title: Text(
-          'Order History',
+          'ORDER HISTORY',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontFamily: ShopifyConstants.fontSubheading,
-            fontSize: r.s(17),
-            fontWeight: FontWeight.w500,
+            fontFamily: ShopifyConstants.fontHeading,
+            fontSize: (MediaQuery.of(context).size.width * 0.09)
+                .clamp(20.0, 40.0),
+            fontStyle: FontStyle.italic,
+            height: 1,
             color: _primary,
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: _primary, strokeWidth: 2))
@@ -434,16 +440,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: _primary),
             onPressed: () => Navigator.of(context).pop(_changed),
           ),
+          leadingWidth: 44,
+          titleSpacing: 0,
           title: Text(
             'ORDER DETAILS',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontFamily: ShopifyConstants.fontHeading,
-              fontSize: r.s(20),
-              letterSpacing: 0.5,
+              fontSize: (MediaQuery.of(context).size.width * 0.09)
+                  .clamp(20.0, 40.0),
+              fontStyle: FontStyle.italic,
+              height: 1,
               color: _primary,
             ),
           ),
-          centerTitle: true,
+          centerTitle: false,
         ),
         body: r.center(
           ListView(

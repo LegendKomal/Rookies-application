@@ -205,6 +205,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                       fontSize: _s(context, 34).clamp(26.0, 46.0),
                       height: 1,
                       fontFamily: _fHead,
+                      fontStyle: FontStyle.italic,
                       color: _primary,
                     ),
                   ),

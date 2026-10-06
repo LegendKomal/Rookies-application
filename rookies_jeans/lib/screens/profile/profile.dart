@@ -71,17 +71,22 @@ class _WebViewScreenState extends State<WebViewScreen> {
               color: _primary),
           onPressed: () => context.pop(),
         ),
+        leadingWidth: 44,
+        titleSpacing: 0,
         title: Text(
-          widget.title,
+          widget.title.toUpperCase(),
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontFamily: ShopifyConstants.fontSubheading,
-            fontSize: _s(context, 17).clamp(15.0, 22.0),
-            fontWeight: FontWeight.w500,
+            fontFamily: ShopifyConstants.fontHeading,
+            fontSize: (MediaQuery.of(context).size.width * 0.09)
+                .clamp(20.0, 40.0),
+            fontStyle: FontStyle.italic,
+            height: 1,
             color: _primary,
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
       ),
       body: Stack(
         children: [
@@ -395,13 +400,14 @@ class _LoggedInProfile extends StatelessWidget {
                         SizedBox(height: _s(context, 14)),
                         Text(
                           auth.firstName.isNotEmpty
-                              ? 'Hey, ${auth.firstName}!'
-                              : 'Hey!',
+                              ? 'HEY, ${auth.firstName.toUpperCase()}!'
+                              : 'HEY!',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: _fHead,
                             fontSize: _s(context, 22).clamp(18.0, 30.0),
                             fontWeight: FontWeight.w500,
+                            fontStyle: FontStyle.italic,
                             color: _primary,
                           ),
                         ),
@@ -568,11 +574,12 @@ class _MoreSection extends StatelessWidget {
               padding: EdgeInsets.fromLTRB(
                   _s(context, 20), _s(context, 20), _s(context, 20), _s(context, 6)),
               child: Text(
-                'More',
+                'MORE',
                 style: TextStyle(
                   fontFamily: _fHead,
                   fontSize: _s(context, 22).clamp(18.0, 30.0),
                   fontWeight: FontWeight.w500,
+                  fontStyle: FontStyle.italic,
                   color: AppColors.primary,
                 ),
               ),

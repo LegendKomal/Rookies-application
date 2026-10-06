@@ -77,6 +77,7 @@ class _WishlistPageState extends State<WishlistPage> {
                   fontSize: titleSize,
                   height: 1,
                   fontFamily: _fHead,
+                  fontStyle: FontStyle.italic,
                   color: primary,
                   // letterSpacing: 1.4,
                 ),

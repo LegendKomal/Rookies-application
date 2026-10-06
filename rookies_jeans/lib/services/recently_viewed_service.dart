@@ -15,23 +15,30 @@ class RecentlyViewedService extends ChangeNotifier {
   static const String _prefsKey = 'recently_viewed_products';
 
   final List<ShopifyProduct> _items = [];
-  bool _initialized = false;
+  Future<void>? _loading;
 
   List<ShopifyProduct> get items => List.unmodifiable(_items);
 
   /// Loads the saved list. Products recorded before this finishes stay in
   /// front of the saved ones.
-  Future<void> initialize() async {
-    if (_initialized) return;
-    _initialized = true;
+  Future<void> initialize() => _loading ??= _load();
+
+  Future<void> _load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_prefsKey);
       if (raw == null) return;
-      final saved = (jsonDecode(raw) as List)
-          .map((e) => _fromJson(e as Map<String, dynamic>))
-          .where((p) => !_items.any((item) => item.id == p.id));
-      _items.addAll(saved);
+      final saved = <ShopifyProduct>[];
+      for (final entry in jsonDecode(raw) as List) {
+        // Skip a corrupt entry rather than losing the whole list.
+        try {
+          saved.add(_fromJson(entry as Map<String, dynamic>));
+        } catch (e) {
+          debugPrint('RecentlyViewedService skipped entry: $e');
+        }
+      }
+      _items.addAll(
+          saved.where((p) => !_items.any((item) => item.id == p.id)));
       if (_items.length > _maxItems) {
         _items.removeRange(_maxItems, _items.length);
       }
@@ -57,6 +64,8 @@ class RecentlyViewedService extends ChangeNotifier {
   }
 
   Future<void> _save() async {
+    // Writing before the saved list is merged in would overwrite it.
+    await initialize();
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(

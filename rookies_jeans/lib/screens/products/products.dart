@@ -80,6 +80,7 @@ class _ProductsPageState extends State<ProductsPage> {
   static const double _kCompactSpacing = 4.0;
   static const double _kAspect = 0.52;
   static const double _kToolbarHeight = 48.0;
+  static const double _kTitleLineHeight = 1.3;
 
   /// Products per row picked from the toolbar: 1 = large cards,
   /// 2 = standard cards, 3 = compact image-only tiles.
@@ -549,7 +550,12 @@ class _ProductsPageState extends State<ProductsPage> {
         _pageLabel.toUpperCase(),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontFamily: _fHead, fontSize: 22, color: primary),
+        style: TextStyle(
+          fontFamily: _fHead,
+          fontSize: 22,
+          fontStyle: FontStyle.italic,
+          color: primary,
+        ),
       ),
     );
   }
@@ -1705,23 +1711,36 @@ class _ProductsPageState extends State<ProductsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    product.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: _fBodyBold,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: primary,
+                  // Always two lines tall, so one- and two-line titles
+                  // leave every card's image the same height.
+                  SizedBox(
+                    height: MediaQuery.textScalerOf(context).scale(11) *
+                        _kTitleLineHeight *
+                        2,
+                    child: Text(
+                      product.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: _fBodyBold,
+                        fontSize: 11,
+                        height: _kTitleLineHeight,
+                        fontWeight: FontWeight.w600,
+                        color: primary,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 5),
                   _priceBlock(product),
-                  if (colorHexes.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    _colorSwatches(colorHexes),
-                  ],
+                  // Swatch row is reserved even when empty, for the same
+                  // equal-height reason as the title.
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 14,
+                    child: colorHexes.isNotEmpty
+                        ? _colorSwatches(colorHexes)
+                        : null,
+                  ),
                 ],
               ),
             ),
@@ -1820,9 +1839,12 @@ class _ProductsPageState extends State<ProductsPage> {
                 ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
                   ..showSnackBar(SnackBar(
-                    content: Text(success
-                        ? '${product.title} added to cart'
-                        : 'Failed to add item to cart'),
+                    content: Text(
+                      success
+                          ? '${product.title} added to cart'
+                          : 'Failed to add item to cart',
+                      style: const TextStyle(fontFamily: AppFonts.accent),
+                    ),
                     duration: const Duration(seconds: 2),
                     behavior: SnackBarBehavior.floating,
                   ));

@@ -52,7 +52,7 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _showToast(String message, {bool isError = false}) =>
-      AppToast.show(message, isError: isError);
+      AppToast.show(context, message, isError: isError);
 
   Future<void> _changeQuantity(ShopifyCartLine line, int newQuantity) async {
     setState(() => _pendingLineIds.add(line.lineId));
@@ -171,6 +171,7 @@ class _CartScreenState extends State<CartScreen> {
                   fontSize: titleSize,
                   height: 1,
                   fontFamily: _fHead,
+                  fontStyle: FontStyle.italic,
                   color: primary,
                   // letterSpacing: 1.8,
                 ),

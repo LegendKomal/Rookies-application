@@ -287,17 +287,21 @@ class _CheckoutWebViewState extends State<CheckoutWebView> {
           color: primary,
           onPressed: () => Navigator.of(context).pop(false),
         ),
+        leadingWidth: 44,
+        titleSpacing: 0,
         title: Text(
           'CHECKOUT',
+          maxLines: 1,
           style: TextStyle(
-            fontFamily: _fBold,
-            fontSize: _s(13),
-            fontWeight: FontWeight.w800,
+            fontFamily: AppFonts.heading,
+            fontSize: (MediaQuery.of(context).size.width * 0.09)
+                .clamp(20.0, 40.0),
+            fontStyle: FontStyle.italic,
+            height: 1,
             color: primary,
-            // letterSpacing: 1.8,
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
         actions: [
           IconButton(
             icon: Icon(Icons.close_rounded, color: primary),

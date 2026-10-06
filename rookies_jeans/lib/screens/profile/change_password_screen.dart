@@ -114,6 +114,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       fontSize: _s(context, 34).clamp(24.0, 46.0),
                       height: 1,
                       fontFamily: _fHead,
+                      fontStyle: FontStyle.italic,
                       color: AppColors.primary,
                     ),
                   ),

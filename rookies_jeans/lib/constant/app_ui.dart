@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 
@@ -197,26 +196,26 @@ class Responsive {
 class AppToast {
   AppToast._();
 
-  static String _toHex(Color color) =>
-      '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
-
-  static void show(String message, {bool isError = false}) {
-    final bgColor = isError ? AppColors.danger : AppColors.primary;
-    final textColor = isError ? Colors.white : AppColors.onPrimary;
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: bgColor,
-      textColor: textColor,
-      fontSize: 13,
-      // Web renders its own toast markup using webBgColor rather than
-      // `backgroundColor`, so it must track the same theme-aware color or
-      // `textColor` above can end up unreadable against it (e.g. near-black
-      // text on a hardcoded dark background in dark mode).
-      webBgColor: _toHex(bgColor),
-      webPosition: 'center',
-      timeInSecForIosWeb: 2,
-    );
+  /// A floating SnackBar in Roboto Mono, matching the "added to cart"
+  /// messages (a native toast can't use the app's fonts).
+  static void show(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+  }) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(
+          message,
+          style: TextStyle(
+            fontFamily: AppFonts.accent,
+            color: isError ? Colors.white : null,
+          ),
+        ),
+        backgroundColor: isError ? AppColors.danger : null,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ));
   }
 }

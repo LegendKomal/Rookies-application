@@ -159,6 +159,7 @@ class _ExploreCategoriesPageState extends State<ExploreCategoriesPage> {
                     fontSize: titleSize,
                     height: 1,
                     fontFamily: _fHead,
+                    fontStyle: FontStyle.italic,
                     color: AppColors.primary,
                   ),
                 ),
@@ -394,7 +395,7 @@ class _CategoriesGrid extends StatelessWidget {
               style: TextStyle(
                 fontFamily: headFont,
                 fontSize: 14,
-                fontWeight: FontWeight.w400,
+                fontWeight: FontWeight.w700,
                 color: AppColors.primary,
               ),
             ),
@@ -460,6 +461,7 @@ class _BackTitleAppBar extends StatelessWidget implements PreferredSizeWidget {
                 fontSize: titleSize,
                 height: 1,
                 fontFamily: AppFonts.heading,
+                fontStyle: FontStyle.italic,
                 color: AppColors.primary,
               ),
             ),
@@ -627,9 +629,12 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
                 ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
                   ..showSnackBar(SnackBar(
-                    content: Text(success
-                        ? '${product.title} added to cart'
-                        : 'Failed to add item to cart'),
+                    content: Text(
+                      success
+                          ? '${product.title} added to cart'
+                          : 'Failed to add item to cart',
+                      style: const TextStyle(fontFamily: AppFonts.accent),
+                    ),
                     duration: const Duration(seconds: 2),
                   ));
               },
@@ -1163,10 +1168,14 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
                   label.toUpperCase(),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: _headStyle(
-                    large
-                        ? _headingSize(0.09, 28, 44)
-                        : _headingSize(0.06, 20, 30),
+                  style: TextStyle(
+                    fontFamily: AppFonts.subheading,
+                    fontSize: large
+                        ? _headingSize(0.11, 34, 54)
+                        : _headingSize(0.075, 24, 36),
+                    fontStyle: FontStyle.italic,
+                    letterSpacing: 0.5,
+                    height: 1.05,
                     color: Colors.white,
                   ),
                 ),
@@ -1354,6 +1363,7 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
                     fontSize: titleSize,
                     height: 1,
                     fontFamily: _fHead,
+                    fontStyle: FontStyle.italic,
                     color: AppColors.primary,
                   ),
                 ),

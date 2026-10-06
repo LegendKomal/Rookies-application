@@ -153,6 +153,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                   fontSize: 34,
                   height: 1,
                   fontFamily: _fHead,
+                  fontStyle: FontStyle.italic,
                   color: _primary,
                 ),
               ),

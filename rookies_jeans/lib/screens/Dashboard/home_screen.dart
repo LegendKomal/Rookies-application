@@ -1838,6 +1838,7 @@ class _ShopTheLookAutoSlideCardState extends State<_ShopTheLookAutoSlideCard> {
                         success
                             ? '${product.title} added to cart'
                             : 'Failed to add item to cart',
+                        style: const TextStyle(fontFamily: AppFonts.accent),
                       ),
                       duration: const Duration(seconds: 2),
                       behavior: SnackBarBehavior.floating,
