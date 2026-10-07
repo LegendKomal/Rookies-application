@@ -270,7 +270,7 @@ class _RegisterState extends State<Register> {
                             "Create Account",
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontFamily: _fBody,
+                              fontFamily: AppFonts.heading,
                               fontSize: _s(30),
                               fontWeight: FontWeight.w400,
                               color: primary,
@@ -283,6 +283,7 @@ class _RegisterState extends State<Register> {
                             style: TextStyle(
                               fontFamily: _fBody,
                               fontSize: _s(15),
+                              fontWeight: FontWeight.w400,
                               color: secondaryText,
                               height: 1.5,
                             ),
@@ -448,7 +449,7 @@ class _RegisterState extends State<Register> {
                             : Text(
                                 "Create Account",
                                 style: TextStyle(
-                                  fontFamily: _fBody,
+                                  fontFamily: AppFonts.accent,
                                   fontSize: _s(16),
                                   fontWeight: FontWeight.w400,
                                 ),

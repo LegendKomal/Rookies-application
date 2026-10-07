@@ -380,6 +380,7 @@ class _LoginState extends State<Login> {
               )
             : Text(text,
                 style: TextStyle(
+                    fontFamily: AppFonts.accent,
                     fontSize: _s(16),
                     fontWeight: FontWeight.w400,
                     // letterSpacing: 0.2
@@ -627,6 +628,7 @@ class _LoginState extends State<Login> {
                                 : "Welcome Back",
                             textAlign: TextAlign.center,
                             style: TextStyle(
+                              fontFamily: AppFonts.heading,
                               fontSize: _s(30),
                               fontWeight: FontWeight.w400,
                               color: primary,
@@ -640,7 +642,9 @@ class _LoginState extends State<Login> {
                                 : "Sign in with your email & password",
                             textAlign: TextAlign.center,
                             style: TextStyle(
+                              fontFamily: AppFonts.body,
                               fontSize: _s(15),
+                              fontWeight: FontWeight.w400,
                               color: secondaryText,
                               height: 1.5,
                             ),
@@ -671,11 +675,15 @@ class _LoginState extends State<Login> {
                       children: [
                         Text("New to ROOKIES? ",
                             style: TextStyle(
-                                color: secondaryText, fontSize: _s(14))),
+                                fontFamily: AppFonts.body,
+                                fontWeight: FontWeight.w400,
+                                color: secondaryText,
+                                fontSize: _s(14))),
                         GestureDetector(
                           onTap: () => context.push('/register'),
                           child: Text("Create Account",
                               style: TextStyle(
+                                  fontFamily: AppFonts.body,
                                   color: primary,
                                   fontSize: _s(14),
                                   fontWeight: FontWeight.w400)),

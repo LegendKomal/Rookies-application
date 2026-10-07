@@ -1750,8 +1750,10 @@ for (final e in rawVariantEdges) {
     }).toList();
   }
 
-  /// Image per collection handle — the collection's own image, else its
-  /// first product's — in one aliased request. Handles with neither are
+  /// Image per collection handle for the Shop By Category cards, in order:
+  /// the collection's `custom.app_category_image` metafield (set in the
+  /// Shopify admin to override the card), the collection's own image, else
+  /// its first product's — in one aliased request. Handles with none are
   /// omitted.
   Future<Map<String, String>> _fetchCollectionImagesByHandle(
     List<String> handles,
@@ -1763,6 +1765,8 @@ for (final e in rawVariantEdges) {
       final safeHandle = handles[i].replaceAll('"', r'\"');
       buffer.write('  c$i: collection(handle: "$safeHandle") {\n');
       buffer.write('    image { url }\n');
+      buffer.write('    cardImage: metafield(namespace: "custom", key: "app_category_image") {'
+          ' reference { ... on MediaImage { image { url } } } }\n');
       buffer.write('    products(first: 1) { edges { node { featuredImage { url } } } }\n');
       buffer.write('  }\n');
     }
@@ -1778,7 +1782,9 @@ for (final e in rawVariantEdges) {
       for (int i = 0; i < handles.length; i++) {
         final node = data['c$i'] as Map<String, dynamic>?;
         if (node == null) continue;
-        String? url = node['image']?['url'] as String?;
+        String? url = node['cardImage']?['reference']?['image']?['url']
+                as String? ??
+            node['image']?['url'] as String?;
         final edges = (node['products']?['edges'] as List?) ?? const [];
         if (url == null && edges.isNotEmpty) {
           final product = edges.first['node'] as Map?;

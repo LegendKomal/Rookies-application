@@ -16,6 +16,7 @@ import 'package:rookies_jeans/screens/search/search_tab_page.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/widget/wishlist_heart_button.dart';
+import 'package:rookies_jeans/widget/banner_page_dots.dart';
 import 'package:rookies_jeans/widget/sticker_chip.dart';
 
 typedef R = Responsive;
@@ -233,12 +234,11 @@ class _HomeScreenState extends State<HomeScreen> {
     // ),
   ];
 
-  String? get _heroBannerImageUrl {
-    for (final banner in _heroBanners) {
-      if (banner.imageUrl != null) return banner.imageUrl;
-    }
-    return null;
-  }
+  /// Every uploaded hero banner image, in order; the hero pages through them.
+  List<String> get _heroBannerImageUrls => [
+    for (final banner in _heroBanners)
+      if (banner.imageUrl != null) banner.imageUrl!,
+  ];
 
   HomeBanner? get _primaryHeroBanner =>
       _heroBanners.isNotEmpty ? _heroBanners.first : null;
@@ -256,17 +256,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<_PromoBlockData> get _promoBlocksToDisplay {
     if (_promoBlocksContent.isEmpty) return _defaultPromoBlocks;
-    return _promoBlocksContent
-        .map(
-          (p) => _PromoBlockData(
-            assetPath: null,
-            imageUrl: p.imageUrl,
-            label: p.label,
-            buttonLabel: p.buttonLabel ?? 'Shop ${p.label}',
-            collectionHandle: p.collectionHandle,
-          ),
-        )
-        .toList();
+    // Entries sharing a label merge into one block whose images rotate; the
+    // first entry supplies the button and collection.
+    final Map<String, PromoBlockContent> firstByLabel = {};
+    final Map<String, List<String>> imagesByLabel = {};
+    for (final p in _promoBlocksContent) {
+      final key = p.label.trim().toLowerCase();
+      firstByLabel.putIfAbsent(key, () => p);
+      final images = imagesByLabel.putIfAbsent(key, () => []);
+      if (p.imageUrl != null) images.add(p.imageUrl!);
+    }
+    return firstByLabel.entries.map((e) {
+      final p = e.value;
+      return _PromoBlockData(
+        assetPath: null,
+        imageUrls: imagesByLabel[e.key]!,
+        label: p.label,
+        buttonLabel: p.buttonLabel ?? 'Shop ${p.label}',
+        collectionHandle: p.collectionHandle,
+      );
+    }).toList();
   }
 
   List<_ShopTheLookOutfit> get _shopTheLookOutfitsToDisplay {
@@ -321,7 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
           (block) => SliverToBoxAdapter(
             child: _PromoBlockCard(
               assetPath: block.assetPath,
-              imageUrl: block.imageUrl,
+              imageUrls: block.imageUrls,
               label: block.label,
               buttonLabel: block.buttonLabel,
               height: _promoBlockHeight(context),
@@ -339,19 +348,26 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Feature banners, stacked in the order they were added; same size as
   /// the Denim / Cargos promo blocks.
   List<Widget> _featureBannerSlivers() {
-    return _featureBanners
-        .map(
-          (b) => SliverToBoxAdapter(
-            child: _PromoBlockCard(
-              imageUrl: b.imageUrl,
-              label: b.label,
-              buttonLabel: b.buttonLabel ?? '',
-              height: _promoBlockHeight(context),
-              onTap: () => _openLink(b.link, title: b.label),
-            ),
+    if (_featureBanners.isEmpty) return const [];
+    // Breathing room between the banners and the sections around them.
+    final gap = SliverToBoxAdapter(
+      child: SizedBox(height: R.of(context).dp(20)),
+    );
+    return [
+      gap,
+      ..._featureBanners.map(
+        (b) => SliverToBoxAdapter(
+          child: _PromoBlockCard(
+            imageUrls: [if (b.imageUrl != null) b.imageUrl!],
+            label: b.label,
+            buttonLabel: b.buttonLabel ?? '',
+            height: _promoBlockHeight(context),
+            onTap: () => _openLink(b.link, title: b.label),
           ),
-        )
-        .toList();
+        ),
+      ),
+      gap,
+    ];
   }
 
   // ignore: unused_element
@@ -361,22 +377,24 @@ class _HomeScreenState extends State<HomeScreen> {
     final double gap = r.dp(8);
     final rows = <Widget>[];
     for (int i = 0; i < tiles.length; i += _kPriceTileColumns) {
-      rows.add(Padding(
-        padding: EdgeInsets.only(top: i == 0 ? 0 : gap),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (int j = 0; j < _kPriceTileColumns; j++) ...[
-              if (j > 0) SizedBox(width: gap),
-              Expanded(
-                child: i + j < tiles.length
-                    ? _priceTile(tiles[i + j])
-                    : const SizedBox.shrink(),
-              ),
+      rows.add(
+        Padding(
+          padding: EdgeInsets.only(top: i == 0 ? 0 : gap),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (int j = 0; j < _kPriceTileColumns; j++) ...[
+                if (j > 0) SizedBox(width: gap),
+                Expanded(
+                  child: i + j < tiles.length
+                      ? _priceTile(tiles[i + j])
+                      : const SizedBox.shrink(),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
-      ));
+      );
     }
 
     return Column(
@@ -424,10 +442,8 @@ class _HomeScreenState extends State<HomeScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ProductDetailPage(
-            handle: product.group(1)!,
-            title: name ?? '',
-          ),
+          builder: (_) =>
+              ProductDetailPage(handle: product.group(1)!, title: name ?? ''),
         ),
       );
       return;
@@ -479,15 +495,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final List<_ExploreTabDef> newTabDefs = exploreTabs.isEmpty
         ? _defaultExploreTabDefs
         : exploreTabs
-              .map((t) => _ExploreTabDef(
-                    t.label.toUpperCase(),
-                    t.collectionHandle,
-                  ))
+              .map(
+                (t) =>
+                    _ExploreTabDef(t.label.toUpperCase(), t.collectionHandle),
+              )
               .toList();
     // Stay on the same collection if it's still a tab; otherwise jump to the
     // first tab and reload the grid.
     final String activeHandle = _exploreTabDefs[_exploreTabIndex].handle;
-    final int keptIndex = newTabDefs.indexWhere((t) => t.handle == activeHandle);
+    final int keptIndex = newTabDefs.indexWhere(
+      (t) => t.handle == activeHandle,
+    );
 
     setState(() {
       _exploreTabDefs = newTabDefs;
@@ -847,23 +865,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _heroBannerImage() => Stack(
-    fit: StackFit.expand,
-    children: [
-      _heroBannerImageUrl != null
-          ? CachedNetworkImage(
-              imageUrl: _heroBannerImageUrl!,
-              fit: BoxFit.cover,
-              placeholder: (_, __) => Container(color: const Color(0xFF6B7A5E)),
-              errorWidget: (_, __, ___) =>
-                  Container(color: const Color(0xFF6B7A5E)),
-            )
-          : Image.asset(
-              'assets/banner.jpeg',
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  Container(color: const Color(0xFF6B7A5E)),
-            ),
+  Widget _heroBannerImage() {
+    // Top/bottom scrims. The pager paints them beneath its page dots so the
+    // dots stay at full brightness.
+    final scrims = <Widget>[
       Positioned.fill(
         child: IgnorePointer(
           child: DecoratedBox(
@@ -900,8 +905,26 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-    ],
-  );
+    ];
+    if (_heroBannerImageUrls.isNotEmpty) {
+      return _HeroBannerPager(
+        imageUrls: _heroBannerImageUrls,
+        overlays: scrims,
+      );
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          'assets/banner.jpeg',
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) =>
+              Container(color: const Color(0xFF6B7A5E)),
+        ),
+        ...scrims,
+      ],
+    );
+  }
 
   Widget _sliverHeadAsBox(String title) {
     final r = R.of(context);
@@ -1187,8 +1210,7 @@ class _HomeScreenState extends State<HomeScreen> {
           productRowHeight = 84.0;
         }
 
-        final double cardHeight =
-            heroHeight + (productRowHeight * maxProducts);
+        final double cardHeight = heroHeight + (productRowHeight * maxProducts);
 
         // Edge to edge: card spans the full screen width.
         return SizedBox(
@@ -1383,7 +1405,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (values.isEmpty) return const SizedBox.shrink();
 
     return StickerChipRow(
-      height: 44,
+      height: 36,
       children: [
         StickerChip(
           label: 'ALL',
@@ -1404,21 +1426,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _exploreFitChipsRow(R r) {
     final values = _exploreFitFilter?.values ?? const [];
-    return StickerChipRow(
-      height: 40,
-      children: [
-        const StickerChipCaption('FIT & FABRIC'),
-        StickerChip(
+    return GlassFilterPill(
+      caption: 'FIT & FABRIC',
+      options: [
+        GlassFilterOption(
           label: 'ALL',
           selected: _selectedExploreFitInput == null,
-          style: StickerChipStyle.mono,
           onTap: () => _selectExploreFit(null),
         ),
         for (final value in values)
-          StickerChip(
+          GlassFilterOption(
             label: value.label.toUpperCase(),
             selected: _selectedExploreFitInput == value.input,
-            style: StickerChipStyle.mono,
             onTap: () => _selectExploreFit(value),
           ),
       ],
@@ -1545,16 +1564,192 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+/// Hero banner showing every uploaded image. Slides to the next one every
+/// [interval] (looping endlessly) and can be swiped; a small horizontal page
+/// indicator ([BannerPageDots]) sits bottom-right of the image (hidden when there's
+/// only one image).
+class _HeroBannerPager extends StatefulWidget {
+  final List<String> imageUrls;
+  final Duration interval;
+
+  /// Painted over the images but beneath the page dots.
+  final List<Widget> overlays;
+  const _HeroBannerPager({
+    required this.imageUrls,
+    this.interval = const Duration(seconds: 5),
+    this.overlays = const [],
+  });
+
+  @override
+  State<_HeroBannerPager> createState() => _HeroBannerPagerState();
+}
+
+class _HeroBannerPagerState extends State<_HeroBannerPager> {
+  // Start far into an unbounded PageView so it can loop in both directions.
+  static const int _loopStart = 10000;
+
+  final PageController _controller = PageController(initialPage: _loopStart);
+  Timer? _timer;
+  int _page = 0;
+
+  int get _count => widget.imageUrls.length;
+
+  @override
+  void initState() {
+    super.initState();
+    _restartTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _HeroBannerPager oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrls.length != _count) {
+      if (_page >= _count) _page = 0;
+      _restartTimer();
+    }
+  }
+
+  // Restarted on every page change too, so a manual swipe gets a full
+  // interval before the next automatic slide.
+  void _restartTimer() {
+    _timer?.cancel();
+    if (_count < 2) return;
+    _timer = Timer.periodic(widget.interval, (_) {
+      if (!mounted || !_controller.hasClients) return;
+      _controller.nextPage(
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final count = _count;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        PageView.builder(
+          controller: _controller,
+          itemCount: count > 1 ? null : count,
+          onPageChanged: (i) {
+            setState(() => _page = (i - _loopStart) % count);
+            _restartTimer();
+          },
+          itemBuilder: (_, i) => CachedNetworkImage(
+            imageUrl: widget.imageUrls[(i - _loopStart) % count],
+            fit: BoxFit.cover,
+            placeholder: (_, __) => Container(color: const Color(0xFF6B7A5E)),
+            errorWidget: (_, __, ___) =>
+                Container(color: const Color(0xFF6B7A5E)),
+          ),
+        ),
+        ...widget.overlays,
+        if (count > 1)
+          Positioned(
+            right: BannerPageDots.right,
+            bottom: BannerPageDots.bottom,
+            child: BannerPageDots(count: count, index: _page),
+          ),
+      ],
+    );
+  }
+}
+
+/// Promo image that cross-fades to the next image every [interval] when
+/// there's more than one; a single image is shown as-is.
+class _RotatingPromoImage extends StatefulWidget {
+  final List<String> imageUrls;
+  final Duration interval;
+  const _RotatingPromoImage({
+    required this.imageUrls,
+    this.interval = const Duration(seconds: 5),
+  });
+
+  @override
+  State<_RotatingPromoImage> createState() => _RotatingPromoImageState();
+}
+
+class _RotatingPromoImageState extends State<_RotatingPromoImage> {
+  Timer? _timer;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _restartTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _RotatingPromoImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrls.length != widget.imageUrls.length) {
+      _index = 0;
+      _restartTimer();
+    }
+  }
+
+  void _restartTimer() {
+    _timer?.cancel();
+    if (widget.imageUrls.length < 2) return;
+    _timer = Timer.periodic(widget.interval, (_) {
+      if (!mounted) return;
+      setState(() => _index = (_index + 1) % widget.imageUrls.length);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final url = widget.imageUrls[_index];
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 450),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      layoutBuilder: (current, previous) => Stack(
+        fit: StackFit.expand,
+        children: [...previous, if (current != null) current],
+      ),
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: ScaleTransition(
+          scale: Tween(begin: 1.04, end: 1.0).animate(animation),
+          child: child,
+        ),
+      ),
+      child: CachedNetworkImage(
+        key: ValueKey(url),
+        imageUrl: url,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => Container(color: const Color(0xFF555555)),
+        errorWidget: (_, __, ___) => Container(color: const Color(0xFF555555)),
+      ),
+    );
+  }
+}
+
 class _PromoBlockCard extends StatefulWidget {
   final String? assetPath;
-  final String? imageUrl;
+  final List<String> imageUrls;
   final String label;
   final String buttonLabel;
   final double height;
   final VoidCallback onTap;
   const _PromoBlockCard({
     this.assetPath,
-    this.imageUrl,
+    this.imageUrls = const [],
     required this.label,
     required this.buttonLabel,
     required this.height,
@@ -1585,15 +1780,8 @@ class _PromoBlockCardState extends State<_PromoBlockCard> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              widget.imageUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: widget.imageUrl!,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) =>
-                          Container(color: const Color(0xFF555555)),
-                      errorWidget: (_, __, ___) =>
-                          Container(color: const Color(0xFF555555)),
-                    )
+              widget.imageUrls.isNotEmpty
+                  ? _RotatingPromoImage(imageUrls: widget.imageUrls)
                   : Image.asset(
                       widget.assetPath ?? 'assets/denim.png',
                       fit: BoxFit.cover,
@@ -1625,29 +1813,29 @@ class _PromoBlockCardState extends State<_PromoBlockCard> {
               ),
               if (widget.buttonLabel.isNotEmpty)
                 Positioned(
-                right: r.dp(18),
-                bottom: r.dp(20),
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: r.dp(18),
-                    vertical: r.dp(11),
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(r.dp(3)),
-                  ),
-                  child: Text(
-                    widget.buttonLabel.toUpperCase(),
-                    style: TextStyle(
-                      fontFamily: AppFonts.accent,
-                      color: const Color(0xFF111111),
-                      fontSize: r.sp(12),
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 2.0,
+                  right: r.dp(18),
+                  bottom: r.dp(20),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: r.dp(18),
+                      vertical: r.dp(11),
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(r.dp(3)),
+                    ),
+                    child: Text(
+                      widget.buttonLabel.toUpperCase(),
+                      style: TextStyle(
+                        fontFamily: AppFonts.accent,
+                        color: const Color(0xFF111111),
+                        fontSize: r.sp(12),
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 2.0,
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -1665,6 +1853,7 @@ class _ShopifyProductItem {
   final String? discountLabel;
   final String? imageUrl;
   final String imageAssetFallback;
+
   /// Source product, when this item came from Shopify (needed for wishlist).
   final ShopifyProduct? product;
   const _ShopifyProductItem({
@@ -2139,13 +2328,13 @@ class _ExploreTabDef {
 
 class _PromoBlockData {
   final String? assetPath;
-  final String? imageUrl;
+  final List<String> imageUrls;
   final String label;
   final String buttonLabel;
   final String collectionHandle;
   const _PromoBlockData({
     this.assetPath,
-    this.imageUrl,
+    this.imageUrls = const [],
     required this.label,
     required this.buttonLabel,
     required this.collectionHandle,

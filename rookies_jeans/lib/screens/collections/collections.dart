@@ -14,6 +14,7 @@ import 'package:rookies_jeans/screens/products/product_peek_dialog.dart';
 import 'package:rookies_jeans/screens/products/products.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
+import 'package:rookies_jeans/widget/banner_page_dots.dart';
 import 'package:rookies_jeans/widget/price_text.dart';
 import 'package:rookies_jeans/widget/sticker_chip.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -494,12 +495,25 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
 
   /// Selected section tab (TOP WEAR / BOTTOM WEAR / ...).
   int _sectionIndex = 0;
+
+  /// Tab drawn as selected. Moves on tap so the chip's fade animation plays
+  /// first; [_sectionIndex] (and the heavy category list below it) follows
+  /// once the fade is done, so building the new cards doesn't eat the
+  /// animation's frames.
+  int _highlightedSection = 0;
+  Timer? _sectionSwitch;
   int _looksShown = _kLooksInitial;
 
   @override
   void initState() {
     super.initState();
     _future = _load();
+  }
+
+  @override
+  void dispose() {
+    _sectionSwitch?.cancel();
+    super.dispose();
   }
 
   Future<_CollectionsPageData> _load() async {
@@ -702,7 +716,12 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
         ),
         if (categories.isNotEmpty) ...[
           SliverToBoxAdapter(child: _heading('SHOP BY CATEGORY')),
-          SliverToBoxAdapter(child: _sectionTabs(sections, sectionIndex)),
+          SliverToBoxAdapter(
+            child: _sectionTabs(
+              sections,
+              _highlightedSection < sections.length ? _highlightedSection : 0,
+            ),
+          ),
           for (final c in categories)
             SliverToBoxAdapter(child: _categoryGroup(c)),
         ],
@@ -805,7 +824,7 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
   // Shop by category
   // ---------------------------------------------------------------------
 
-  /// One row of section tabs (TOP WEAR » / BOTTOM WEAR » / ...); the
+  /// One row of section tabs (TOP WEAR / BOTTOM WEAR / ...); the
   /// selected section's categories are listed below it.
   Widget _sectionTabs(List<ShopMenuSection> sections, int selected) {
     if (sections.length < 2) return const SizedBox(height: 4);
@@ -816,14 +835,24 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
         children: [
           for (int i = 0; i < sections.length; i++)
             StickerChip(
-              label: '${sections[i].title.toUpperCase()} »',
+              label: sections[i].title.toUpperCase(),
               selected: i == selected,
               style: StickerChipStyle.mini,
-              onTap: () => setState(() => _sectionIndex = i),
+              fadeAnimation: true,
+              onTap: () => _selectSection(i),
             ),
         ],
       ),
     );
+  }
+
+  void _selectSection(int i) {
+    if (i == _highlightedSection) return;
+    setState(() => _highlightedSection = i);
+    _sectionSwitch?.cancel();
+    _sectionSwitch = Timer(StickerChip.fadeDuration, () {
+      if (mounted) setState(() => _sectionIndex = _highlightedSection);
+    });
   }
 
   bool get _wideLayout => MediaQuery.of(context).size.width >= 700;
@@ -1277,19 +1306,11 @@ class _BannerCarouselState extends State<_BannerCarousel> {
           ),
           if (widget.banners.length > 1)
             Positioned(
-              left: 16,
-              bottom: 16,
-              child: Row(
-                children: List.generate(widget.banners.length, (i) {
-                  final bool active = i == _index;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    margin: const EdgeInsets.only(right: 5),
-                    width: active ? 22 : 8,
-                    height: 3,
-                    color: active ? Colors.white : Colors.white54,
-                  );
-                }),
+              right: BannerPageDots.right,
+              bottom: BannerPageDots.bottom,
+              child: BannerPageDots(
+                count: widget.banners.length,
+                index: _index,
               ),
             ),
         ],

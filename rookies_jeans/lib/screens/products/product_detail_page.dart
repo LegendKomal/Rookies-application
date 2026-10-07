@@ -12,6 +12,7 @@ import 'package:rookies_jeans/models/cart_model.dart';
 import 'package:rookies_jeans/models/product_detail_model.dart';
 import 'package:rookies_jeans/models/product_model.dart';
 import 'package:rookies_jeans/screens/products/size_chart_view.dart';
+import 'package:rookies_jeans/services/product_pairings.dart';
 import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 import 'package:rookies_jeans/services/wishlist_service.dart';
 import 'package:rookies_jeans/services/recently_viewed_service.dart';
@@ -19,7 +20,7 @@ import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/screens/cart/cart.dart';
 import 'package:rookies_jeans/screens/cart/checkout_flow.dart';
 import 'package:rookies_jeans/widget/price_text.dart';
-import 'package:rookies_jeans/widget/wishlist_heart_button.dart';
+import 'package:rookies_jeans/widget/product_row_section.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final String handle;
@@ -198,34 +199,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     'COLOR', 'CARE', 'FIT',
   ];
 
-  static const Map<String, _PairingConfig> _categoryPairings = {
-    'shirt': _PairingConfig(
-      label: 'GOES WELL WITH',
-      collectionHandles: ['ss26-loose-fit-jeans', 'ss26-bootcutjeans', 'baloon-fit-pants'],
-      displayLabel: 'Jeans & Trousers',
-    ),
-    'tshirt': _PairingConfig(
-      label: 'GOES WELL WITH',
-      collectionHandles: ['ss26-loose-fit-jeans', 'baloon-fit-pants'],
-      displayLabel: 'Bottoms',
-    ),
-    'jeans': _PairingConfig(
-      label: 'GOES WELL WITH',
-      collectionHandles: ['ss26-tshirts-oversize-fit-half-sleeve', 'oversized-shirts'],
-      displayLabel: 'Tops & Shirts',
-    ),
-    'pants': _PairingConfig(
-      label: 'GOES WELL WITH',
-      collectionHandles: ['ss26-tshirts-oversize-fit-half-sleeve', 'oversized-shirts'],
-      displayLabel: 'Tops & Shirts',
-    ),
-    'linen': _PairingConfig(
-      label: 'GOES WELL WITH',
-      collectionHandles: ['ss26-loose-fit-jeans', 'baloon-fit-pants'],
-      displayLabel: 'Relaxed Bottoms',
-    ),
-  };
-
   @override
   void initState() {
     super.initState();
@@ -244,15 +217,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     super.dispose();
   }
 
-  String _detectCategory() {
-    final combined = '$_currentHandle $_currentTitle'.toLowerCase();
-    if (combined.contains('shirt')) return 'shirt';
-    if (combined.contains('tshirt') || combined.contains('t-shirt') || combined.contains('tee')) return 'tshirt';
-    if (combined.contains('jean') || combined.contains('denim')) return 'jeans';
-    if (combined.contains('pant') || combined.contains('trouser') || combined.contains('cargo')) return 'pants';
-    if (combined.contains('linen')) return 'linen';
-    return 'shirt';
-  }
+  String _detectCategory() =>
+      ProductPairings.detectCategory(_currentHandle, _currentTitle);
 
   Future<void> _fetchProduct() async {
     if (mounted) {
@@ -337,12 +303,12 @@ debugPrint('==========================================');
     if (!mounted) return;
     setState(() => _isLoadingRelated = true);
 
-    final category = _detectCategory();
-    final pairing  = _categoryPairings[category];
+    final pairings =
+        ProductPairings.goesWellWithCollections(_detectCategory());
 
     try {
-      if (pairing != null && pairing.collectionHandles.isNotEmpty) {
-        final handle   = pairing.collectionHandles.first;
+      if (pairings.isNotEmpty) {
+        final handle   = pairings.first;
         final products = await ShopifyStorefrontService.instance
             .getProductsByCollection(handle, first: 6);
         if (mounted) {
@@ -369,27 +335,8 @@ debugPrint('==========================================');
     }
   }
 
-  String _sameCollectionHandle() {
-    final category = _detectCategory();
-    switch (category) {
-      case 'shirt':
-        return _currentHandle.contains('oversized')
-            ? 'oversized-shirts'
-            : 'ss26-linens';
-      case 'tshirt':
-        return 'ss26-tshirts-oversize-fit-half-sleeve';
-      case 'jeans':
-        return _currentHandle.contains('loose')
-            ? 'ss26-loose-fit-jeans'
-            : 'ss26-bootcutjeans';
-      case 'pants':
-        return 'baloon-fit-pants';
-      case 'linen':
-        return 'ss26-linens';
-      default:
-        return 'all';
-    }
-  }
+  String _sameCollectionHandle() =>
+      ProductPairings.sameCollectionHandle(_detectCategory(), _currentHandle);
 
   void _updateVariant() {
     if (_product == null || _product!.variants.isEmpty) return;
@@ -529,19 +476,6 @@ debugPrint('==========================================');
     }
   }
 
-  void _openProductDetail(ShopifyProduct product) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProductDetailPage(
-          handle: product.handle,
-          title: product.title,
-          heroImageUrl: product.primaryImageUrl,
-        ),
-      ),
-    );
-  }
-
   /// Swaps in [product] as the one shown on THIS page — used when picking a
   /// different color from the same Variant King group — instead of pushing
   /// a new route. This is the familiar "tap a color swatch, the page
@@ -621,11 +555,11 @@ debugPrint('==========================================');
                   _infoSection(p),
                   if (_goesWellWith.isNotEmpty) ...[
                     const Divider(height: 1),
-                    _productRowSection('GOES WELL WITH', _goesWellWith),
+                    ProductRowSection(title: 'GOES WELL WITH', products: _goesWellWith),
                   ],
                   if (_youMayAlsoLike.isNotEmpty) ...[
                     const Divider(height: 1),
-                    _productRowSection('YOU MAY ALSO LIKE', _youMayAlsoLike),
+                    ProductRowSection(title: 'YOU MAY ALSO LIKE', products: _youMayAlsoLike),
                   ],
                   _recentlyViewedSection(p.id),
                   const SizedBox(height: 40),
@@ -1247,20 +1181,6 @@ _variantMetafieldsSection(),
     );
   }
 
-  /// Anton has no italic face, so the tilt is a skew (same as the home screen).
-  Widget _italicHeading(String text) => Transform(
-        transform: Matrix4.skewX(-0.2),
-        alignment: Alignment.bottomLeft,
-        child: Text(
-          text,
-          style: TextStyle(
-            fontFamily: _fHeading,
-            fontSize: _s(22).clamp(20.0, 28.0),
-            color: primary,
-          ),
-        ),
-      );
-
   /// Every product the customer has opened (saved across app restarts)
   /// except this one, newest first.
   Widget _recentlyViewedSection(String currentProductId) => ListenableBuilder(
@@ -1274,113 +1194,11 @@ _variantMetafieldsSection(),
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Divider(height: 1),
-              _productRowSection('RECENTLY VIEWED', items),
+              ProductRowSection(title: 'RECENTLY VIEWED', products: items),
             ],
           );
         },
       );
-
-  /// Heading + horizontally scrolling product cards.
-  Widget _productRowSection(String title, List<ShopifyProduct> products) {
-    final cardWidth = _s(140).clamp(120.0, 180.0);
-    final imgHeight = _s(150).clamp(130.0, 200.0);
-    final listHeight = imgHeight + _s(70).clamp(60.0, 90.0);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 0, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16, bottom: 14),
-            child: _italicHeading(title),
-          ),
-          SizedBox(
-            height: listHeight,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.only(right: 16),
-              itemCount: products.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 6),
-              itemBuilder: (_, i) =>
-                  _pairingCard(products[i], cardWidth, imgHeight),
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _pairingCard(ShopifyProduct product, double cardWidth, double imgHeight) {
-    return GestureDetector(
-      onTap: () => _openProductDetail(product),
-      child: SizedBox(
-        width: cardWidth,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              child: SizedBox(
-                width: cardWidth,
-                height: imgHeight,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    product.primaryImageUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: product.primaryImageUrl!,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) =>
-                                Container(color: fieldFill),
-                            errorWidget: (_, __, ___) =>
-                                Container(color: fieldFill),
-                          )
-                        : Container(color: fieldFill),
-                    Positioned(
-                      top: 2,
-                      right: 2,
-                      child: WishlistHeartButton(product: product, size: 18, idleColor: Colors.black),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              product.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: _fBody,
-                fontSize: _s(11),
-                color: primary,
-                height: 1.3,
-              ),
-            ),
-            const SizedBox(height: 3),
-            _pairingPriceText(product),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _pairingPriceText(ShopifyProduct product) {
-    if (!product.isOnSale) {
-      return PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(11), color: primary, amountFontFamily: _fBody);
-    }
-    return Row(
-      children: [
-        Flexible(
-          child: PriceText(product.formattedPrice, currencyCode: product.currencyCode, fontSize: _s(11), color: primary),
-        ),
-        const SizedBox(width: 5),
-        Flexible(
-          child: PriceText(product.formattedCompareAtPrice, currencyCode: product.currencyCode, fontSize: _s(10), color: secondaryTxt, decoration: TextDecoration.lineThrough),
-        ),
-      ],
-    );
-  }
 
   Widget _priceBlock(ShopifyProductDetail p) {
     if (!p.isOnSale) {
@@ -1875,18 +1693,6 @@ _variantMetafieldsSection(),
           ),
         ),
       );
-}
-
-class _PairingConfig {
-  final String label;
-  final List<String> collectionHandles;
-  final String displayLabel;
-
-  const _PairingConfig({
-    required this.label,
-    required this.collectionHandles,
-    required this.displayLabel,
-  });
 }
 
 class FullScreenImageViewer extends StatefulWidget {
