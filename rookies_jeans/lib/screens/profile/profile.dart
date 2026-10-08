@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/constant/app_ui.dart';
+import 'package:rookies_jeans/services/otp_auth_service.dart';
 import 'package:rookies_jeans/services/shopify_auth_service.dart';
 
 const double _kMaxContentW = 640;
@@ -480,6 +481,56 @@ class _MoreSection extends StatelessWidget {
     );
   }
 
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.card,
+        title: Text(
+          'Delete account?',
+          style: TextStyle(fontFamily: AppFonts.subheading, color: AppColors.primary),
+        ),
+        content: Text(
+          'This permanently deletes your Rookies account, saved addresses and '
+          'profile details. Order records may be kept where the law requires. '
+          'This cannot be undone.',
+          style: TextStyle(fontFamily: AppFonts.body, color: AppColors.secondaryText),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text('Cancel', style: TextStyle(color: AppColors.primary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    final error = await OtpAuthService.instance.deleteAccount();
+    if (!context.mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+
+    final messenger = ScaffoldMessenger.of(context);
+    if (error != null) {
+      messenger.showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+    await AuthService.instance.signOut();
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Your account has been deleted.')),
+    );
+    if (context.mounted) context.go('/home');
+  }
+
   void _showThemeSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -637,6 +688,12 @@ class _MoreSection extends StatelessWidget {
                   await AuthService.instance.signOut();
                   if (context.mounted) context.go('/home');
                 },
+              ),
+            if (showSignOut)
+              _MoreTile(
+                label: 'Delete Account',
+                icon: Icons.delete_outline_rounded,
+                onTap: () => _confirmDeleteAccount(context),
               ),
             SizedBox(height: _s(context, 8)),
           ],

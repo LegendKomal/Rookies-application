@@ -132,6 +132,20 @@ class OtpAuthService {
     return _signIn(res.body);
   }
 
+  /// Permanently deletes the signed-in customer's Shopify account through the
+  /// otp_login_worker (Storefront has no customer delete; the worker holds
+  /// the Admin token). Required in-app by the App Store and Google Play.
+  /// Returns null on success, otherwise a user-facing error message. The
+  /// caller signs out afterwards.
+  Future<String?> deleteAccount() async {
+    final token = await ShopifyAuthService.instance.getSavedCustomerToken();
+    if (token == null || token.isEmpty) {
+      return 'Your session has expired. Please sign in again.';
+    }
+    final res = await _worker('/delete-account', {'customerAccessToken': token});
+    return res.error;
+  }
+
   Future<OtpVerifyResult> _signIn(Map<String, dynamic> body) async {
     final token = body['accessToken'] as String?;
     if (body['status'] != 'signed_in' || token == null || token.isEmpty) {

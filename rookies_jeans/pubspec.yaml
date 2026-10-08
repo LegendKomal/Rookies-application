@@ -1,5 +1,5 @@
 name: rookies_jeans
-description: "A new Flutter project."
+description: "Rookies Jeans shopping app."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -21,19 +21,21 @@ dependencies:
   shared_preferences: ^2.5.5
   fluttertoast: ^9.1.0
   webview_flutter: ^4.14.0
-  flutter_launcher_icons: ^0.14.4
   share_plus: ^11.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/app_icon.png"
   remove_alpha_ios: true
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/app_icon.png"
 
 flutter:
   uses-material-design: true

@@ -1,6 +1,6 @@
 # Rookies OTP login backend
 
-A tiny backend (two endpoints; Vercel or Cloudflare free tier is plenty) that
+A tiny backend (OTP login + account deletion; Vercel or Cloudflare free tier is plenty) that
 lets the app sign customers in with an MSG91 phone OTP. No panel, no UI,
 nothing to keep running — deploy once.
 
@@ -34,7 +34,8 @@ Admin → Settings → Apps → Develop apps → "Build apps in Dev Dashboard"):
 
 1. **Create app** → name it e.g. `Rookies OTP Login`.
 2. On the app's version, set **Access scopes** to `read_customers` and
-   `write_customers`, then **Release** the version.
+   `write_customers` (plus `write_customer_data_erasure` for account
+   deletion of customers who have orders), then **Release** the version.
 3. **Install** the app on the Rookies store and approve the permissions.
 4. **App settings** → copy the **Client ID** and **Client secret** for step 3.
 
@@ -67,7 +68,7 @@ accounts → Multipass). See below.
    **Other**. Leave build settings empty.
 4. **Environment Variables**: add the five secrets above.
 5. **Deploy**. Put `https://<project>.vercel.app/api` in `otpLoginUrl` in
-   `lib/constant/shopify_constants.dart` (the app adds `/login`, `/complete`).
+   `lib/constant/shopify_constants.dart` (the app adds `/login`, `/complete`, `/delete-account`).
 
 Logs: the project's **Logs** tab. Changing a variable needs a **Redeploy**.
 

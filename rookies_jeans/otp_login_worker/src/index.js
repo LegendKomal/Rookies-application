@@ -1,4 +1,4 @@
-// Rookies phone-OTP login: a Cloudflare Worker with two endpoints.
+// Rookies phone-OTP login + account deletion: a Cloudflare Worker.
 //
 // The app sends and verifies the OTP itself with the MSG91 OTP widget, which
 // hands back a short-lived MSG91 access token. This worker exists only to
@@ -13,6 +13,14 @@
 //        | {status: "profile_required", verificationToken, firstName, lastName}
 //   POST /complete  {verificationToken, email, firstName, lastName}
 //       -> {status: "signed_in", accessToken, expiresAt}
+//   POST /delete-account  {customerAccessToken}
+//       -> {status: "deleted"} | {status: "erasure_requested"}
+//
+// /delete-account is the in-app account deletion Apple (5.1.1(v)) and Google
+// Play require. Storefront has no customer delete, so the worker confirms the
+// token with Storefront and deletes with the Admin API. Shopify refuses to
+// delete customers who have orders; those get a GDPR data-erasure request
+// instead, which Shopify carries out after its retention period.
 //
 // "profile_required" means no Shopify customer with an email owns the phone
 // yet; the app collects name + email and calls /complete with the ticket.
@@ -59,10 +67,14 @@ export async function handleRequest(request, env) {
   try {
     if (action === 'login') return await login(body, env);
     if (action === 'complete') return await complete(body, env);
+    if (action === 'delete-account') return await deleteAccount(body, env);
     return json({ error: 'Not found' }, 404);
   } catch (e) {
     console.error(e);
-    return json({ error: 'Could not complete sign in. Please try again.' }, 502);
+    const message = action === 'delete-account'
+      ? 'Could not delete your account. Please try again.'
+      : 'Could not complete sign in. Please try again.';
+    return json({ error: message }, 502);
   }
 }
 
@@ -137,6 +149,44 @@ async function complete(body, env) {
   }
 
   return signedIn(customer, env);
+}
+
+async function deleteAccount(body, env) {
+  const token = body?.customerAccessToken;
+  if (typeof token !== 'string' || !token) return json({ error: 'Invalid request.' }, 400);
+
+  // Only the holder of a live customer token can delete that customer.
+  const data = await storefrontGraphql(
+    'query ($token: String!) { customer(customerAccessToken: $token) { id } }',
+    { token },
+    env,
+  );
+  const customerId = data.customer?.id;
+  if (!customerId) {
+    return json({ error: 'Your session has expired. Please sign in again.' }, 401);
+  }
+
+  const deleted = await adminGraphql(
+    `mutation ($input: CustomerDeleteInput!) {
+      customerDelete(input: $input) { deletedCustomerId userErrors { message } }
+    }`,
+    { input: { id: customerId } },
+    env,
+  );
+  if (deleted.customerDelete.deletedCustomerId) return json({ status: 'deleted' });
+
+  // Typically "customer has orders": erase the personal data instead.
+  console.error('customerDelete refused:',
+    deleted.customerDelete.userErrors.map((e) => e.message).join('; '));
+  const erasure = await adminGraphql(
+    `mutation ($id: ID!) {
+      customerRequestDataErasure(customerId: $id) { customerId userErrors { message } }
+    }`,
+    { id: customerId },
+    env,
+  );
+  assertNoUserErrors(erasure.customerRequestDataErasure.userErrors, 'customerRequestDataErasure');
+  return json({ status: 'erasure_requested' });
 }
 
 async function signedIn(customer, env) {
