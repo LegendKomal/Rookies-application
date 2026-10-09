@@ -324,7 +324,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                 backgroundColor: _primary,
                 foregroundColor: _onPrimary,
                 elevation: 0,
-                shape: const RoundedRectangleBorder(),
+                shape: AppShapes.button,
               ),
               child: _isSaving
                   ? SizedBox(

@@ -1,3 +1,5 @@
+import 'dart:math' show min;
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
@@ -337,9 +339,9 @@ class _CartScreenState extends State<CartScreen> {
                   'No items in your cart',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontFamily: _fHead,
-                    fontSize: _s(22),
-                    fontWeight: FontWeight.w500,
+                    fontFamily: _fBody,
+                    fontSize: _s(20),
+                    fontWeight: FontWeight.w800,
                     color: primary,
                   ),
                 ),
@@ -362,28 +364,55 @@ class _CartScreenState extends State<CartScreen> {
   );
 
   double _maxTileExtent(double width) {
-    if (width >= 1024) return 240;
-    if (width >= 600) return 220;
-    return 200;
+    if (width >= 1024) return 200;
+    if (width >= 600) return 180;
+    return 160;
   }
 
-  /// Wishlist-style grid. Cards are sized so a full row fits the top half.
+  /// Grid of cart cards, styled like the Goes Well With cards: product
+  /// photo with the details underneath. Cards fill their column; the photo
+  /// box is shortened so a full row fits the top half with the next row
+  /// peeking in below (hinting that the area scrolls); the photo fills
+  /// the box, trimmed at the bottom if needed.
   Widget _cartGrid(ShopifyCart cart, double areaHeight) => _centered(
-    GridView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(12),
-      itemCount: cart.lines.length,
-      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: _maxTileExtent(MediaQuery.of(context).size.width),
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        mainAxisExtent: (areaHeight - 24).clamp(240.0, 380.0),
-      ),
-      itemBuilder: (_, i) => _cartLineCard(cart.lines[i]),
+    LayoutBuilder(
+      builder: (context, constraints) {
+        const double pad = 12, gap = 10, runGap = 16, peek = 80;
+        final double inner = constraints.maxWidth - pad * 2;
+        final double maxExtent =
+            _maxTileExtent(MediaQuery.of(context).size.width);
+        final int columns =
+            ((inner + gap) / (maxExtent + gap)).ceil().clamp(3, 6);
+        final double slotWidth = (inner - gap * (columns - 1)) / columns;
+        // Title, variant, price and the stepper row under the photo.
+        final double infoHeight = 20 + _s(66);
+        final double imageHeight =
+            (areaHeight - pad - runGap - peek - infoHeight)
+                .clamp(min(120.0, slotWidth * 1.5), slotWidth * 1.5);
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(pad),
+          // Full width so a lone card sits on the left, not centred.
+          child: SizedBox(
+            width: inner,
+            child: Wrap(
+              spacing: gap,
+              runSpacing: runGap,
+              children: [
+                for (final line in cart.lines)
+                  SizedBox(
+                    width: slotWidth,
+                    child: _cartLineCard(line, imageHeight),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     ),
   );
 
-  Widget _cartLineCard(ShopifyCartLine line) {
+  Widget _cartLineCard(ShopifyCartLine line, double imageHeight) {
     final isPending = _pendingLineIds.contains(line.lineId);
 
     // Tapping anywhere on the card opens the product; the quantity stepper
@@ -391,22 +420,22 @@ class _CartScreenState extends State<CartScreen> {
     return GestureDetector(
       onTap: line.productHandle != null ? () => _openProduct(line) : null,
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        decoration: BoxDecoration(
-          color: cardColor,
-          border: Border.all(color: borderColor, width: 0.8),
-        ),
-        child: Column(
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            SizedBox(
+              width: double.infinity,
+              height: imageHeight,
               child: Stack(
                 children: [
                   Positioned.fill(
                     child: line.imageUrl != null
                         ? CachedNetworkImage(
                             imageUrl: line.imageUrl!,
+                            // Fills the box; trims the bottom of the photo
+                            // when the box is shorter, keeping the face.
                             fit: BoxFit.cover,
+                            alignment: Alignment.topCenter,
                             placeholder: (_, __) => Container(color: fieldFill),
                             errorWidget: (_, __, ___) => Container(
                               color: fieldFill,
@@ -424,7 +453,7 @@ class _CartScreenState extends State<CartScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+              padding: const EdgeInsets.only(top: 7),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -434,10 +463,10 @@ class _CartScreenState extends State<CartScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontFamily: _fBody,
-                      fontSize: _s(12),
+                      fontSize: _s(11),
                       fontWeight: FontWeight.w700,
                       color: primary,
-                      height: 1.35,
+                      height: 1.3,
                     ),
                   ),
                   if (line.variantTitle != null &&
@@ -449,12 +478,12 @@ class _CartScreenState extends State<CartScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontFamily: _fBody,
-                        fontSize: _s(10),
+                        fontSize: _s(9),
                         color: secondaryTxt,
                       ),
                     ),
                   ],
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
                       Flexible(
@@ -463,7 +492,7 @@ class _CartScreenState extends State<CartScreen> {
                               ? line.price.toStringAsFixed(0)
                               : '${line.currencyCode} ${line.price.toStringAsFixed(2)}',
                           currencyCode: line.currencyCode,
-                          fontSize: _s(14),
+                          fontSize: _s(12),
                           fontWeight: FontWeight.w800,
                           amountFontFamily: _fBody,
                           color: primary,
@@ -483,7 +512,7 @@ class _CartScreenState extends State<CartScreen> {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       _qtyStepper(line, isPending),
@@ -498,7 +527,7 @@ class _CartScreenState extends State<CartScreen> {
                               onTap: () => _removeLine(line),
                               child: Icon(
                                 Icons.delete_outline_rounded,
-                                size: _s(20),
+                                size: _s(17),
                                 color: secondaryTxt,
                               ),
                             ),
@@ -509,7 +538,6 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 
@@ -600,13 +628,13 @@ class _CartScreenState extends State<CartScreen> {
               : () => _changeQuantity(line, line.quantity - 1),
         ),
         SizedBox(
-          width: _s(28),
+          width: _s(22),
           child: Text(
             '${line.quantity}',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: _fBold,
-              fontSize: _s(12),
+              fontSize: _s(11),
               fontWeight: FontWeight.w700,
               color: primary,
             ),
@@ -626,9 +654,9 @@ class _CartScreenState extends State<CartScreen> {
       InkWell(
         onTap: onTap,
         child: SizedBox(
-          width: _s(26).clamp(26.0, 40.0),
-          height: _s(26).clamp(26.0, 40.0),
-          child: Icon(icon, size: _s(14), color: primary),
+          width: _s(22).clamp(22.0, 32.0),
+          height: _s(22).clamp(22.0, 32.0),
+          child: Icon(icon, size: _s(12), color: primary),
         ),
       );
 
@@ -683,9 +711,7 @@ class _CartScreenState extends State<CartScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primary,
                   foregroundColor: onPrimary,
-                  shape: const RoundedRectangleBorder(
-                    // borderRadius: BorderRadius.circular(8),
-                  ),
+                  shape: AppShapes.button,
                   elevation: 0,
                   padding: EdgeInsets.symmetric(
                     horizontal: _s(28).clamp(20.0, 40.0),

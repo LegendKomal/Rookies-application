@@ -118,7 +118,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         backgroundColor: _primary,
                         foregroundColor: _onPrimary,
                         elevation: 0,
-                        shape: const RoundedRectangleBorder(),
+                        shape: AppShapes.button,
                       ),
                       child: const Text(
                         'Retry',

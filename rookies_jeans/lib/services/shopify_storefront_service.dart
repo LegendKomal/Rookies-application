@@ -1750,23 +1750,61 @@ for (final e in rawVariantEdges) {
     }).toList();
   }
 
+  /// All `category_card_image` entries ("Shop By Category Image" in
+  /// Shopify admin → Metaobjects) as collection handle → image URL.
+  Future<Map<String, String>> _fetchCategoryCardImages() async {
+    const String query = r'''
+      query getCategoryCardImages {
+        metaobjects(type: "category_card_image", first: 250) {
+          edges {
+            node {
+              collection: field(key: "collection") { reference { ... on Collection { handle } } }
+              image: field(key: "image") { reference { ... on MediaImage { image { url } } } }
+            }
+          }
+        }
+      }
+    ''';
+
+    try {
+      final res = await ShopifyGraphQL.post(query);
+      _log('getCategoryCardImages → ${res.statusCode}');
+      if (res.hasErrors || res.data == null) return {};
+
+      final edges = (res.data!['metaobjects']?['edges'] as List?) ?? [];
+      final Map<String, String> images = {};
+      for (final e in edges) {
+        final node = e['node'] as Map<String, dynamic>;
+        final String? handle =
+            node['collection']?['reference']?['handle'] as String?;
+        final String? url =
+            node['image']?['reference']?['image']?['url'] as String?;
+        if (handle != null && handle.isNotEmpty && url != null) {
+          images[handle] = url;
+        }
+      }
+      return images;
+    } catch (e) {
+      _log('getCategoryCardImages EXCEPTION: $e');
+      return {};
+    }
+  }
+
   /// Image per collection handle for the Shop By Category cards, in order:
-  /// the collection's `custom.app_category_image` metafield (set in the
-  /// Shopify admin to override the card), the collection's own image, else
-  /// its first product's — in one aliased request. Handles with none are
-  /// omitted.
+  /// its "Shop By Category Image" metaobject entry (set in the Shopify
+  /// admin to override the card), the collection's own image, else its
+  /// first product's. Handles with none are omitted.
   Future<Map<String, String>> _fetchCollectionImagesByHandle(
     List<String> handles,
   ) async {
     if (handles.isEmpty) return {};
 
+    final cardImagesFuture = _fetchCategoryCardImages();
     final buffer = StringBuffer('query getCollectionImages {\n');
     for (int i = 0; i < handles.length; i++) {
       final safeHandle = handles[i].replaceAll('"', r'\"');
       buffer.write('  c$i: collection(handle: "$safeHandle") {\n');
       buffer.write('    image { url }\n');
-      buffer.write('    cardImage: metafield(namespace: "custom", key: "app_category_image") {'
-          ' reference { ... on MediaImage { image { url } } } }\n');
       buffer.write('    products(first: 1) { edges { node { featuredImage { url } } } }\n');
       buffer.write('  }\n');
     }
@@ -1775,16 +1813,25 @@ for (final e in rawVariantEdges) {
     try {
       final res = await ShopifyGraphQL.post(buffer.toString());
       _log('getExploreMenuSections (images) → ${res.statusCode}');
-      if (res.hasErrors || res.data == null) return {};
+      final cardImages = await cardImagesFuture;
+      if (res.hasErrors || res.data == null) {
+        return {
+          for (final h in handles)
+            if (cardImages[h] != null) h: cardImages[h]!,
+        };
+      }
 
       final data = res.data!;
       final Map<String, String> result = {};
       for (int i = 0; i < handles.length; i++) {
+        final override = cardImages[handles[i]];
+        if (override != null) {
+          result[handles[i]] = override;
+          continue;
+        }
         final node = data['c$i'] as Map<String, dynamic>?;
         if (node == null) continue;
-        String? url = node['cardImage']?['reference']?['image']?['url']
-                as String? ??
-            node['image']?['url'] as String?;
+        String? url = node['image']?['url'] as String?;
         final edges = (node['products']?['edges'] as List?) ?? const [];
         if (url == null && edges.isNotEmpty) {
           final product = edges.first['node'] as Map?;

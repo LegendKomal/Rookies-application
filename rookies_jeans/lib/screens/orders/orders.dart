@@ -1106,7 +1106,7 @@ class _ActionButton extends StatelessWidget {
               ),
             ),
           );
-    const shape = RoundedRectangleBorder();
+    const shape = AppShapes.button;
 
     return SizedBox(
       height: height,

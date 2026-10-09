@@ -824,24 +824,29 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
   // Shop by category
   // ---------------------------------------------------------------------
 
-  /// One row of section tabs (TOP WEAR / BOTTOM WEAR / ...); the
-  /// selected section's categories are listed below it.
+  /// One row of section tabs (TOP WEAR / BOTTOM WEAR / ...), sharing the
+  /// screen width equally; the selected section's categories are listed
+  /// below it.
   Widget _sectionTabs(List<ShopMenuSection> sections, int selected) {
     if (sections.length < 2) return const SizedBox(height: 4);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: StickerChipRow(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+      child: SizedBox(
         height: 34,
-        children: [
-          for (int i = 0; i < sections.length; i++)
-            StickerChip(
-              label: sections[i].title.toUpperCase(),
-              selected: i == selected,
-              style: StickerChipStyle.mini,
-              fadeAnimation: true,
-              onTap: () => _selectSection(i),
-            ),
-        ],
+        child: Row(
+          children: [
+            for (int i = 0; i < sections.length; i++)
+              Expanded(
+                child: StickerChip(
+                  label: sections[i].title.toUpperCase(),
+                  selected: i == selected,
+                  style: StickerChipStyle.mini,
+                  fadeAnimation: true,
+                  onTap: () => _selectSection(i),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

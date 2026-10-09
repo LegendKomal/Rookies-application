@@ -976,10 +976,13 @@ debugPrint('==========================================');
           Text(
             p.title,
             style: TextStyle(
-              fontFamily: _fBody,
-              fontSize: _s(22),
+              // Bebas Neue is condensed and has one weight, so it runs
+              // larger than the body font and isn't bolded.
+              fontFamily: AppFonts.subheading,
+              fontSize: _s(30),
+              letterSpacing: 0.5,
               color: primary,
-              height: 1.3,
+              height: 1.05,
             ),
           ),
           const SizedBox(height: 8),
@@ -1453,7 +1456,7 @@ _variantMetafieldsSection(),
           style: ElevatedButton.styleFrom(
             disabledBackgroundColor: borderColor,
             elevation: 0,
-            shape: const RoundedRectangleBorder(),
+            shape: AppShapes.button,
           ),
           child: Text('SOLD OUT', style: label.copyWith(color: onPrimary)),
         ),
@@ -1484,7 +1487,7 @@ _variantMetafieldsSection(),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: primary,
                         side: BorderSide(color: primary, width: 1.2),
-                        shape: const RoundedRectangleBorder(),
+                        shape: AppShapes.button,
                         minimumSize: Size.fromHeight(height),
                       ),
                       child: _isAddingToCart
@@ -1509,7 +1512,7 @@ _variantMetafieldsSection(),
                   foregroundColor: onPrimary,
                   disabledBackgroundColor: primary.withValues(alpha: 0.6),
                   elevation: 0,
-                  shape: const RoundedRectangleBorder(),
+                  shape: AppShapes.button,
                   minimumSize: Size.fromHeight(height),
                 ),
                 child: _isBuyingNow
@@ -1543,7 +1546,9 @@ _variantMetafieldsSection(),
       height: height,
       decoration: BoxDecoration(
         border: Border.all(color: primary, width: 1.2),
+        borderRadius: AppShapes.buttonBorderRadius,
       ),
+      clipBehavior: Clip.antiAlias,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

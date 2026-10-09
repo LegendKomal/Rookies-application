@@ -355,7 +355,7 @@ class _CheckoutWebViewState extends State<CheckoutWebView> {
                     backgroundColor: primary,
                     foregroundColor: onPrimary,
                     elevation: 0,
-                    shape: const RoundedRectangleBorder(),
+                    shape: AppShapes.button,
                     padding: EdgeInsets.symmetric(
                         horizontal: _s(28), vertical: _s(12)),
                   ),

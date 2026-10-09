@@ -30,16 +30,17 @@ class ProductRowSection extends StatelessWidget {
     double s(double base) =>
         Responsive.of(context, baseW: 400, maxScale: 1.25).s(base);
 
-    final cardWidth = s(140).clamp(120.0, 180.0);
-    final imgHeight = s(150).clamp(130.0, 200.0);
-    final listHeight = imgHeight + s(70).clamp(60.0, 90.0);
+    final cardWidth = s(125).clamp(110.0, 165.0);
+    // Product photos are 2:3 portrait; match it so nothing gets cropped.
+    final imgHeight = cardWidth * 1.5;
+    final listHeight = imgHeight + s(56).clamp(50.0, 74.0);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 0, 8),
+      padding: const EdgeInsets.fromLTRB(16, 16, 0, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(right: 16, bottom: 14),
+            padding: const EdgeInsets.only(right: 16, bottom: 10),
             child: Transform(
               transform: Matrix4.skewX(-0.2),
               alignment: Alignment.bottomLeft,
@@ -67,7 +68,7 @@ class ProductRowSection extends StatelessWidget {
                   _card(context, s, products[i], cardWidth, imgHeight),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
         ],
       ),
     );
@@ -107,6 +108,7 @@ class ProductRowSection extends StatelessWidget {
                         ? CachedNetworkImage(
                             imageUrl: product.primaryImageUrl!,
                             fit: BoxFit.cover,
+                            alignment: Alignment.topCenter,
                             placeholder: (_, __) => Container(color: fieldFill),
                             errorWidget: (_, __, ___) =>
                                 Container(color: fieldFill),

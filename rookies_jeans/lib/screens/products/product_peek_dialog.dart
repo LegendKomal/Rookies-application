@@ -378,7 +378,7 @@ class ProductPeekDialogState extends State<ProductPeekDialog> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: widget.primary,
                                     foregroundColor: widget.onPrimary,
-                                    shape: const RoundedRectangleBorder(),
+                                    shape: AppShapes.button,
                                     elevation: 0,
                                   ),
                                   child: _isAddingToCart

@@ -232,7 +232,9 @@ class _SearchTabPageState extends State<SearchTabPage> {
   Widget _topBar() {
     return Container(
       color: cardColor,
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      // A little less room on the left than the right, so the arrow and
+      // search bar sit balanced instead of running to the right edge.
+      padding: const EdgeInsets.fromLTRB(0, 8, 16, 8),
       child: Row(
         children: [
           IconButton(

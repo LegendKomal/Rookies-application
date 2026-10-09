@@ -24,8 +24,13 @@ void main() async {
   CartService.instance.initialize();
   RecentlyViewedService.instance.initialize();
 
-  await AuthService.instance.initialize();
-  await ThemeService.instance.initialize();
+  // Show the splash video right away; sign-in (which can hit the network)
+  // and theme loading finish while it plays, and the splash waits for them
+  // before opening home.
+  SplashScreen.startup = Future.wait([
+    AuthService.instance.initialize(),
+    ThemeService.instance.initialize(),
+  ]);
 
   runApp(const MyApp());
 }

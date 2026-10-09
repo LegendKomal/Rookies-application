@@ -127,6 +127,18 @@ class AppFonts {
   static const String rupee    = ShopifyConstants.fontRupee;
 }
 
+/// Corner rounding shared by the app's action buttons (Add to Cart, Buy
+/// Now, Checkout, Save, ...).
+class AppShapes {
+  AppShapes._();
+
+  static const double buttonRadius = 8;
+  static const BorderRadius buttonBorderRadius =
+      BorderRadius.all(Radius.circular(buttonRadius));
+  static const RoundedRectangleBorder button =
+      RoundedRectangleBorder(borderRadius: buttonBorderRadius);
+}
+
 class AppLayout {
   AppLayout._();
 
