@@ -832,7 +832,7 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
       child: SizedBox(
-        height: 34,
+        height: 38,
         child: Row(
           children: [
             for (int i = 0; i < sections.length; i++)
@@ -840,7 +840,7 @@ class _CollectionsShowcasePageState extends State<CollectionsShowcasePage> {
                 child: StickerChip(
                   label: sections[i].title.toUpperCase(),
                   selected: i == selected,
-                  style: StickerChipStyle.mini,
+                  style: StickerChipStyle.small,
                   fadeAnimation: true,
                   onTap: () => _selectSection(i),
                 ),

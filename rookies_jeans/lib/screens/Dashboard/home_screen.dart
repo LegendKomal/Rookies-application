@@ -553,11 +553,16 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_selectedExploreFitInput != null) _selectedExploreFitInput!,
   ];
 
-  Future<void> _fetchExploreProducts() async {
+  /// Loads the first page for the current tab and filters. The previous
+  /// products (and filter rows) stay on screen until the new ones arrive so
+  /// the section keeps its height and the page doesn't jump on every tap.
+  /// [replaceFilters] drops filter rows the new response doesn't have
+  /// (used when switching tabs).
+  Future<void> _fetchExploreProducts({bool replaceFilters = false}) async {
     final int requestId = ++_exploreRequestId;
     setState(() {
       _exploreLoadingFirst = true;
-      _exploreProducts = [];
+      _exploreLoadingMore = false;
       _exploreEndCursor = null;
       _exploreHasMore = true;
     });
@@ -578,6 +583,10 @@ class _HomeScreenState extends State<HomeScreen> {
         _exploreEndCursor = response.endCursor;
         _exploreHasMore = response.hasNextPage;
         _exploreLoadingFirst = false;
+        if (replaceFilters) {
+          _exploreCategoryFilter = null;
+          _exploreFitFilter = null;
+        }
         for (final filter in response.filters) {
           final label = filter.label.trim().toLowerCase();
           if (label == 'category') _exploreCategoryFilter = filter;
@@ -587,7 +596,10 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       debugPrint('Failed to fetch explore products for "$handle": $e');
       if (!mounted || requestId != _exploreRequestId) return;
-      setState(() => _exploreLoadingFirst = false);
+      setState(() {
+        _exploreLoadingFirst = false;
+        _exploreProducts = [];
+      });
     }
   }
 
@@ -628,10 +640,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _exploreTabIndex = index;
       _selectedExploreCategoryInput = null;
       _selectedExploreFitInput = null;
-      _exploreCategoryFilter = null;
-      _exploreFitFilter = null;
     });
-    _fetchExploreProducts();
+    _fetchExploreProducts(replaceFilters: true);
   }
 
   void _selectExploreCategory(ShopifyFilterValue? value) {
@@ -1450,7 +1460,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_exploreLoadingFirst)
+          if (_exploreLoadingFirst && _exploreProducts.isEmpty)
             Padding(
               padding: EdgeInsets.symmetric(vertical: r.dp(32)),
               child: Center(
@@ -1467,19 +1477,28 @@ class _HomeScreenState extends State<HomeScreen> {
           else if (_exploreProducts.isEmpty)
             _empty()
           else
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _exploreProducts.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: r.dp(16),
-                crossAxisSpacing: r.dp(12),
-                childAspectRatio: 0.62,
-              ),
-              itemBuilder: (_, i) => _collectionProductCard(
-                _mapShopifyProduct(_exploreProducts[i]),
-                r,
+            // While a new filter loads, the old products stay (dimmed) so
+            // the grid keeps its height instead of collapsing to a spinner.
+            IgnorePointer(
+              ignoring: _exploreLoadingFirst,
+              child: AnimatedOpacity(
+                opacity: _exploreLoadingFirst ? 0.4 : 1,
+                duration: const Duration(milliseconds: 150),
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _exploreProducts.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: r.dp(16),
+                    crossAxisSpacing: r.dp(12),
+                    childAspectRatio: 0.62,
+                  ),
+                  itemBuilder: (_, i) => _collectionProductCard(
+                    _mapShopifyProduct(_exploreProducts[i]),
+                    r,
+                  ),
+                ),
               ),
             ),
           if (_exploreLoadingMore)
