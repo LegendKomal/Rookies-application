@@ -408,25 +408,26 @@ function assertNoUserErrors(errors, context) {
 // Search values are quoted so "+" and "@" aren't parsed as query syntax.
 const quoted = (value) => `"${value.replace(/["\\]/g, '')}"`;
 
-async function findCustomerByPhone(phone, env) {
+// Shopify's search is fuzzy (a phone search also hits customers who only have
+// that number on an address, and may rank them first), so fetch several
+// results and only trust an exact match.
+async function searchCustomers(q, env) {
   const data = await adminGraphql(
-    `query ($q: String!) { customers(first: 1, query: $q) { nodes { ${CUSTOMER_FIELDS} } } }`,
-    { q: `phone:${quoted(phone)}` },
+    `query ($q: String!) { customers(first: 25, query: $q) { nodes { ${CUSTOMER_FIELDS} } } }`,
+    { q },
     env,
   );
-  const customer = data.customers.nodes[0] || null;
-  // Shopify's search is fuzzy; only trust an exact match.
-  return customer && customer.phone === phone ? customer : null;
+  return data.customers.nodes;
+}
+
+async function findCustomerByPhone(phone, env) {
+  const customers = await searchCustomers(`phone:${quoted(phone)}`, env);
+  return customers.find((c) => c.phone === phone) || null;
 }
 
 async function findCustomerByEmail(email, env) {
-  const data = await adminGraphql(
-    `query ($q: String!) { customers(first: 1, query: $q) { nodes { ${CUSTOMER_FIELDS} } } }`,
-    { q: `email:${quoted(email)}` },
-    env,
-  );
-  const customer = data.customers.nodes[0] || null;
-  return customer && customer.email?.toLowerCase() === email ? customer : null;
+  const customers = await searchCustomers(`email:${quoted(email)}`, env);
+  return customers.find((c) => c.email?.toLowerCase() === email) || null;
 }
 
 async function createCustomer(input, env) {
