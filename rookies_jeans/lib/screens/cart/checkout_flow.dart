@@ -48,8 +48,9 @@ Future<bool> runCheckoutFlow(
   }
 
   // Checkout runs through GoKwik; Shopify's native checkoutUrl is not
-  // used (its payment providers are disabled).
-  final result = await navigator.push<bool>(
+  // used (its payment providers are disabled). Pushed on the root navigator
+  // so it covers the bottom nav bar instead of opening inside the cart tab.
+  final result = await Navigator.of(context, rootNavigator: true).push<bool>(
     MaterialPageRoute(
       builder: (_) => CheckoutWebView(lines: lines),
       fullscreenDialog: true,
