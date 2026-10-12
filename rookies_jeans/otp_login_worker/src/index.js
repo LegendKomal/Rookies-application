@@ -8,8 +8,8 @@
 // email/password login returns, so orders, addresses and checkout work
 // unchanged).
 //
-//   POST /login     {phone, accessToken}
-//       -> {status: "signed_in", accessToken, expiresAt}
+//   POST /login     {phone, accessToken} | {phone, reviewOtp} (demo account)
+//       ->{status: "signed_in", accessToken, expiresAt}
 //        | {status: "profile_required", verificationToken, firstName, lastName}
 //   POST /complete  {verificationToken, email, firstName, lastName}
 //       -> {status: "signed_in", accessToken, expiresAt}
@@ -95,17 +95,24 @@ async function health(env) {
 
 async function login(body, env) {
   const claimed = normalizePhone(body?.phone);
-  if (!claimed || typeof body?.accessToken !== 'string') {
-    return json({ error: 'Invalid request.' }, 400);
-  }
+  if (!claimed) return json({ error: 'Invalid request.' }, 400);
 
-  const verified = await verifyMsg91Token(body.accessToken, env);
-  if (!verified.ok) return json({ error: verified.error }, 401);
+  if (typeof body?.reviewOtp === 'string') {
+    // App Store / Play review demo account: no SMS, a fixed OTP instead.
+    if (!(await isReviewLogin(claimed, body.reviewOtp, env))) {
+      return json({ error: 'Incorrect OTP. Please try again.' }, 401);
+    }
+  } else {
+    if (typeof body?.accessToken !== 'string') return json({ error: 'Invalid request.' }, 400);
 
-  // The phone is only trusted as MSG91 reports it; the app's copy just has to agree.
-  if (verified.phone !== claimed) {
-    console.error(`Phone mismatch: app sent ${claimed}, MSG91 verified ${verified.phone}`);
-    return json({ error: 'Verification did not match this number. Please try again.' }, 401);
+    const verified = await verifyMsg91Token(body.accessToken, env);
+    if (!verified.ok) return json({ error: verified.error }, 401);
+
+    // The phone is only trusted as MSG91 reports it; the app's copy just has to agree.
+    if (verified.phone !== claimed) {
+      console.error(`Phone mismatch: app sent ${claimed}, MSG91 verified ${verified.phone}`);
+      return json({ error: 'Verification did not match this number. Please try again.' }, 401);
+    }
   }
 
   const customer = await findCustomerByPhone(claimed, env);
@@ -221,6 +228,19 @@ async function verifyMsg91Token(accessToken, env) {
     return { ok: false, error: 'Could not confirm your number. Please try again.' };
   }
   return { ok: true, phone };
+}
+
+// Reviewers can't receive an Indian SMS, so REVIEW_PHONE signs in with
+// REVIEW_OTP instead. Both are deployment secrets; with either unset the
+// demo login is off. Compared as HMACs so the check takes constant time.
+async function isReviewLogin(phone, otp, env) {
+  if (!env.REVIEW_PHONE || !env.REVIEW_OTP) return false;
+  if (phone !== normalizePhone(env.REVIEW_PHONE)) return false;
+  const [given, expected] = await Promise.all([
+    hmac(env.SESSION_SECRET, `review-otp:${otp.trim()}`),
+    hmac(env.SESSION_SECRET, `review-otp:${env.REVIEW_OTP}`),
+  ]);
+  return given.every((b, i) => b === expected[i]);
 }
 
 // MSG91 doesn't document this response's shape, so look in the places it has

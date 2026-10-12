@@ -61,9 +61,15 @@ class OtpAuthService {
   /// "+919876543210" -> "919876543210" (MSG91 wants no "+").
   String _msg91Identifier(String phone) => phone.replaceAll(RegExp(r'\D'), '');
 
+  bool _isReviewPhone(String phone) => phone == ShopifyConstants.reviewPhone;
+
   /// Returns null on success, otherwise a user-facing error message.
   Future<String?> sendOtp(String phone) async {
     _reqId = null;
+    if (_isReviewPhone(phone)) {
+      _reqId = 'review';
+      return null;
+    }
     final res = await _msg91('sendOtp', {
       'identifier': _msg91Identifier(phone),
     });
@@ -76,7 +82,7 @@ class OtpAuthService {
 
   /// [channel] is 'text' (SMS) or 'whatsapp'.
   Future<String?> resendOtp(String phone, {String channel = 'text'}) async {
-    if (_reqId == null) return sendOtp(phone);
+    if (_reqId == null || _isReviewPhone(phone)) return sendOtp(phone);
     final res = await _msg91('retryOtp', {
       'reqId': _reqId,
       'retryChannel': channel == 'whatsapp' ? _channelWhatsApp : _channelSms,
@@ -92,16 +98,22 @@ class OtpAuthService {
       return const OtpVerifyResult(error: 'Please request an OTP first.');
     }
 
-    final verified = await _msg91('verifyOtp', {'reqId': _reqId, 'otp': otp});
-    if (verified.error != null) return OtpVerifyResult(error: verified.error);
+    final Map<String, dynamic> proof;
+    if (_isReviewPhone(phone)) {
+      proof = {'reviewOtp': otp};
+    } else {
+      final verified = await _msg91('verifyOtp', {'reqId': _reqId, 'otp': otp});
+      if (verified.error != null) return OtpVerifyResult(error: verified.error);
 
-    final msg91Token = verified.body['message']?.toString() ??
-        verified.body['access-token']?.toString();
-    if (msg91Token == null || msg91Token.isEmpty) {
-      return const OtpVerifyResult(error: 'Invalid response from OTP service.');
+      final msg91Token = verified.body['message']?.toString() ??
+          verified.body['access-token']?.toString();
+      if (msg91Token == null || msg91Token.isEmpty) {
+        return const OtpVerifyResult(error: 'Invalid response from OTP service.');
+      }
+      proof = {'accessToken': msg91Token};
     }
 
-    final res = await _worker('/login', {'phone': phone, 'accessToken': msg91Token});
+    final res = await _worker('/login', {'phone': phone, ...proof});
     if (res.error != null) return OtpVerifyResult(error: res.error);
 
     _reqId = null;

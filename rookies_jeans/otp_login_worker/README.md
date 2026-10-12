@@ -57,6 +57,11 @@ The same code runs on **Vercel** (`api/[action].js`) or **Cloudflare Workers**
 | `SHOPIFY_STOREFRONT_TOKEN` | the same Storefront token the app uses |
 | `SESSION_SECRET` | any long random string (e.g. `openssl rand -hex 32`) |
 
+Optional, for App Store / Google Play review: `REVIEW_PHONE` (`+919999999999`,
+must match `reviewPhone` in `lib/constant/shopify_constants.dart`) and
+`REVIEW_OTP` (a 6-digit code you choose). That number then signs in with that
+code and no SMS is sent. Leave either unset to switch the demo login off.
+
 Optional, Shopify Plus only: `SHOPIFY_MULTIPASS_SECRET` (Settings → Customer
 accounts → Multipass). See below.
 
