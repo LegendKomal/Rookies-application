@@ -30,7 +30,7 @@ class ShopifyConstants {
 
   /// App Store / Play review demo number: no SMS is sent, the OTP is checked
   /// by the worker against its REVIEW_OTP secret (must match REVIEW_PHONE).
-  static const String reviewPhone = '+919999999999';
+  static const String reviewPhone = '+916123450987';
 
   static const String storeUrl      ='https://rookiesjeans.com';
   static const String shiprocketUrl  = 'https://rookiesjeans.shiprocket.co/';
