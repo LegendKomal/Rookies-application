@@ -15,6 +15,12 @@ class ShopifyConstants {
         'X-Shopify-Storefront-Access-Token': storefrontAccessToken,
       };
 
+  /// Sent with Shopify CDN image requests: the CDN then serves WebP, which is
+  /// ~40% smaller than the uploaded JPEG for the home banners.
+  static const Map<String, String> imageHeaders = {
+    'Accept': 'image/webp,image/*',
+  };
+
   /// The website's existing MSG91 "OTPLOGIN" widget (Mobile Integration OFF),
   /// shared with the app — the app calls the same web widget endpoints the
   /// site's script does, so nothing on MSG91 or the website changes. Both

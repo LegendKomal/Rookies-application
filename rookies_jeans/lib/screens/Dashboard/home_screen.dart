@@ -79,6 +79,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int _exploreTabIndex = 0;
   ShopifyFilter? _exploreCategoryFilter;
   ShopifyFilter? _exploreFitFilter;
+  // Fits available in the current category, captured while no fit is
+  // selected. Once a fit is picked Shopify's counts drop the other fits to
+  // zero, so the row keeps showing this list instead.
+  List<ShopifyFilterValue> _exploreFitOptions = const [];
   String? _selectedExploreCategoryInput;
   String? _selectedExploreFitInput;
   int _exploreRequestId = 0;
@@ -515,6 +519,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _selectedExploreFitInput = null;
         _exploreCategoryFilter = null;
         _exploreFitFilter = null;
+        _exploreFitOptions = const [];
       } else {
         _exploreTabIndex = keptIndex;
       }
@@ -568,6 +573,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     final String handle = _exploreTabDefs[_exploreTabIndex].handle;
+    final bool fitSelected = _selectedExploreFitInput != null;
 
     try {
       final response = await ShopifyStorefrontService.instance
@@ -586,11 +592,19 @@ class _HomeScreenState extends State<HomeScreen> {
         if (replaceFilters) {
           _exploreCategoryFilter = null;
           _exploreFitFilter = null;
+          _exploreFitOptions = const [];
         }
         for (final filter in response.filters) {
           final label = filter.label.trim().toLowerCase();
           if (label == 'category') _exploreCategoryFilter = filter;
           if (label == 'fit') _exploreFitFilter = filter;
+        }
+        // Counts here reflect only the category, so this is the full set of
+        // fits for it. With a fit applied, keep the list from before.
+        if (!fitSelected) {
+          _exploreFitOptions = (_exploreFitFilter?.values ?? const [])
+              .where((v) => v.count > 0)
+              .toList();
         }
       });
     } catch (e) {
@@ -646,7 +660,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _selectExploreCategory(ShopifyFilterValue? value) {
     if (_selectedExploreCategoryInput == value?.input) return;
-    setState(() => _selectedExploreCategoryInput = value?.input);
+    // A new category starts fresh: drop the fit selection so the grid shows
+    // every product in that category.
+    setState(() {
+      _selectedExploreCategoryInput = value?.input;
+      _selectedExploreFitInput = null;
+    });
     _fetchExploreProducts();
   }
 
@@ -929,7 +948,7 @@ class _HomeScreenState extends State<HomeScreen> {
           'assets/banner.jpeg',
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) =>
-              Container(color: const Color(0xFF6B7A5E)),
+              const ColoredBox(color: Colors.black),
         ),
         ...scrims,
       ],
@@ -1384,7 +1403,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _exploreTabsRow(r),
           SizedBox(height: r.dp(6)),
           _exploreCategoryChipsRow(r),
-          if ((_exploreFitFilter?.values.isNotEmpty ?? false)) ...[
+          if (_visibleExploreFitValues.isNotEmpty) ...[
             SizedBox(height: r.dp(6)),
             _exploreFitChipsRow(r),
           ],
@@ -1434,8 +1453,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Fit values that have products under the current category. The list is
+  /// captured before any fit is picked, so selecting one never hides the
+  /// others.
+  List<ShopifyFilterValue> get _visibleExploreFitValues => _exploreFitOptions;
+
   Widget _exploreFitChipsRow(R r) {
-    final values = _exploreFitFilter?.values ?? const [];
+    final values = _visibleExploreFitValues;
     return GlassFilterPill(
       caption: 'FIT & FABRIC',
       options: [
@@ -1664,10 +1688,12 @@ class _HeroBannerPagerState extends State<_HeroBannerPager> {
           },
           itemBuilder: (_, i) => CachedNetworkImage(
             imageUrl: widget.imageUrls[(i - _loopStart) % count],
+            httpHeaders: ShopifyConstants.imageHeaders,
+            fadeInDuration: const Duration(milliseconds: 150),
             fit: BoxFit.cover,
-            placeholder: (_, __) => Container(color: const Color(0xFF6B7A5E)),
+            placeholder: (_, __) => const ColoredBox(color: Colors.black),
             errorWidget: (_, __, ___) =>
-                Container(color: const Color(0xFF6B7A5E)),
+                const ColoredBox(color: Colors.black),
           ),
         ),
         ...widget.overlays,
@@ -2270,7 +2296,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1400), 
     )..repeat();
   }
 

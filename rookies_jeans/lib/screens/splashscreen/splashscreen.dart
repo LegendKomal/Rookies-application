@@ -51,7 +51,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   void _onVideoTick() {
     final value = _controller.value;
-    if (value.hasError) {
+    if (value.  hasError) {
       _goHome();
       return;
     }

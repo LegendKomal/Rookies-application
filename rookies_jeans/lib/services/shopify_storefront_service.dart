@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:rookies_jeans/constant/shopify_api.dart';
 import 'package:rookies_jeans/constant/shopify_constants.dart';
 import 'package:rookies_jeans/models/product_detail_model.dart';
@@ -87,19 +88,44 @@ class ShopifyStorefrontService {
     }
   }
 
+  /// Warms the cache with what HomeScreen loads on open, so it can run while
+  /// the splash video plays. Must stay in step with HomeScreen._fetchAll and
+  /// _fetchExploreProducts (same calls, same arguments) or the cache misses.
   Future<void> prefetchHomeData() async {
+    // Home first loads the default (Hot Deals) grid, then switches to the
+    // first configured tab if Hot Deals isn't one of them.
+    final explore = getExploreTabs().then((tabs) {
+      final handles = {
+        ShopifyConstants.hotDealsHandle,
+        if (tabs.isNotEmpty) tabs.first.collectionHandle,
+      };
+      return Future.wait(
+        handles.map((h) => getProductsByCollectionPaginated(h, first: 20)),
+      );
+    });
+    // The hero banner is the first thing on screen; download its images too,
+    // into the same disk cache CachedNetworkImage reads from.
+    final banners = getHomeBanners().then(
+      (list) => Future.wait([
+        for (final b in list)
+          if (b.imageUrl != null)
+            DefaultCacheManager()
+                .getSingleFile(
+                  b.imageUrl!,
+                  headers: ShopifyConstants.imageHeaders,
+                )
+                .then((_) {}, onError: (_) {}),
+      ]),
+    );
     await Future.wait([
-      getHomeBanners(),
-      getHotDeals(),
-      getOversizedShirts(),
-      getBalloonBanner(),
-      getLatestDropCollections(),
-      getOurCollectionTiles(),
+      banners,
       getExploreCategoriesContent(),
       getPromoBlocks(),
       getShopTheLookEntries(),
       getOccasionTilesContent(),
-      getInstagramPostsContent(),
+      getFeatureBanners(),
+      getPriceTiles(),
+      explore,
     ]);
   }
 

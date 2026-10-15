@@ -222,11 +222,31 @@ class GlassFilterPill extends StatelessWidget {
                       fontWeight: option.selected
                           ? FontWeight.w700
                           : FontWeight.w400,
+                      // RobotoMono is a variable font, so the weight has to
+                      // be set on its wght axis to actually render bold.
+                      fontVariations: [
+                        FontVariation('wght', option.selected ? 700 : 400),
+                      ],
                       letterSpacing: 1.2,
                       height: 1,
                       color: option.selected
                           ? SlantChip.accent
                           : ink.withOpacity(0.7),
+                      // Thin same-colour shadows either side thicken the
+                      // strokes so the selection reads as bold even where
+                      // the wght axis renders lighter than expected.
+                      shadows: option.selected
+                          ? const [
+                              Shadow(
+                                color: SlantChip.accent,
+                                offset: Offset(0.4, 0),
+                              ),
+                              Shadow(
+                                color: SlantChip.accent,
+                                offset: Offset(-0.4, 0),
+                              ),
+                            ]
+                          : const [],
                     ),
                     child: Text(option.label, maxLines: 1),
                   ),

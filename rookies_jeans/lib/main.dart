@@ -17,6 +17,7 @@ import 'package:rookies_jeans/screens/search/search_tab_page.dart';
 import 'package:rookies_jeans/screens/splashscreen/splashscreen.dart';
 import 'package:rookies_jeans/services/cart_service.dart';
 import 'package:rookies_jeans/services/recently_viewed_service.dart';
+import 'package:rookies_jeans/services/shopify_storefront_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +32,12 @@ void main() async {
     AuthService.instance.initialize(),
     ThemeService.instance.initialize(),
   ]);
+
+  // Load home's content while the splash plays; HomeScreen picks it up from
+  // the service cache. Failures are ignored here — home retries on its own.
+  ShopifyStorefrontService.instance.prefetchHomeData().catchError((Object e) {
+    debugPrint('Home prefetch failed: $e');
+  });
 
   runApp(const MyApp());
 }

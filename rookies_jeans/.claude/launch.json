@@ -2,15 +2,40 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "care-parcel",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "C:/Users/Finesse Fashions/Desktop/care-parcel",
+        "run",
+        "dev"
+      ],
+      "port": 8790
+    },
+    {
       "name": "flutter-web-static",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "serve", "-l", "8766", "build/web"],
+      "runtimeArgs": [
+        "--yes",
+        "serve",
+        "-l",
+        "8766",
+        "build/web"
+      ],
       "port": 8766
     },
     {
       "name": "flutter-web-dev",
       "runtimeExecutable": "flutter",
-      "runtimeArgs": ["run", "-d", "web-server", "--web-port", "8767", "--web-hostname", "0.0.0.0"],
+      "runtimeArgs": [
+        "run",
+        "-d",
+        "web-server",
+        "--web-port",
+        "8767",
+        "--web-hostname",
+        "0.0.0.0"
+      ],
       "port": 8767
     }
   ]
