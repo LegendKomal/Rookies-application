@@ -656,14 +656,17 @@ debugPrint('==========================================');
 
   Widget _backButton() => Positioned(
         top: _overlayTop,
-        left: 12,
+        left: 4,
         child: GestureDetector(
+          // Opaque so taps anywhere in the box hit the button instead of
+          // falling through to the image viewer underneath.
+          behavior: HitTestBehavior.opaque,
           onTap: () => Navigator.maybePop(context),
           child: SizedBox(
-            width: 34,
-            height: 34,
+            width: 48,
+            height: 48,
             child: Icon(Icons.arrow_back_ios_new_rounded,
-                size: 16, color: primary),
+                size: 22, color: primary),
           ),
         ),
       );
@@ -672,6 +675,7 @@ debugPrint('==========================================');
         top: _overlayTop + 8,
         right: 12,
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: _toggleWishlist,
           child: SizedBox(
             width: 38,
@@ -703,6 +707,7 @@ debugPrint('==========================================');
         top: _overlayTop + 50,
         right: 12,
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: _shareProduct,
           child: SizedBox(
             width: 38,
